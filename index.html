@@ -73,7 +73,7 @@ table.sum .re{font-size:14px;color:var(--sub)}
 // 直しページ（M209・決定ログ 10/19 未明、10/19 夜 パパ）。
 // 流れ: 1回目○→正解と解説／×→答えを言わない手がかり→解き直し→○なら正解と解説、
 //       ×ならその答えへのコメントと「鍵の問い」（1つ手前の途中の値・取り違えの相手など）→鍵に正解したら正解と解説。
-//       鍵の無い推論の問はもう1回だけ（計算は除く）。知識の問（見る場所を開いて調べて書く）と計算は、正解するまで解き直し。先へは進める（開かない問は表で「まだ」）。
+//       鍵の無い推論の問はもう1回だけ、鍵は2回まで（計算は除く）。知識の問（見る場所を開いて調べて書く）と計算は、正解するまで解き直し。先へは進める（開かない問は表で「まだ」）。
 // 正解はページに持たない。判定はサーバ（GAS か preview.py）が返す。
 // サーバとの話し方は2通り: GAS が配ったときは google.script.run、それ以外（見本・将来のミニアプリ）は fetch。
 
@@ -173,7 +173,7 @@ function step() {
     }));
 }
 
-// 鍵の無い推論の問は、2回目の×のあと1回だけ（10/21 パパ: 演問 5B08 で比の1桁を6回当てにいった）。
+// 鍵の無い推論の問は、2回目の×のあと1回だけ。鍵の問いも2回まで（10/21 パパ: 演問 5B08 で比の1桁を6回当てにいった）。
 // 計算は数が大きく当てにならないので、今までどおり正解するまで。回数は端末に覚える（開き直しで戻らない）
 const capped = q => q.kind !== "知識" && !/^計算/.test(S.title || "");
 const triesKey = q => `naoshi:${SID}:${q.id}`;
@@ -187,7 +187,8 @@ function closed(q) {
 // 2回目が×のあと。鍵の問い（無ければ、もう一度解く。推論は1回まで）
 function gate(q, key) {
   const k = key || { none: true };
-  if (k.none && capped(q) && triesUsed(q) >= 1) return closed(q);
+  const limit = k.none ? 1 : 2;
+  if (capped(q) && triesUsed(q) >= limit) return closed(q);
   const lead = k.none
     ? `<div class="box hint"><div class="h">もう一度</div>${q.kind === "知識" ? "見る場所をもう一度開いて、書き直そう。" : "手がかりにもどって、もう一度解こう。"}${q.hint && q.kind !== "知識" ? `<div class="small">${esc(q.hint)}</div>` : ""}${look(q)}</div>`
     : `<div class="box hint"><div class="h">🔑 鍵の問い（答えると正解と解説が開く）</div>${esc(k.q)}${k.look ? `<div class="look">👀 見る: ${esc(k.look)}</div>` : ""}</div>`;
@@ -197,7 +198,10 @@ function gate(q, key) {
     call(k.none ? "answer" : "key", { s: SID, id: q.id, answer: val, conf: "" }).then(r => {
       if (r.error) throw new Error(r.error);
       if (r.open) { clearWork(); mark(k.none ? "もう一度: " : "鍵: ", val, true); return opened(r); }
-      if (k.none && capped(q)) { useTry(q); clearWork(); mark("もう一度: ", val, false); return closed(q); }
+      if (capped(q)) {
+        useTry(q);
+        if (triesUsed(q) >= limit) { clearWork(); mark(k.none ? "もう一度: " : "鍵: ", val, false); return closed(q); }
+      }
       const msg = document.getElementById("again");
       msg.textContent = `「${val}」はちがう。もう一度。`;
       if (r.comment) msg.textContent += " " + r.comment;
