@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>直し</title>
+<link rel="icon" href="data:,">
+<style>
+/* 見分けドリル（apps/miwake/index.html）と同じ色・字の大きさ。スマホ幅を先に作る */
+:root{
+  --bg:#f6f5f1; --card:#fff; --ink:#1f2328; --sub:#6b6f76; --line:#d9d6cf;
+  --ok:#1f7a4d; --okbg:#e3f3ea; --ng:#b3261e; --ngbg:#fbe7e5; --sel:#2b5cb8; --selbg:#e6eefc;
+  --hint:#7a5a00; --hintbg:#fff6d6;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;font-size:18px;line-height:1.6}
+#app{max-width:760px;margin:0 auto;padding:16px}
+.bar{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:4px 2px 10px;border-bottom:1px solid var(--line);margin-bottom:14px}
+.bar h1{font-size:18px;margin:0}
+.bar .cnt{font-size:16px;color:var(--sub);white-space:nowrap}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:12px}
+.row{display:flex;gap:10px;align-items:baseline;padding:10px 0;border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:0}
+.mk{font-weight:800;width:1.4em;text-align:center}
+.mk.ok{color:var(--ok)} .mk.ng{color:var(--ng)}
+.row .n{color:var(--sub);min-width:3.2em}
+.row .a{flex:1}
+.row details{margin-top:4px;font-size:16px;color:var(--sub)}
+.tag{font-size:13px;color:var(--sub)}
+.q{font-size:20px;font-weight:600;margin:4px 0 12px}
+.img{display:block;max-width:100%;max-height:340px;margin:8px auto 12px;border:1px solid var(--line);border-radius:6px}
+.imgslot{border:2px dashed var(--line);border-radius:8px;padding:18px;text-align:center;color:var(--sub);font-size:15px;margin:8px 0 12px}
+.mine{font-size:17px}
+.mine b{color:var(--ng)}
+.box{border-radius:10px;padding:12px 14px;margin:12px 0}
+.box.hint{background:var(--hintbg)}
+.box.hint{white-space:pre-line}
+.box.hint .h{font-weight:700;color:var(--hint);font-size:15px}
+.look{font-size:16px;margin-top:8px}
+.box.ok{background:var(--okbg)}
+.box.ng{background:var(--ngbg)}
+.box .big{font-size:24px;font-weight:800}
+.box.ok .big{color:var(--ok)} .box.ng .big{color:var(--ng)}
+.yoshiri{font-size:15px;color:var(--sub);margin-top:6px}
+.choices{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:8px;margin:8px 0}
+.opt{font:inherit;font-size:20px;padding:12px 6px;border:2px solid var(--line);border-radius:10px;background:#fff;cursor:pointer;color:var(--ink)}
+.opt.sel{border-color:var(--sel);background:var(--selbg)}
+input.txt{font:inherit;font-size:22px;width:100%;padding:10px 12px;border:2px solid var(--sel);border-radius:10px}
+.commit{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+button.go{font:inherit;padding:14px 10px;border-radius:10px;cursor:pointer;font-size:18px}
+.c-sure{background:var(--ink);color:#fff;border:2px solid var(--ink);font-weight:700}
+.c-unsure{background:#fff;color:#8a8f98;border:2px solid #c9c6bf}
+button.go:disabled{opacity:.35;cursor:default}
+.next{display:block;width:100%;margin-top:14px;font:inherit;padding:14px;border-radius:10px;border:2px solid var(--ink);background:#fff;cursor:pointer;font-size:18px}
+.small{font-size:14px;color:var(--sub)}
+.vs{font-size:18px;margin-bottom:6px}
+.vs b.ng{color:var(--ng)} .vs b.ok{color:var(--ok)}
+.cmt{margin:6px 0 8px;font-weight:600}
+table.sum{width:100%;border-collapse:collapse;font-size:16px}
+table.sum th,table.sum td{padding:8px 4px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+table.sum th{font-size:13px;color:var(--sub);font-weight:600;white-space:nowrap}
+table.sum td.m{font-weight:800;text-align:center;width:2em}
+table.sum td.m.ok{color:var(--ok)} table.sum td.m.ng{color:var(--ng)}
+table.sum .re{font-size:14px;color:var(--sub)}
+.err{color:var(--ng)}
+.note{margin-top:6px;padding:8px 10px;border-radius:8px;background:var(--hintbg);font-size:16px}
+.note b{color:var(--hint)}
+</style>
+</head>
+<body>
+<div id="app"><p class="small">読みこみ中…</p></div>
+<script>
+// 直しページ（M209・決定ログ 10/19 未明、10/19 夜 パパ）。
+// 流れ: 1回目○→正解と解説／×→答えを言わない手がかり→解き直し→○なら正解と解説、
+//       ×ならその答えへのコメントと「鍵の問い」（1つ手前の途中の値・取り違えの相手など）→鍵に正解したら正解と解説。
+//       鍵の無い問と知識の問（見る場所を開いて調べて書く）は、正解するまで解き直し。先へは進める（開かない問は表で「まだ」）。
+// 正解はページに持たない。判定はサーバ（GAS か preview.py）が返す。
+// サーバとの話し方は2通り: GAS が配ったときは google.script.run、それ以外（見本・将来のミニアプリ）は fetch。
+
+const params = new URLSearchParams(location.search);
+const SID = window.NAOSHI_SID || params.get("s") || "";   // GAS が配ったときは Naoshi.gs が差し込む
+// fetch のときの宛先。GitHub Pages に置いたときは URL の d（GAS のデプロイ ID）から exec を組む（2026-10-21:
+// script.google.com は13歳未満の Google アカウントでログインしたブラウザだとはじかれるので、ページは外に置く）
+const DEPLOY = params.get("d") || "";
+const API = window.NAOSHI_API || (DEPLOY ? `https://script.google.com/macros/s/${encodeURIComponent(DEPLOY)}/exec` : "api");
+
+function call(op, args) {
+  if (window.google && google.script && google.script.run) {
+    return new Promise((ok, ng) =>
+      google.script.run.withSuccessHandler(ok).withFailureHandler(ng).naoshiApi(op, args));
+  }
+  return fetch(API, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },   // 単純リクエスト（GAS でも CORS の事前確認が要らない）
+    credentials: "omit",   // Google のログインを乗せない（乗ると子どものアカウントではじかれる）
+    body: JSON.stringify({ app: "naoshi", op, args }),
+  }).then(r => r.json());
+}
+
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const $app = document.getElementById("app");
+let S;          // セッション（問題の一覧。正解は○と開いた問だけ）
+let todo = [];  // 直す問題の順番
+let cur = 0;
+
+function img(q) {
+  if (q.image) return `<img class="img" src="${esc(q.image)}" alt="${esc(q.imageAlt || "")}">`;
+  if (q.imageNote) return `<div class="imgslot">${esc(q.imageNote)}</div>`;
+  return "";
+}
+const yoshiri = q => q.yoshiri ? `<div class="yoshiri">📖 ${esc(q.yoshiri)}</div>` : "";
+const look = q => q.look ? `<div class="look">👀 見る: ${esc(q.look)}</div>` : "";
+const mineAns = q => q.first.answer ? esc(q.first.answer) : "（空欄）";
+const bar = right => `<div class="bar"><h1>${esc(S.title)}</h1><span class="cnt">${right}</span></div>`;
+
+// ---------------------------------------------------------------- 一覧
+function list() {
+  const ng = S.items.filter(q => !q.first.ok);
+  todo = ng.filter(q => q.state !== "open");
+  const rows = S.items.map(q => {
+    const open = q.first.ok || q.state === "open";
+    const tail = q.first.ok ? "　正解" : open ? `　→ 正解 ${esc(q.answer)}` : "　→ 直す";
+    return `
+    <div class="row">
+      <span class="mk ${q.first.ok ? "ok" : "ng"}">${q.first.ok ? "○" : "×"}</span>
+      <span class="n">${esc(q.no)}</span>
+      <span class="a">てみ回答: ${mineAns(q)}${tail}
+        ${q.first.ok && q.note ? `<div class="note"><b>ひとこと</b>　${esc(q.note)}</div>` : ""}
+        ${open && q.explain ? `<details><summary>解説</summary>${esc(q.explain)}${yoshiri(q)}</details>` : ""}
+      </span>
+    </div>`;
+  }).join("");
+  $app.innerHTML = `
+    ${bar(`○${S.items.length - ng.length}　×${ng.length}`)}
+    <div class="card">${rows}</div>
+    ${todo.length ? `<button class="next" id="start">直しを始める（${todo.length}問）</button>`
+                  : `<p>${ng.length ? "直しは全部おわり。" : "全部○。"}解説は上でひらける。</p>`}
+    <button class="next" id="end">結果の表へ</button>`;
+  const b = document.getElementById("start");
+  if (b) b.onclick = () => { cur = 0; step(); };
+  document.getElementById("end").onclick = done;
+}
+
+// ---------------------------------------------------------------- 1問ずつ
+function step() {
+  if (cur >= todo.length) return done();
+  const q = todo[cur];
+  $app.innerHTML = `
+    ${bar(`直し ${cur + 1}/${todo.length}`)}
+    <div class="card" id="card">
+      <div class="tag">${esc(q.no)}</div>
+      <div class="q">${esc(q.text)}</div>
+      ${img(q)}
+      <div class="mine">てみ回答: <b>${mineAns(q)}</b>　${q.first.unread ? "読めなかった" : "不正解"}</div>
+      <div id="work"></div>
+    </div>
+    <button class="next" id="next" style="display:none">${cur + 1 < todo.length ? "次の問題へ" : "おわり"}</button>`;
+  document.getElementById("next").onclick = () => { cur++; step(); };
+  if (q.state === "tried") return gate(q, q.key);   // 前に2回目まで答えた問は鍵から
+  const lead = q.kind === "知識"
+    ? `<div class="box hint"><div class="h">調べて書こう</div>覚える問題。見る場所を開いて、正しい答えを書こう。${look(q)}${yoshiri(q)}</div>`
+    : `<div class="box hint"><div class="h">考える手がかり</div>${esc(q.hint)}${look(q)}${yoshiri(q)}</div>
+       <div class="small">見る場所を開いて確かめてから答えてもいい。</div>`;
+  form(lead, q.type, q.options, true, (val, conf) =>
+    call("answer", { s: SID, id: q.id, answer: val, conf }).then(r => {
+      if (r.error) throw new Error(r.error);
+      clearWork();
+      mark(`2回目: `, val, r.open);
+      if (r.open) return opened(r);
+      if (r.comment) addWork(`<div class="box ng"><div class="cmt">${esc(r.comment)}</div></div>`);
+      showNext();
+      gate(q, r.key);
+    }));
+}
+
+// 2回目が×のあと。鍵の問い（無ければ、正解するまでもう一度解く）
+function gate(q, key) {
+  const k = key || { none: true };
+  const lead = k.none
+    ? `<div class="box hint"><div class="h">もう一度</div>${q.kind === "知識" ? "見る場所をもう一度開いて、書き直そう。" : "手がかりにもどって、もう一度解こう。"}${q.hint && q.kind !== "知識" ? `<div class="small">${esc(q.hint)}</div>` : ""}${look(q)}</div>`
+    : `<div class="box hint"><div class="h">🔑 鍵の問い（答えると正解と解説が開く）</div>${esc(k.q)}${k.look ? `<div class="look">👀 見る: ${esc(k.look)}</div>` : ""}</div>`;
+  const type = k.none ? q.type : k.type, options = k.none ? q.options : k.options;
+  showNext();
+  form(lead, type, options, false, val =>
+    call(k.none ? "answer" : "key", { s: SID, id: q.id, answer: val, conf: "" }).then(r => {
+      if (r.error) throw new Error(r.error);
+      if (r.open) { clearWork(); mark(k.none ? "もう一度: " : "鍵: ", val, true); return opened(r); }
+      const msg = document.getElementById("again");
+      msg.textContent = `「${val}」はちがう。もう一度。`;
+      if (r.comment) msg.textContent += " " + r.comment;
+      resetForm();
+    }));
+}
+
+// 入力欄と決定ボタン。conf=true なら「自信あり／なし」の2つ
+function form(lead, type, options, conf, submit) {
+  const input = type === "choice"
+    ? `<div class="choices">${(options || []).map(o => `<button class="opt" data-v="${esc(o)}">${esc(o)}</button>`).join("")}</div>`
+    : `<input class="txt" id="ans" autocomplete="off" autocapitalize="off" placeholder="${type === "number" ? "答え（例 3/4・1と5/7・2.5）" : "答え"}">`;
+  const btns = conf
+    ? `<div class="commit"><button class="go c-sure" data-c="あり" disabled>自信あり で決定</button>
+       <button class="go c-unsure" data-c="なし" disabled>自信なし で決定</button></div>`
+    : `<div class="commit" style="grid-template-columns:1fr"><button class="go c-sure" data-c="" disabled>決定</button></div>`;
+  addWork(`<div id="form">${lead}${input}<div class="small err" id="again"></div>${btns}</div>`);
+  let val = "";
+  const go = [...document.querySelectorAll("#form .go")];
+  const set = v => { val = v; go.forEach(b => b.disabled = !String(v).trim()); };
+  document.querySelectorAll("#form .opt").forEach(b => b.onclick = () => {
+    document.querySelectorAll("#form .opt").forEach(x => x.classList.remove("sel"));
+    b.classList.add("sel"); set(b.dataset.v);
+  });
+  const t = document.getElementById("ans");
+  if (t) { t.oninput = () => set(t.value); t.focus(); }
+  window.resetForm = () => {
+    document.querySelectorAll("#form .opt").forEach(x => x.classList.remove("sel"));
+    if (t) { t.value = ""; t.focus(); }
+    set("");
+  };
+  go.forEach(b => b.onclick = () => {
+    go.forEach(x => x.disabled = true);
+    submit(val, b.dataset.c).catch(fail);
+  });
+}
+
+const addWork = html => document.getElementById("work").insertAdjacentHTML("beforeend", html);
+const clearWork = () => { const f = document.getElementById("form"); if (f) f.remove(); };
+const showNext = () => { document.getElementById("next").style.display = "block"; };
+function mark(label, val, ok) {
+  addWork(`<div class="mine">${label}<b style="color:${ok ? "var(--ok)" : "var(--ng)"}">${esc(val)}</b>　${ok ? "○" : "×"}</div>`);
+}
+
+function opened(r) {
+  addWork(`
+    <div class="box ok">
+      <div class="big">${r.ok ? "正解" : "🔑 開いた　正解: " + esc(r.answer)}</div>
+      <div>${esc(r.explain)}</div>
+      ${r.yoshiri ? `<div class="yoshiri">📖 ${esc(r.yoshiri)}</div>` : ""}
+      ${r.image ? `<img class="img" src="${esc(r.image)}" alt="">` : r.imageNote ? `<div class="imgslot">${esc(r.imageNote)}</div>` : ""}
+    </div>`);
+  showNext();
+}
+
+function done() {
+  call("done", { s: SID }).catch(() => {});
+  summary();
+}
+
+// おわりの表: 1回目の答え・正誤・正解（○と開いた問だけ）・直し。紙の教材を丸つけするときに横に置いて見る
+function summary() {
+  $app.innerHTML = `${bar("おわり")}<p class="small">読みこみ中…</p>`;
+  call("summary", { s: SID }).then(r => {
+    if (!r || !r.rows) throw new Error(r && r.error || "表が出せない");
+    const ng = r.rows.filter(x => x.mark !== "○");
+    const left = ng.filter(x => !x.open).length;
+    const body = r.rows.map(x => `
+      <tr><td>${esc(x.no)}</td><td>${x.first ? esc(x.first) : "（空欄）"}</td>
+        <td class="m ${x.mark === "○" ? "ok" : "ng"}">${esc(x.mark)}</td>
+        <td>${x.open ? esc(x.answer) : `<span class="re">まだ</span>`}</td>
+        <td class="re">${x.second ? `${x.second.ok ? "○" : "×"} ${esc(x.second.answer)}` : ""}</td></tr>`).join("");
+    $app.innerHTML = `
+      ${bar("おわり")}
+      <div class="card">
+        ${ng.length ? `<p>直し ${ng.length}問のうち、正解が開いたのは <b>${ng.length - left}問</b>。</p>` : ""}
+        <p class="small">この表を見ながら、教材に丸をつけよう。正誤は1回目の答え。</p>
+        <table class="sum"><tr><th>問題</th><th>てみ回答</th><th>正誤</th><th>正解</th><th>直し</th></tr>${body}</table>
+        ${r.skipped && r.skipped.length ? `<p class="small">このページに無い問題（寸評シートを見てね）: ${r.skipped.map(esc).join("・")}</p>` : ""}
+        ${S.later ? `<p class="small">${esc(S.later)}</p>` : ""}
+      </div>
+      ${left ? `<button class="next" id="back">まだの問題を直す（${left}問）</button>` : ""}`;
+    const b = document.getElementById("back");
+    if (b) b.onclick = () => reload(() => { list(); cur = 0; step(); });
+  }).catch(fail);
+}
+
+function reload(then) {
+  call("session", { s: SID }).then(r => { if (!r || !r.items) throw new Error(r && r.error); S = r; then(); }).catch(fail);
+}
+
+function fail(e) {
+  $app.insertAdjacentHTML("beforeend", `<p class="err">つながらなかった。少し待ってページを開き直してね。（${esc(e && e.message || e)}）</p>`);
+}
+
+call("session", { s: SID }).then(r => {
+  if (!r || !r.items) throw new Error(r && r.error || "このリンクは使えない");
+  S = r;
+  if (r.done) summary(); else list();
+}).catch(e => { $app.innerHTML = `<p class="err">${esc(e.message || e)}</p>`; });
+</script>
+</body>
+</html>
