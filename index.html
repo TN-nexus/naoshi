@@ -161,7 +161,7 @@ function step() {
     ? `<div class="box hint"><div class="h">調べて書こう</div>覚える問題。見る場所を開いて、正しい答えを書こう。${look(q)}${yoshiri(q)}</div>`
     : `<div class="box hint"><div class="h">考える手がかり</div>${esc(q.hint)}${look(q)}${yoshiri(q)}</div>
        <div class="small">見る場所を開いて確かめてから答えてもいい。</div>`;
-  form(lead, q.type, q.options, true, (val, conf) =>
+  form(lead, q.type, q.options, true, "この問題の答え", (val, conf) =>
     call("answer", { s: SID, id: q.id, answer: val, conf }).then(r => {
       if (r.error) throw new Error(r.error);
       clearWork();
@@ -194,7 +194,7 @@ function gate(q, key) {
     : `<div class="box hint"><div class="h">🔑 鍵の問い（答えると正解と解説が開く）</div>${esc(k.q)}${k.look ? `<div class="look">👀 見る: ${esc(k.look)}</div>` : ""}</div>`;
   const type = k.none ? q.type : k.type, options = k.none ? q.options : k.options;
   showNext();
-  form(lead, type, options, false, val =>
+  form(lead, type, options, false, k.none ? "この問題の答え" : "鍵の問いへの答え", val =>
     call(k.none ? "answer" : "key", { s: SID, id: q.id, answer: val, conf: "" }).then(r => {
       if (r.error) throw new Error(r.error);
       if (r.open) { clearWork(); mark(k.none ? "もう一度: " : "鍵: ", val, true); return opened(r); }
@@ -209,11 +209,11 @@ function gate(q, key) {
     }));
 }
 
-// 入力欄と決定ボタン。conf=true なら「自信あり／なし」の2つ
-function form(lead, type, options, conf, submit) {
+// 入力欄と決定ボタン。conf=true なら「自信あり／なし」の2つ。what は入力欄に薄く出す「何の答えか」（10/25 パパ: 鍵のとき何を書くか迷った）
+function form(lead, type, options, conf, what, submit) {
   const input = type === "choice"
     ? `<div class="choices">${(options || []).map(o => `<button class="opt" data-v="${esc(o)}">${esc(o)}</button>`).join("")}</div>`
-    : `<input class="txt" id="ans" autocomplete="off" autocapitalize="off" placeholder="${type === "number" ? "答え（例 3/4・1と5/7・2.5）" : "答え"}">`;
+    : `<input class="txt" id="ans" autocomplete="off" autocapitalize="off" placeholder="${what}">${type === "number" ? `<div class="small">書き方の例 3/4・1と5/7・2.5</div>` : ""}`;
   const btns = conf
     ? `<div class="commit"><button class="go c-sure" data-c="あり" disabled>自信あり で決定</button>
        <button class="go c-unsure" data-c="なし" disabled>自信なし で決定</button></div>`
