@@ -50,6 +50,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:"Hiragino Sans",
 .tk.bx{outline:2px solid var(--ink);outline-offset:1px}
 /* HUD: 棚4つ。毎回同じ場所・同じ順。光らせない（§0） */
 .shelf{padding:6px 0;border-top:1px solid var(--line)}
+.shelf.dim{opacity:.3;pointer-events:none}   /* いまの手で使わない棚は薄くして押せない（11/01 夜3 パパ。娘が拾う手で原理・年表を一緒に押していた） */
 .shelf:first-child{border-top:0}
 .sname{font-size:13px;color:var(--sub);margin-bottom:4px}
 .items{display:flex;flex-wrap:wrap;gap:6px}
@@ -396,8 +397,10 @@ function hudHtml() {
     return sh.items.map(it => it.rows
       ? `<div class="era">${one(sh, it, hd)}<div class="rows">${it.rows.map(r => one(sh, r, "row")).join("")}</div></div>`
       : one(sh, it, hd)).join(""); };
+  const ws = workStep();   // いまの手が使う棚だけ押せる（11/01 夜3）: menu・assemble・order・label・match・judge は from の棚、mark・text・number・answer と鍵の問いの間は棚なし、手が全部終われば全部
+  const live = sh => !IT.cur ? true : (!!ws && ["menu", "assemble", "order", "label", "match", "judge", "place"].includes(ws.type) && ws.from === sh.name);
   return `<div class="card">${IT.shelves.map(sh => `
-    <div class="shelf"><div class="sname">${esc(sh.name)}</div><div class="items">${items(sh)}</div></div>`).join("")}</div>`;
+    <div class="shelf ${live(sh) ? "" : "dim"}"><div class="sname">${esc(sh.name)}</div><div class="items">${items(sh)}</div></div>`).join("")}</div>`;
 }
 
 // ---------------------------------------------------------------- 国語（11/01）: 右に本文・左に設問。どちらも縦書き
