@@ -1,0 +1,768 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>手</title>
+<link rel="icon" href="data:,">
+<style>
+/* 直しページ（apps/naoshi/page.html）と同じ色・字の大きさ。スマホ幅を先に作る */
+:root{
+  --bg:#f6f5f1; --card:#fff; --ink:#1f2328; --sub:#6b6f76; --line:#d9d6cf;
+  --ok:#1f7a4d; --okbg:#e3f3ea; --ng:#b3261e; --ngbg:#fbe7e5; --sel:#2b5cb8; --selbg:#e6eefc;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;font-size:18px;line-height:1.7}
+#app{max-width:1100px;margin:0 auto;padding:16px}
+.bar{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:4px 2px 10px;border-bottom:1px solid var(--line);margin-bottom:14px}
+.bar h1{font-size:18px;margin:0}
+.bar .cnt{font-size:16px;color:var(--sub);white-space:nowrap}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:12px}
+.lead{font-size:15px;color:var(--sub);white-space:pre-line;margin-bottom:8px}
+.look{font-size:14px;color:var(--sub);margin:2px 0 6px}
+.ptext{font-size:19px;margin-bottom:10px}
+.opts .o{padding:6px 0;border-top:1px solid var(--line)}
+.opts .o .ol{display:flex;gap:8px}
+.opts .o .oq{font-size:13px;color:var(--sub);margin:4px 0 2px 3.4em}
+.opts .o .k{font-weight:700;min-width:1.4em}
+.focus{background:#fff7d6;border-radius:8px;box-shadow:0 0 0 6px #fff7d6}
+.opts .o .hm{display:inline-flex;gap:2px;min-width:3.2em}
+.opts .o .hm span{display:inline-block;width:1.5em;height:1.5em;line-height:1.4em;text-align:center;border:1px solid var(--line);border-radius:6px;color:var(--sub);font-size:15px;cursor:default;background:#fff}
+.opts .o .hm span.on{border-color:var(--ink);color:var(--ink);font-weight:700}
+.opts .o .hm.done span{border-color:transparent;background:transparent}
+.opts .o .hm.done span.on{border-color:var(--ink)}
+.inq{margin:6px 0 10px;padding:8px 10px}
+.inq .q,.ansrow .q{font-weight:700;font-size:16px;margin-bottom:6px}
+.row2{display:flex;align-items:center;gap:10px}
+.row2 .msg{flex:1;min-height:1.2em}
+.row2 .go{width:auto;min-width:7em;padding:8px 16px;margin:0}
+.decls{font-size:14px;color:var(--sub);margin:4px 0 8px}
+.ansrow{margin-top:12px;padding:10px 12px}
+.ab{font-size:18px;font-weight:700;width:2.4em;height:2.2em;margin-right:6px;border:1px solid var(--line);border-radius:8px;background:#fff}
+.ab.sel{border-color:var(--sel);background:var(--selbg)}
+.fin{color:var(--sub);text-align:center;padding:14px}
+.opts .o .hm span.dis{color:#c9c6bf;border-color:#e6e3dc}
+.opts .o .said{margin:2px 0 0 3.4em;color:var(--sub);font-size:14px}
+/* 文節: リンクの見た目にしない・カーソルも変えない（§2） */
+.tk{cursor:default;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;border-radius:3px}
+.tk.ul{text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:5px}
+.tk.sh{font-weight:700}
+.tk.bx{outline:2px solid var(--ink);outline-offset:1px}
+/* HUD: 棚4つ。毎回同じ場所・同じ順。光らせない（§0） */
+.shelf{padding:6px 0;border-top:1px solid var(--line)}
+.shelf:first-child{border-top:0}
+.sname{font-size:13px;color:var(--sub);margin-bottom:4px}
+.items{display:flex;flex-wrap:wrap;gap:6px}
+.it{font:inherit;font-size:16px;line-height:1.4;padding:8px 10px;border:2px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);cursor:default;-webkit-tap-highlight-color:transparent;text-align:left}
+.it.sel{border-color:var(--sel);background:var(--selbg)}
+.it .placed{display:block;font-size:14px;color:var(--sub)}
+/* 並べかえ（11/01 夜2）: タップした順の番号。札・選択肢の頭に丸数字 */
+.seqn{display:inline-block;min-width:1.5em;height:1.5em;line-height:1.5em;text-align:center;border-radius:50%;background:var(--sel);color:#fff;font-size:13px;font-weight:700;margin-right:6px;vertical-align:middle}
+.opts .o.tap{cursor:default;-webkit-tap-highlight-color:transparent}
+.opts .o.osel{background:var(--selbg);border-radius:8px}
+.fig .map{pointer-events:none}
+.it.hasimg{display:inline-flex;align-items:center;gap:8px}
+.it .thumb{height:44px;width:auto;flex:none;border-radius:4px}
+.it.big{flex-basis:100%;display:block}
+.it .bigimg{display:block;width:100%;max-height:30vh;object-fit:contain;margin-top:6px}
+.era{flex-basis:100%}
+.it.hd{font-weight:600;padding:6px 10px}
+.rows{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 4px 14px}
+.it.row{font-size:15px;padding:6px 8px}
+/* 図: 問題の図は問題文の直後。札の図は選んだときだけ、その札が1行に広がって大きく（説明の文は出さない。10/31 固定枠をやめた） */
+.pimg{display:block;width:100%;max-height:40vh;object-fit:contain;margin:6px 0 10px}
+/* 図の手（算数。11/01）: 図形を直接タップ。区画＝塗る、線＝なぞる。作図をデジタルで再現。リンクの見た目にしない */
+.ain{font:inherit;font-size:18px;width:9em;padding:6px 8px;border:2px solid var(--line);border-radius:8px;margin-right:8px}
+.fig{display:block;width:100%;max-width:520px;height:auto;margin:6px auto 10px;-webkit-tap-highlight-color:transparent;user-select:none}
+.fig .base{stroke:var(--ink);stroke-width:2.2;fill:none;stroke-linejoin:round}
+.fig .rg{fill:transparent;stroke:none}
+.fig .rg.on{fill-opacity:.42}
+.fig .rg.sel{fill-opacity:.28}
+.fig .sg{stroke:transparent;stroke-width:22;stroke-linecap:round;fill:none}
+.fig .sg.on,.fig .sg.sel{stroke-width:14;stroke-opacity:.55}
+.fig .sg.sel{stroke-opacity:.35}
+.fig .hi{fill:none;stroke:var(--ink);stroke-width:4.5;stroke-linejoin:round;stroke-linecap:round;pointer-events:none}
+.fig .nt{font-size:19px;font-weight:700;fill:var(--ink);font-family:inherit;text-anchor:middle;dominant-baseline:central;pointer-events:none;paint-order:stroke;stroke:#fff;stroke-width:5}
+.fig .vl circle{fill:#fff;stroke:var(--ink);stroke-width:2}
+.fig .vl text{font-size:18px;font-weight:700;fill:var(--ink);font-family:inherit;text-anchor:middle;dominant-baseline:central}
+.fig .arrow{stroke:var(--ink);stroke-width:2.2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.lbn{font-size:15px;color:var(--sub);margin-right:6px}
+.put{font:inherit;font-size:16px;padding:6px 12px;border:2px solid var(--line);border-radius:8px;background:#fff;margin-right:8px}
+.fig .pt{font-size:22px;fill:var(--ink);font-family:inherit}
+.fig .rl{font-size:20px;fill:var(--sub);font-family:inherit;text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.fig .c0{fill:#f2a33a;stroke:#f2a33a}.fig .c1{fill:#e2574c;stroke:#e2574c}.fig .c2{fill:#3b7dd8;stroke:#3b7dd8}.fig .c3{fill:#3aa66a;stroke:#3aa66a}
+/* 国語モード（11/01）: 右に本文・左に設問、どちらも縦書き。900px 未満は上に本文・下に設問。リンクの見た目にしない */
+#app.k{max-width:1600px}
+.kwrap{display:flex;flex-direction:column;gap:12px;min-width:0}
+.kwrap>*{min-width:0;max-width:100%}
+.kpane{order:0;position:sticky;top:0;z-index:5;height:42vh;display:flex;flex-direction:column;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.khead{padding:4px 12px;border-bottom:1px solid var(--line);flex:none;font-size:13px;color:var(--sub)}
+.kscroll{flex:1;min-height:0;writing-mode:vertical-rl;overflow-x:auto;overflow-y:hidden;padding:14px 12px;font-size:18px;line-height:2.1}
+.kp{margin-block-end:.6em;padding:4px 2px;border:1px solid transparent;border-radius:8px}
+.kp.focus{background:#fff7d6}
+.kp.psel{border:2px solid var(--sel)}
+.kp.pdone{border-color:var(--sub)}
+.kn{font-size:12px;color:var(--sub);text-combine-upright:all;margin-block-end:.4em;display:inline-block}
+.kwrap .tk.ul{text-underline-position:right}
+.tk.ln{background:#fff2a8}
+.tk.pk{outline:2px solid var(--sel);outline-offset:1px}
+.tk.bl{text-decoration:underline;text-decoration-thickness:1.5px;text-underline-position:right;text-underline-offset:4px}
+.tk.bl0{position:relative}
+.tk .lbl{position:absolute;top:-.7em;right:-1.1em;font-size:11px;line-height:1;color:var(--ink)}
+.tk .tl{position:relative;text-decoration:underline;text-decoration-thickness:1.5px;text-underline-position:right;text-underline-offset:4px}
+.kq{order:1;display:flex;flex-direction:column;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.kqscroll{height:46vh;writing-mode:vertical-rl;overflow-x:auto;overflow-y:hidden;padding:14px 12px;font-size:18px;line-height:2}
+.klead{font-size:13px;color:var(--sub);margin-block-end:.8em}
+.kqt{margin-block-end:1em;padding:2px}
+.kqt.focus,.ko.focus,.kans.focus{background:#fff7d6;border-radius:8px}
+.ko{margin-block-end:.5em;padding:4px 2px}
+.ko .k{font-weight:700;margin-block-end:.3em;display:inline-block}
+.ko .hm{display:inline-flex;gap:2px;margin-block-end:.4em}
+.ko .hm span{display:inline-block;width:1.5em;height:1.5em;line-height:1.5em;text-align:center;border:1px solid var(--line);border-radius:6px;color:var(--sub);font-size:15px;cursor:default;background:#fff}
+.ko .hm span.on{border-color:var(--ink);color:var(--ink);font-weight:700}
+.ko .hm span.dis{color:#c9c6bf;border-color:#e6e3dc}
+.ko .hm.done span{border-color:transparent;background:transparent}
+.ko .hm.done span.on{border-color:var(--ink)}
+.ko .said{display:block;font-size:13px;color:var(--sub)}
+.kans{padding:4px 2px}
+.kans .ab{width:2.2em;height:2.4em;margin:0 0 6px 0}
+.kband{flex:none;border-top:1px solid var(--line);padding:8px 12px;background:#fff;position:sticky;bottom:0}
+.kband .q{font-size:14px;color:var(--sub);margin-bottom:4px}
+.kband .row2{flex-wrap:wrap}
+.kband .it{padding:6px 10px;font-size:15px}
+.stepc .beat{font-size:13px;color:var(--sub)}
+.stepc .q{font-size:19px;font-weight:600;margin:2px 0 8px}
+.trail{font-size:15px;color:var(--sub);margin-bottom:6px}
+.trail div{padding:1px 0}
+.msg{min-height:1.6em;font-weight:700}
+.msg.ng{color:var(--ng)} .msg.ok{color:var(--ok)} .msg.info{color:var(--ink)}
+input.txt{font:inherit;font-size:20px;width:100%;padding:8px 10px;border:2px solid var(--sel);border-radius:10px;margin:4px 0}
+button.go{display:block;width:100%;font:inherit;font-size:18px;font-weight:700;padding:12px;border-radius:10px;border:2px solid var(--ink);background:var(--ink);color:#fff;cursor:pointer;margin-top:6px}
+button.go:disabled{opacity:.35;cursor:default}
+button.next{display:block;width:100%;margin-top:10px;font:inherit;padding:12px;border-radius:10px;border:2px solid var(--ink);background:#fff;cursor:pointer;font-size:17px}
+.row{display:flex;gap:10px;align-items:baseline;padding:10px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.row:last-child{border-bottom:0}
+.row .n{flex:1} .row .st{color:var(--sub);white-space:nowrap}
+table.sum{width:100%;border-collapse:collapse;font-size:16px}
+table.sum th,table.sum td{padding:7px 4px;border-bottom:1px solid var(--line);text-align:left}
+table.sum th{font-size:13px;color:var(--sub);font-weight:600}
+td.m{font-weight:800;text-align:center;width:2em} td.m.ok{color:var(--ok)} td.m.ng{color:var(--ng)}
+.ans{font-size:22px;font-weight:800;margin-top:10px}
+.small{font-size:14px;color:var(--sub)}
+.err{color:var(--ng)}
+/* スマホ: 問題 → 棚 → 手（手は下に貼りつく）。広い画面: 左に問題と手、右に棚 */
+.stepc{position:sticky;bottom:0;box-shadow:0 -4px 12px rgba(0,0,0,.06)}
+@media (min-width:900px){
+  .wrap{display:grid;grid-template-columns:1fr 380px;gap:14px;align-items:start}
+  .side{position:sticky;top:12px;max-height:calc(100vh - 24px);overflow-y:auto}   /* 棚が長くても棚だけで送る（10/31 理科: 札21枚で選択肢と部品が同時に見えなかった） */
+  .stepc{position:static;box-shadow:none}
+  .kwrap{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:start}
+  .kq{order:0;height:calc(100vh - 70px)}
+  .kqscroll{flex:1;min-height:0;height:auto}
+  .kpane{order:1;position:static;height:calc(100vh - 70px)}
+}
+</style>
+</head>
+<body>
+<div id="app"><p class="small">読みこみ中…</p></div>
+<script>
+// 手の器（仕様 wiki/knowledge/手の器_仕様_2026-10-31.md）。1問を手の列で出す。
+// ページは正解（want・answer）を持たない。判定・回数・ゲートはサーバ（GAS の Te.gs か preview.py）。
+// 送るのは確定ボタンを押したときだけ（タップでは送らない）。例外: 選択肢のあたまの ○×、国語の read のあとの線（線を引くこと自体が行為）。
+
+const params = new URLSearchParams(location.search);
+const PREVIEW = params.get("preview") === "1";
+const SID = window.TE_SID || params.get("s") || "";
+const DEPLOY = params.get("d") || "";
+const API = PREVIEW ? "/api" : (DEPLOY ? `https://script.google.com/macros/s/${encodeURIComponent(DEPLOY)}/exec` : "api");
+
+function call(op, args) {
+  if (!PREVIEW && window.google && google.script && google.script.run) {
+    return new Promise((ok, ng) =>
+      google.script.run.withSuccessHandler(ok).withFailureHandler(ng).teApi(op, args));
+  }
+  return fetch(API, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },   // 単純リクエスト（GAS でも CORS の事前確認が要らない）
+    credentials: "omit",   // Google のログインを乗せない（13歳未満のアカウントではじかれる）
+    body: JSON.stringify({ app: "te", op, args }),
+  }).then(r => r.json());
+}
+
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const $app = document.getElementById("app");
+let S;            // セッション {title, items:[1問]}
+let idx = 0;      // いま開いている問
+let IT;           // いまの1問（サーバの形のまま）
+let sel;          // 確定前の選び {marks:Set, shelf, id, opt, at, answer}
+let note = null;  // 直前の確定の結果 {cls, text}
+let busy = false; // 線を送っている間はタップを受けない
+let kScroll = null; // 本文の面の横の送り位置（null＝まだ。右端＝本文の頭から見せる）
+let kqScroll = null; // 設問の面（国語）の横の送り位置
+const TEXT = "本文", FUDA = "札";   // 国語: 本文の文節を指す／左の面の札（本文にない）
+
+const newSel = () => ({ marks: new Set(), ids: new Set(), lines: new Set(), seq: [], shelf: null, id: null, opt: null, at: null, mark: null, answer: "", para: null, vals: {}, pick: null, key: "" });
+const OPTS = "選択肢";   // 並べかえ・答えの from（問題文の箱の選択肢の行）
+const seqBadge = id => { const k = sel.seq.indexOf(id); return k >= 0 ? `<span class="seqn">${k + 1}</span>` : ""; };   // 並べかえ（11/01 夜2）: タップした順
+const isK = () => IT && IT.layout === "kokugo" && IT.text;
+const readStep = () => IT.steps.find(s => s.type === "read") || null;
+const readDone = () => { const r = readStep(); return !!r && r.status === "ok"; };
+// 本文の文節 id（本文の順）。文節 id＝"t9_3:4"、文 id＝":" より前
+const textIds = () => (IT.text.paras || []).flatMap(p => (p.sents || []).flatMap(x => (x.b || [x.s]).map((_, i) => `${x.id}:${i}`)));
+const paraOf = bid => { const sid = String(bid).split(":")[0]; const p = (IT.text.paras || []).find(p => (p.sents || []).some(x => x.id === sid)); return p ? +p.n : null; };
+const bunText = bid => { const [sid, i] = String(bid).split(":"); for (const p of IT.text.paras || []) for (const x of p.sents || []) if (x.id === sid) return (x.b || [])[+i] || ""; return ""; };
+// 線: read の手の途中は手元の選び、そのあとはサーバの lines
+const linesNow = () => { const c = curStep(); return c && c.type === "read" ? sel.lines : new Set(IT.lines || []); };
+const curStep = () => IT.steps.find(s => s.id === IT.cur) || null;
+// 鍵の問い（11/01）: 閉じた手に鍵があると、その手は keyState "wait"（問題文の箱に鍵の問い）。開いたら show に正解
+const keyWait = s => !!s && s.keyState === "wait";
+// 日本語入力の変換中の Enter（isComposing／keyCode 229）は確定にしない（11/01 パパ: 人名の変換で確定が押された）
+const ime = e => e.isComposing || e.keyCode === 229;
+const workStep = () => { const c = curStep(); return keyWait(c) ? null : c; };   // 鍵の問いの間は手の操作を出さない
+// 単発で1つ選ぶ手（棚の札 menu・答えの記号1つ）はタップで送る。確定ボタンは出さない（11/01 夜2 パパ）。複数を選ぶ手と入力欄は確定のまま
+const oneTap = s => !!s && ((s.type === "menu" && s.from !== TEXT) || (s.type === "answer" && !s.multi));
+const doneCount = it => it.steps.filter(s => s.status).length;
+const bar = right => `<div class="bar"><h1>${esc(S.title)}</h1><span class="cnt">${right}</span></div>`;
+const itemName = it => [it.round, it.subject, it.material, it.no].filter(Boolean).join(" ");
+const flatItems = sh => sh.items.flatMap(x => [x, ...(x.rows || [])]);   // 年表の棚は 時代 → rows（出来事）の2段
+const FIG = "図";   // 算数（11/01）: 図形の区画・線を直接タップする棚（画面の棚には出ない。図そのもの）
+const figParts = () => { const f = IT.problem && IT.problem.figure; return f ? [...(f.regions || []), ...(f.segments || [])] : []; };
+const label = (shelf, id) => {
+  const sh = IT.shelves.find(x => x.name === shelf);
+  const it = sh && flatItems(sh).find(x => x.id === id);
+  if (it) return it.label;
+  const fp = figParts().find(x => x.id === id);
+  return fp ? (fp.label || fp.id) : (id ?? "");
+};
+
+// 図（SVG）。区画 polygon＝塗る／線＝なぞる。済んだ「図」の手は手ごとの色で残す（コベツバの板書のマーカーと同じ）。選び中は薄く
+function figureHtml() {
+  const f = IT.problem && IT.problem.figure;
+  if (!f) return "";
+  const cur = workStep();
+  const P = f.points || {}, xy = n => Array.isArray(n) ? n : (P[n] || [0, 0]);   // 点は名前か [x,y] そのまま（地図。11/01 夜2）
+  const bgimg = f.image ? `<image class="map" href="${esc(f.image)}" x="0" y="0" width="${f.w || 560}" height="${f.h || 480}" preserveAspectRatio="none"/>` : "";   // 地図・絵の上に区画を置く（社会の地図の位置。11/01 夜2）
+  const figSteps = IT.steps.filter(s => s.type === "assemble" && s.from === FIG);
+  const colorOf = {};   // 部品 id → 色の番号（済んだ手の順）
+  figSteps.forEach((s, k) => { if (s.status === "ok" && s.last) (s.last.ids || []).forEach(i => { colorOf[i] = colorOf[i] ?? (k % 4); }); });
+  const curK = cur && cur.type === "assemble" && cur.from === FIG ? figSteps.indexOf(cur) % 4 : 0;
+  const selOn = i => cur && cur.from === FIG && ((cur.type === "assemble" && (sel.ids.has(i) || (cur.shown || []).includes(i))) || (cur.type === "label" && (sel.pick === i || sel.vals[i] != null)));
+  const cls = (i, kind) => colorOf[i] != null ? `${kind} on c${colorOf[i]}` : selOn(i) ? `${kind} sel c${curK}` : kind;
+  const base = (f.lines || []).map(l => `<polyline class="base" points="${l.map(n => xy(n).join(",")).join(" ")}"/>`).join("")
+    + (f.arrows || []).map(([a, b]) => { const p = xy(a), q = xy(b); const ang = Math.atan2(q[1] - p[1], q[0] - p[0]); const h = (t, s) => [q[0] - 14 * Math.cos(ang + t * s), q[1] - 14 * Math.sin(ang + t * s)]; const u = h(0.5, 1), w = h(0.5, -1); return `<polyline class="arrow" points="${p.join(",")} ${q.join(",")}"/><polyline class="arrow" points="${u.join(",")} ${q.join(",")} ${w.join(",")}"/>`; }).join("");
+  const rgs = (f.regions || []).map(r => `<polygon class="${cls(r.id, "rg")} fg" data-shelf="${FIG}" data-id="${esc(r.id)}" points="${(r.pts || []).map(n => xy(n).join(",")).join(" ")}"/>`).join("");
+  const sgs = (f.segments || []).map(g => `<polyline class="${cls(g.id, "sg")} fg" data-shelf="${FIG}" data-id="${esc(g.id)}" points="${(g.pts || []).map(n => xy(n).join(",")).join(" ")}"/>`).join("");
+  const cen = pts => { const a = pts.map(xy); return [a.reduce((t, q) => t + q[0], 0) / a.length, a.reduce((t, q) => t + q[1], 0) / a.length]; };
+  const rls = (f.regions || []).filter(r => r.mark).map(r => { const c = r.at || cen(r.pts || []); return `<text class="rl" x="${c[0]}" y="${c[1]}">${esc(r.mark)}</text>`; }).join("");
+  // 拾った文節 → 図の注記。いま選んでいる印（mark の手の途中）か、確定した印
+  const ms = IT.steps.find(s => s.type === "mark");
+  let marked = new Set();
+  if (ms) {
+    if (ms.show) marked = new Set([...ms.show.box, ...ms.show.under]);
+    else if (cur && cur.id === ms.id) marked = new Set([...sel.marks, ...(ms.shown || [])]);
+    else if (ms.status && ms.last) marked = new Set(ms.last.marks || []);
+  }
+  const notes = (f.notes || []).filter(n => marked.has(n.tok));
+  const hiIds = new Set(notes.map(n => n.on));
+  const mid = g => { const a = (g.pts || []).map(xy); return [(a[0][0] + a[a.length - 1][0]) / 2, (a[0][1] + a[a.length - 1][1]) / 2]; };
+  const posOf = n => { if (n.at) return n.at; const r = (f.regions || []).find(x => x.id === n.on); if (r) { const c = r.at || cen(r.pts || []); return [c[0], c[1] + 26]; } const g = (f.segments || []).find(x => x.id === n.on); return g ? mid(g) : [0, 0]; };
+  const nts = notes.map(n => { const q = posOf(n); return `<text class="nt" x="${q[0] + (n.dx || 0)}" y="${q[1] + (n.dy || 0)}">${esc(n.text)}</text>`; }).join("");
+  const his = (f.regions || []).filter(r => hiIds.has(r.id)).map(r => `<polygon class="hi" points="${(r.pts || []).map(n => xy(n).join(",")).join(" ")}"/>`).join("")
+    + (f.segments || []).filter(g => hiIds.has(g.id)).map(g => `<polyline class="hi" points="${(g.pts || []).map(n => xy(n).join(",")).join(" ")}"/>`).join("");
+  // 位置に書いた数（11/01 部品4）: 済んだ label の手の値＋いまの手で書いた値。区間の真ん中に ○つきで
+  const vals = {};
+  IT.steps.filter(s => s.type === "label" && s.status === "ok" && s.last).forEach(s => Object.assign(vals, s.last.vals || {}));
+  if (cur && cur.type === "label") Object.assign(vals, sel.vals);
+  const partOf = id => (f.regions || []).find(x => x.id === id) || (f.segments || []).find(x => x.id === id);
+  const vls = Object.entries(vals).map(([id, v]) => { const g = partOf(id); if (!g) return ""; const q = g.pts && g.pts.length > 2 && !g.line ? cen(g.pts) : mid(g); const dx = g.vdx || 0, dy = g.vdy || 0; return `<g class="vl"><circle cx="${q[0] + dx}" cy="${q[1] + dy}" r="15"/><text x="${q[0] + dx}" y="${q[1] + dy}">${esc(v)}</text></g>`; }).join("");
+  const pts = Object.entries(f.labels || {}).map(([n, o]) => `<text class="pt" x="${xy(n)[0] + (o[0] || 0)}" y="${xy(n)[1] + (o[1] || 0)}">${esc(n)}</text>`).join("");
+  return `<svg class="fig" viewBox="0 0 ${f.w || 560} ${f.h || 480}" xmlns="http://www.w3.org/2000/svg">${bgimg}${rgs}${base}${his}${sgs}${rls}${nts}${vls}${pts}</svg>`;
+}
+
+// ---------------------------------------------------------------- 一覧（問が2つ以上のとき）
+function list() {
+  if (S.items.length === 1) return openItem(0);
+  const rows = S.items.map((it, i) => {
+    const st = !it.started ? "まだ" : it.finished ? (it.allOk ? "揃った" : "おわり") : `手 ${doneCount(it)}/${it.steps.length}`;
+    return `<div class="row" data-i="${i}"><span class="n">${esc(itemName(it))}</span><span class="st">${st}</span></div>`;
+  }).join("");
+  $app.innerHTML = `${bar(`${S.items.length}問`)}<div class="card">${rows}</div>`;
+  $app.querySelectorAll(".row").forEach(r => r.onclick = () => openItem(+r.dataset.i));
+}
+
+function openItem(i) {
+  idx = i; IT = S.items[i]; sel = newSel(); note = null; kScroll = null; kqScroll = null;
+  render();
+  window.scrollTo(0, 0);   // 次へ で問題文から見せる（10/31）
+}
+
+// ---------------------------------------------------------------- 1問
+function tokensHtml(tokens, kind, deco) {
+  return tokens.map((t, i) => `<span class="tk ${deco(i)}" data-k="${kind}" data-i="${i}">${esc(t)}</span>`).join("");
+}
+
+function problemHtml() {
+  const p = IT.problem || {}, cur = workStep(), kc = curStep();
+  const ms = IT.steps.find(s => s.type === "mark");
+  const isIn = cur && (cur.type === "text" || cur.type === "number");
+  const isLb = cur && cur.type === "label";   // 図の位置に数を書く（11/01 部品4）
+  const isOrd = cur && cur.type === "order";   // 並べかえ（11/01 夜2）
+  const textFocus = cur && (cur.type === "mark" || cur.type === "menu" || cur.type === "place" || cur.type === "assemble" || isOrd || isIn || isLb);
+  let text = esc(p.text || "");
+  if (ms && ms.tokens) {
+    text = tokensHtml(ms.tokens, "text", i => {
+      if (ms.show) return ms.show.box.includes(i) ? "bx" : ms.show.under.includes(i) ? "ul" : "";   // ○、または鍵の問いで開いた（11/01）
+      if (cur && cur.id === ms.id) return ms.shown.includes(i) ? "ul sh" : sel.marks.has(i) ? "ul" : "";
+      if (ms.status === "closed" && ms.last) return (ms.last.marks || []).includes(i) ? "ul" : "";
+      return "";
+    });
+  }
+  // 問題文の箱の中の手（拾う・宣言・置く）: 問いの一文と確定ボタン。済んだ宣言は1行で残す
+  const decl = IT.steps.filter(s => (s.type === "menu" || s.type === "place" || s.type === "assemble" || s.type === "order" || s.type === "label" || s.type === "text" || s.type === "number") && s.status)
+    .map(s => `<div class="decl">${esc(s.beat || "")}: ${esc(resultText(s))}　${s.status === "ok" ? "○" : "×"}${esc(keyText(s))}</div>`).join("");
+  const inq = textFocus ? `<div class="inq">
+      <div class="q">${esc(cur.q || "")}</div>
+      <div class="row2">${isIn ? `<input class="ain" id="ain" type="text" inputmode="${cur.type === "number" ? "decimal" : "text"}" autocomplete="off" value="${esc(sel.answer)}">` : ""}${isLb ? (sel.pick ? `<span class="lbn">${esc(label(FIG, sel.pick))} に</span><input class="ain lb" id="lbin" type="text" inputmode="decimal" autocomplete="off" value="${esc(sel.vals[sel.pick] || "")}"><button class="put" id="put">書く</button>` : `<span class="lbn">図の場所をタップしてから数を書く</span>`) : ""}<span class="msg ${note ? note.cls : ""}">${note ? esc(note.text) : ""}</span>
+      ${oneTap(cur) ? "" : `<button class="go" id="go" ${ready(cur) ? "" : "disabled"}>確定</button>`}</div></div>` : keyWait(kc) ? keyHtml(kc) : "";
+  // 選択肢: いま問われている行にだけ ○× のあたま（押したら確定）。済んだ行には付けた印と部品
+  const opts = Object.entries(p.options || {}).map(([k, v]) => {
+    const js = IT.steps.find(s => (s.type === "judge" || s.type === "match") && s.target === k);
+    const isTarget = cur && cur.type === "match" && cur.target === k;
+    let body = esc(v), said = "";
+    if (js && js.tokens) {
+      body = tokensHtml(js.tokens, "opt:" + k, i => {
+        if (isTarget && sel.opt === k && sel.at === i) return "ul";
+        if (js.status && js.last && js.last.opt === k && js.last.at === i && !isTarget) return "ul";
+        return "";
+      });
+    }
+    if (js && js.type === "match" && js.status && js.last) said = esc("→ " + label(js.last.shelf, js.last.id) + keyText(js));
+    if (isTarget && note) said = `<span class="msg ${note.cls}">${esc(note.text)}</span>`;
+    let head = "";
+    if (isTarget) {
+      const okOn = !!sel.shelf && sel.at === null, ngOn = !!sel.shelf && sel.at !== null;
+      head = `<span class="hm"><span class="${okOn ? "" : "dis"}" data-m="ok" data-o="${esc(k)}">○</span><span class="${ngOn ? "" : "dis"}" data-m="ng" data-o="${esc(k)}">×</span></span>`;
+    } else if (js && js.type === "match" && js.status && js.last && js.last.mark) {
+      head = `<span class="hm done"><span class="${js.last.mark === "ok" ? "on" : ""}">○</span><span class="${js.last.mark === "ng" ? "on" : ""}">×</span></span>`;
+    } else if (js && js.type === "match") head = `<span class="hm"></span>`;
+    const qline = isTarget && cur.q ? `<div class="oq">${esc(cur.q)}</div>` : "";
+    const ordTap = isOrd && cur.from === OPTS;   // 並べかえ（選択肢を順にタップ。11/01 夜2）
+    if (ordTap) head = seqBadge(k);
+    return `<div class="o ${isTarget ? "focus" : ""} ${ordTap ? "tap" : ""} ${ordTap && sel.seq.includes(k) ? "osel" : ""}" ${ordTap ? `data-oid="${esc(k)}"` : ""}><div class="ol">${head}<span class="k">${esc(k)}</span><span>${body}</span></div>${said ? `<div class="said">${said}</div>` : ""}${qline}</div>`;
+  }).join("");
+  // 差し戻し（×の数が合わない）: 選択肢の上に1行
+  const gateMsg = cur && cur.type === "match" && IT.gate && IT.gate.state === "" && IT.round > 1 && !note ? "" : "";
+  // 答えの欄: 自分のつけた印を見て選ぶ
+  const ansStep = IT.steps.find(s => s.type === "answer");
+  let ansRow = "";
+  if (ansStep && cur && cur.id === ansStep.id) {
+    const keys = (ansStep.keys && ansStep.keys.length) ? ansStep.keys : Object.keys(p.options || {});   // keys: 答えに並べる記号だけ（Ⅰ・Ⅱ と ア〜エ が同じ箱のとき。11/01 夜3）
+    const on = k => ansStep.multi ? sel.ids.has(k) : sel.id === k;   // 複数選択（11/01 夜2）はいくつでも
+    ansRow = `<div class="ansrow focus"><div class="q">${esc(ansStep.q || "")}</div>
+      <div class="row2"><span class="abs">${keys.map(k => `<button class="ab ${on(k) ? "sel" : ""}" data-k="${esc(k)}">${esc(k)}</button>`).join("")}</span>
+      <span class="msg ${note ? note.cls : ""}">${note ? esc(note.text) : ""}</span>
+      ${oneTap(cur) ? "" : `<button class="go" id="go" ${ready(cur) ? "" : "disabled"}>確定</button>`}</div></div>`;
+  } else if (ansStep && ansStep.status) {
+    ansRow = `<div class="ansrow"><span class="q">答え</span>　<b>${esc(ansText(ansStep.last))}</b>　${ansStep.status === "ok" ? "○" : "×"}${esc(keyText(ansStep))}</div>`;
+  }
+  return `<div class="card">
+    ${p.lead ? `<div class="lead">${esc(p.lead)}</div>` : ""}
+    ${p.image ? `<img class="pimg" src="${esc(p.image)}" alt="">` : ""}
+    <div class="ptext ${textFocus ? "focus" : ""}">${text}</div>
+    ${figureHtml()}
+    ${inq}${decl ? `<div class="decls">${decl}</div>` : ""}
+    ${opts ? `<div class="opts">${opts}</div>` : ""}
+    ${ansRow}
+  </div>`;
+}
+
+function hudHtml() {
+  const cur = curStep();
+  const placed = {};
+  IT.steps.filter(s => s.type === "place" && s.status === "ok" && s.show)
+    .forEach(s => s.show.forEach(w => { (placed[w.slot] = placed[w.slot] || []).push(w.value); }));
+  const one = (sh, it, kind) => {   // 札1枚。kind: ""／"hd"（年表の時代の見出し）／"row"（その時代の出来事）
+    const big = it.img && sel.shelf === sh.name && sel.id === it.id;
+    const pl = sh.name === "場" && placed[it.id] ? `<span class="placed">← ${placed[it.id].map(esc).join("・")}</span>` : "";
+    if (big) return `<button class="it big sel ${kind}" data-shelf="${esc(sh.name)}" data-id="${esc(it.id)}"><span>${esc(it.label)}</span><img class="bigimg" src="${esc(it.img)}" alt="">${pl}</button>`;
+    const inSeq = cur && cur.type === "order" && sel.shelf === sh.name && sel.seq.includes(it.id);   // 並べかえ（11/01 夜2）
+    const selCls = (sel.shelf === sh.name && (sel.id === it.id || sel.ids.has(it.id))) || inSeq ? "sel" : (cur && cur.type === "assemble" && cur.from === sh.name && cur.shown.includes(it.id)) ? "sel sh" : "";
+    const sq = inSeq ? seqBadge(it.id) : "";
+    return `<button class="it ${it.img ? "hasimg" : ""} ${kind} ${selCls}" data-shelf="${esc(sh.name)}" data-id="${esc(it.id)}">${sq}${it.img ? `<img class="thumb" src="${esc(it.img)}" alt=""><span>${esc(it.label)}</span>` : esc(it.label)}${pl}</button>`;
+  };
+  // 年表の棚（10/31 夜3）: 時代（見出し）→ その中の出来事。粗→細の2段でタップ（国語の段落→文と同じ）。札に rows があれば2段
+  // 行はサーバが時代の手の済むまで伏せる（11/01）。見出しの見た目は行の有無で変えない（年表の棚は最初から見出し）
+  const items = sh => { const hd = (sh.name === "年表" || sh.items.some(x => x.rows)) ? "hd" : "";
+    return sh.items.map(it => it.rows
+      ? `<div class="era">${one(sh, it, hd)}<div class="rows">${it.rows.map(r => one(sh, r, "row")).join("")}</div></div>`
+      : one(sh, it, hd)).join(""); };
+  return `<div class="card">${IT.shelves.map(sh => `
+    <div class="shelf"><div class="sname">${esc(sh.name)}</div><div class="items">${items(sh)}</div></div>`).join("")}</div>`;
+}
+
+// ---------------------------------------------------------------- 国語（11/01）: 右に本文・左に設問。どちらも縦書き
+// 本文: 1文の span（10/31 夜2 に文節から戻した。id は "t9_3:0"）。線＝マーカーの下地。――線①〜⑤＝傍線と番号。段落の箱（読んだあとは focus_para に薄い下地）
+function kPaneHtml() {
+  const cur = curStep(), on = linesNow(), done = readDone();
+  const bl = {}, lb = {}, sub = {};   // ――線: 文の中の部分文字列（sent＋text）→ その字だけ傍線と番号／古い形（from/to）＝文節の区間
+  (IT.text.lines || []).forEach(L => {
+    if (L.sent) { (sub[L.sent] = sub[L.sent] || []).push(L); return; }
+    const [sid, a] = L.from.split(":"), z = +L.to.split(":")[1];
+    for (let i = +a; i <= z; i++) bl[`${sid}:${i}`] = true;
+    lb[L.from] = L.label;
+  });
+  // 文の字のうち ――線の部分だけを <span class="tl"> で包む（タップの属性は付けない。タップは外の文の span）
+  const withLines = (sid, t) => {
+    const ls = (sub[sid] || []).map(L => ({ L, at: t.indexOf(L.text) })).filter(o => o.at >= 0 && o.L.text).sort((a, b) => a.at - b.at);
+    let out = "", k = 0;
+    ls.forEach(({ L, at }) => {
+      if (at < k) return;
+      out += esc(t.slice(k, at)) + `<span class="tl"><span class="lbl">${esc(L.label)}</span>${esc(L.text)}</span>`;
+      k = at + L.text.length;
+    });
+    return out + esc(t.slice(k));
+  };
+  const isPara = cur && cur.type === "para";
+  const paras = (IT.text.paras || []).map(p => {
+    const cls = [done && +p.n === +IT.focus_para ? "focus" : "", isPara && sel.para === +p.n ? "psel" : "",
+                 !isPara && IT.para != null && +IT.para === +p.n ? "pdone" : ""].join(" ");
+    return `<div class="kp ${cls}" data-p="${esc(p.n)}"><span class="kn">${esc(p.n)}</span>${
+      (p.sents || []).map(x => (x.b || [x.s]).map((t, i) => {
+        const id = `${x.id}:${i}`;
+        const c = [on.has(id) ? "ln" : "", sel.shelf === TEXT && sel.id === id ? "pk" : "", bl[id] ? "bl" : "", lb[id] ? "bl0" : ""].join(" ");
+        const body = i === 0 && sub[x.id] ? withLines(x.id, t) : esc(t);
+        return `<span class="tk ${c}" data-k="sent" data-i="${esc(id)}">${lb[id] ? `<span class="lbl">${esc(lb[id])}</span>` : ""}${body}</span>`;
+      }).join("")).join("")}</div>`;
+  }).join("");
+  return `<div class="kpane"><div class="khead">${esc(IT.text.title || "")}</div><div class="kscroll">${paras}</div></div>`;
+}
+
+// 根拠の短い呼び名（済んだ選択肢の「→ 根拠」）
+function kPart(l) {
+  if (!l || !l.shelf) return "";
+  if (l.id === "p_none") return "本文にない";
+  if (l.shelf === TEXT) return `${paraOf(l.id) ?? ""}「${bunText(l.id)}」`;
+  return label(l.shelf, l.id);
+}
+
+// 設問の面: lead → 設問文（印）→ 選択肢（上端に ○×）→ 答えの欄
+function kQHtml() {
+  const p = IT.problem || {}, cur = workStep();
+  const ms = IT.steps.find(s => s.type === "mark");
+  let text = esc(p.text || "");
+  if (ms && ms.tokens) {
+    text = tokensHtml(ms.tokens, "text", i => {
+      if (ms.show) return ms.show.box.includes(i) ? "bx" : ms.show.under.includes(i) ? "ul" : "";   // ○、または鍵の問いで開いた（11/01）
+      if (cur && cur.id === ms.id) return ms.shown.includes(i) ? "ul sh" : sel.marks.has(i) ? "ul" : "";
+      if (ms.status === "closed" && ms.last) return (ms.last.marks || []).includes(i) ? "ul" : "";
+      return "";
+    });
+  }
+  const opts = Object.entries(p.options || {}).map(([k, v]) => {
+    const js = IT.steps.find(s => s.type === "match" && s.target === k);
+    const isTarget = cur && cur.type === "match" && cur.target === k;
+    let body = esc(v), head = "", said = "";
+    if (js && js.tokens) {
+      body = tokensHtml(js.tokens, "opt:" + k, i => {
+        if (isTarget) return sel.opt === k && sel.at === i ? "ul" : "";
+        return js.status && js.last && js.last.opt === k && js.last.at === i ? "ul" : "";
+      });
+    }
+    if (isTarget) {
+      const on = !!sel.shelf && sel.at !== null;
+      head = `<span class="hm"><span class="${on ? "" : "dis"}" data-m="ok" data-o="${esc(k)}">○</span><span class="${on ? "" : "dis"}" data-m="ng" data-o="${esc(k)}">×</span></span>`;
+    } else if (js && js.status && js.last && js.last.mark) {
+      head = `<span class="hm done"><span class="${js.last.mark === "ok" ? "on" : ""}">○</span><span class="${js.last.mark === "ng" ? "on" : ""}">×</span></span>`;
+      said = `→ ${kPart(js.last)}${keyText(js)}`;
+    } else if (js) head = `<span class="hm"><span>　</span><span>　</span></span>`;
+    return `<div class="ko ${isTarget ? "focus" : ""}">${head}<span class="k">${esc(k)}</span>${body}${said ? `<span class="said">${esc(said)}</span>` : ""}</div>`;
+  }).join("");
+  const ansStep = IT.steps.find(s => s.type === "answer");
+  let ans = "";
+  if (ansStep && cur && cur.id === ansStep.id) {
+    ans = `<div class="kans focus">${Object.keys(p.options || {}).map(k => `<button class="ab ${sel.id === k ? "sel" : ""}" data-k="${esc(k)}">${esc(k)}</button>`).join("")}</div>`;
+  } else if (ansStep && ansStep.status) {
+    ans = `<div class="kans">答え <b>${esc(ansText(ansStep.last))}</b> ${ansStep.status === "ok" ? "○" : "×"}${esc(keyText(ansStep))}</div>`;
+  }
+  return `<div class="kqscroll">
+    ${p.lead ? `<div class="klead">${esc(p.lead)}</div>` : ""}
+    <div class="kqt ${cur && cur.type === "mark" ? "focus" : ""}">${text}</div>
+    ${opts}${ans}</div>`;
+}
+
+// 設問の面の下の帯（横書き）: 問いの一文・メッセージ・確定・（match のときだけ）「本文にない」の札
+function kBandHtml() {
+  const cur = curStep();
+  if (!cur) return "";
+  if (keyWait(cur)) return `<div class="kband">${keyHtml(cur)}</div>`;   // 鍵の問い（11/01）
+  const fuda = cur.type === "match"
+    ? `<button class="it ${sel.shelf === FUDA && sel.id === "p_none" ? "sel" : ""}" data-shelf="${FUDA}" data-id="p_none">本文にない</button>` : "";
+  const go = (cur.type === "match" || oneTap(cur)) ? "" : `<button class="go" id="go" ${ready(cur) ? "" : "disabled"}>確定</button>`;
+  return `<div class="kband"><div class="q">${esc(cur.q || "")}</div>
+    <div class="row2"><span class="msg ${note ? note.cls : ""}">${note ? esc(note.text) : ""}</span>${fuda}${go}</div></div>`;
+}
+
+// 鍵の問い（11/01）: 問い＋選ぶ札（choice）か入力欄、確定。説明の文は出さない
+function keyHtml(cur) {
+  const k = cur.key || {};
+  const choice = (k.type || "choice") === "choice";
+  const opts = choice ? `<div class="items">${(k.options || []).map(o => `<button class="it kopt ${sel.key === String(o) ? "sel" : ""}" data-kopt="${esc(o)}">${esc(o)}</button>`).join("")}</div>` : "";
+  const inp = choice ? "" : `<input class="ain" id="kin" type="text" inputmode="${k.type === "number" ? "decimal" : "text"}" autocomplete="off" value="${esc(sel.key)}">`;
+  const look = k.look ? `<div class="look">見る: ${esc(k.look)}</div>` : "";   // 見る場所（予シリの頁。開いて調べてよい。11/01）
+  return `<div class="inq"><div class="q">🔑 ${esc(k.q || "")}</div>${look}${opts}
+    <div class="row2">${inp}<span class="msg ${note ? note.cls : ""}">${note ? esc(note.text) : ""}</span>
+    <button class="go" id="go" ${String(sel.key).trim() ? "" : "disabled"}>確定</button></div></div>`;
+}
+
+// 鍵の問いで開いた手の正解（済んだ手の行の末尾）。mark は印で見せるので字は足さない
+function keyText(s) {
+  const w = s.show;
+  if (s.keyState !== "open" || !w) return "";
+  let v = "";
+  if (s.type === "text" || s.type === "number") v = w.answer ?? "";
+  else if (s.type === "menu" || s.type === "answer") v = w.label || w.id || "";
+  else if (s.type === "order") v = (w.labels || w.ids || []).join("→");
+  else if (s.type === "place") v = w.map(x => [x.slot, x.value].filter(y => y != null).join("←")).join("・");
+  else if (s.type === "assemble") v = (w.ids || []).map(i => label(s.from, i)).join("・");
+  else if (s.type === "label") v = Object.entries(w.vals || {}).map(([k, x]) => `${label(FIG, k)}＝${x}`).join("・");
+  else if (s.type === "match" || s.type === "judge") {
+    const tk = s.tokens || [];
+    v = w.ok ? "○" : `× 「${w.at != null ? (tk[w.at] ?? w.at) : ""}」${(w.parts || []).length ? " ← " + w.parts.join("・") : ""}`;
+  }
+  return v === "" ? "" : `　🔑 ${v}`;
+}
+
+function resultText(s) {
+  const l = s.last || {};
+  if (s.type === "mark") {
+    const ms = s.tokens || [];
+    const idxs = s.status === "ok" && s.show ? [...s.show.box, ...s.show.under].sort((a, b) => a - b) : (l.marks || []);
+    return idxs.map(i => ms[i]).filter(Boolean).join("・");
+  }
+  if (s.type === "menu" || s.type === "place") return l.shelf ? label(l.shelf, l.id) : "";
+  if (s.type === "assemble") return (l.ids || []).map(i => label(l.shelf || s.from, i)).join("・");
+  if (s.type === "label") return Object.entries(l.vals || {}).map(([k, v]) => `${label(FIG, k)}＝${v}`).join("・");
+  if (s.type === "order") return (l.ids || []).map(i => label(l.shelf || s.from, i)).join("→");   // 並べかえ（11/01 夜2）
+  if (s.type === "match") return `${s.target} ${l.mark === "ng" ? "×" : l.mark === "ok" ? "○" : ""} ${kPartOr(l)}`;
+  if (s.type === "answer") return ansText(l);
+  return l.answer || "";
+}
+const ansText = l => !l ? "" : Array.isArray(l.ids) ? l.ids.join("・") : (l.id || "");   // 答え（複数選択は ・ でつなぐ）
+
+const kPartOr = l => (isK() ? kPart(l) : (l.shelf ? label(l.shelf, l.id) : ""));
+
+function ready(cur) {
+  if (cur.type === "read") return sel.lines.size > 0;
+  if (cur.type === "para") return sel.para !== null;
+  if (cur.type === "mark") return sel.marks.size > 0 || !!sel.shelf;
+  if (cur.type === "text" || cur.type === "number") return !!String(sel.answer).trim() || !!sel.shelf;
+  if (cur.type === "judge") return true;
+  if (cur.type === "assemble") return sel.ids.size > 0 || (cur.shown || []).length > 0;
+  if (cur.type === "label") return Object.keys(sel.vals).length > 0;
+  if (cur.type === "match") return !!sel.shelf && !!sel.mark;
+  if (cur.type === "answer") return cur.multi ? sel.ids.size > 0 : !!sel.id;
+  if (cur.type === "order") return sel.seq.length > 0;
+  return !!sel.shelf;
+}
+
+function render() {
+  const cur = curStep();
+  const next = S.items.findIndex((x, i) => i !== idx && !x.finished);
+  const nav = IT.finished
+    ? (next >= 0 ? `<button class="next" id="nx">次へ</button>` : S.items.length > 1 ? `<button class="next" id="nx0">一覧へ</button>` : `<div class="fin">おわり</div>`)
+    : "";
+  const side0 = $app.querySelector(".side"), sideTop = side0 ? side0.scrollTop : 0;   // 棚の送り位置は描き直しても保つ（10/31）
+  const ks0 = $app.querySelector(".kscroll"), kq0 = $app.querySelector(".kqscroll");
+  if (ks0) kScroll = ks0.scrollLeft;
+  if (kq0) kqScroll = kq0.scrollLeft;
+  $app.classList.toggle("k", !!isK());
+  const top = bar(IT.finished ? "おわり" : `手 ${doneCount(IT)}/${IT.steps.length}`);
+  const body = isK()
+    ? `<div class="kwrap"><div class="kq">${kQHtml()}${kBandHtml()}</div>${kPaneHtml()}</div>${nav}`
+    : `<div class="wrap"><div class="main">${problemHtml()}${nav}</div><div class="side">${hudHtml()}</div></div>`;
+  $app.innerHTML = `${top}${body}
+    ${S.items.length > 1 ? `<button class="next" id="back">一覧へ</button>` : ""}`;
+  const side1 = $app.querySelector(".side");
+  if (side1 && sideTop) side1.scrollTop = sideTop;
+  const ks1 = $app.querySelector(".kscroll"), kq1 = $app.querySelector(".kqscroll");
+  if (ks1) ks1.scrollLeft = kScroll === null ? ks1.scrollWidth : kScroll;   // 最初は右端（縦書きの頭）
+  if (kq1) kq1.scrollLeft = kqScroll === null ? kq1.scrollWidth : kqScroll;
+  const go = document.getElementById("go");
+  if (go && cur) go.onclick = () => keyWait(cur) ? submitKey(cur) : submit(cur);
+  const kin = document.getElementById("kin");   // 鍵の問い（11/01）の入力
+  if (kin && keyWait(cur)) { kin.oninput = () => { sel.key = kin.value; if (go) go.disabled = !String(sel.key).trim(); }; kin.onkeydown = e => { if (e.key === "Enter" && !ime(e) && String(sel.key).trim()) submitKey(cur); }; }
+  const lbin = document.getElementById("lbin"), put = document.getElementById("put");
+  if (lbin && cur) {
+    const commit = () => { const v = lbin.value.trim(); if (v) sel.vals[sel.pick] = v; else delete sel.vals[sel.pick]; sel.pick = null; note = null; render(); };
+    lbin.focus(); lbin.onkeydown = e => { if (e.key === "Enter" && !ime(e)) commit(); };
+    if (put) put.onclick = commit;
+  }
+  const ain = document.getElementById("ain");   // 数・語の入力: 打つたびに確定の可否だけ変える（描き直さない）
+  if (ain && cur && !keyWait(cur)) { ain.oninput = () => { sel.answer = ain.value; if (go) go.disabled = !ready(cur); }; ain.onkeydown = e => { if (e.key === "Enter" && !ime(e) && ready(cur)) submit(cur); }; }
+  const nx = document.getElementById("nx");
+  if (nx) nx.onclick = () => openItem(next);
+  const nx0 = document.getElementById("nx0");
+  if (nx0) nx0.onclick = () => reload(list);
+  const b = document.getElementById("back");
+  if (b) b.onclick = () => { reload(list); };
+}
+
+// タップ（選びを変えて描き直すだけ。送るのは確定か、選択肢のあたまの ○× を押したとき）
+$app.addEventListener("click", e => {
+  if (!IT) return;
+  const cur = curStep();
+  if (keyWait(cur)) {   // 鍵の問い（11/01）: 選ぶ札だけ受ける
+    const ko = e.target.closest(".kopt");
+    if (!ko) return;
+    sel.key = sel.key === ko.dataset.kopt ? "" : ko.dataset.kopt;
+    note = null; render(); return;
+  }
+  const tk = e.target.closest(".tk"), it = e.target.closest(".it, .fg"), hm = e.target.closest(".hm span[data-m]"), ab = e.target.closest(".ab");
+  if (tk && tk.dataset.k === "sent" && isK()) return tapSent(cur, tk.dataset.i);
+  const kp = e.target.closest(".kp");
+  if (kp && isK() && cur && cur.type === "para") return tapSent(cur, null, +kp.dataset.p);
+  if (!IT.cur) return;
+  if (hm && cur.type === "match" && hm.dataset.o === cur.target) {
+    if (hm.classList.contains("dis")) { note = { cls: "info", text: isK() ? "選択肢の文節をタップして、本文の文か「本文にない」を選んでから" : hm.dataset.m === "ng" ? "ちがう所をタップして、部品も選んでから" : "部品を選んでから" }; render(); return; }
+    sel.mark = hm.dataset.m;
+    note = null;
+    submit(cur);
+    return;
+  } else if (ab && cur.type === "answer") {
+    if (cur.multi) {   // 複数選択（11/01 夜2）: いくつでも
+      sel.ids.has(ab.dataset.k) ? sel.ids.delete(ab.dataset.k) : sel.ids.add(ab.dataset.k);
+      sel.shelf = sel.ids.size ? "答え" : null;
+    } else {
+      sel.shelf = "答え"; sel.id = ab.dataset.k;
+      note = null; submit(cur); return;   // 記号1つはタップで送る（11/01 夜2）
+    }
+  } else if (cur.type === "order" && (it || e.target.closest(".o[data-oid]"))) {   // 並べかえ（11/01 夜2）: タップした順に番号。もう一度で外す
+    const oo = it ? null : e.target.closest(".o[data-oid]");
+    const sh = it ? it.dataset.shelf : OPTS, id = it ? it.dataset.id : oo.dataset.oid;
+    if (sel.shelf !== sh) { sel.seq = []; sel.shelf = sh; }
+    const k = sel.seq.indexOf(id);
+    if (k >= 0) sel.seq.splice(k, 1); else sel.seq.push(id);
+    if (!sel.seq.length) sel.shelf = null;
+  } else if (tk) {
+    const k = tk.dataset.k, i = +tk.dataset.i;
+    if (k === "text" && cur.type === "mark") {
+      if (cur.shown.includes(i)) return;
+      sel.marks.has(i) ? sel.marks.delete(i) : sel.marks.add(i);
+    } else if (k.startsWith("opt:") && (cur.type === "judge" || cur.type === "match")) {
+      const o = k.slice(4);
+      if (o !== cur.target) return;
+      if (sel.opt === o && sel.at === i) { sel.opt = null; sel.at = null; } else { sel.opt = o; sel.at = i; }
+    } else return;
+  } else if (it && cur.type === "label") {
+    if (it.dataset.shelf !== FIG) return;
+    sel.pick = sel.pick === it.dataset.id ? null : it.dataset.id;
+  } else if (it && cur.type === "assemble") {
+    if (cur.from === it.dataset.shelf && cur.shown.includes(it.dataset.id)) return;
+    if (sel.shelf !== it.dataset.shelf) { sel.ids = new Set(); sel.shelf = it.dataset.shelf; }
+    sel.ids.has(it.dataset.id) ? sel.ids.delete(it.dataset.id) : sel.ids.add(it.dataset.id);
+    if (!sel.ids.size) sel.shelf = null;
+  } else if (it) {
+    if (oneTap(cur)) { sel.shelf = it.dataset.shelf; sel.id = it.dataset.id; note = null; submit(cur); return; }   // 棚から1つ選ぶ手はタップで送る（11/01 夜2）
+    if (sel.shelf === it.dataset.shelf && sel.id === it.dataset.id) { sel.shelf = null; sel.id = null; }
+    else { sel.shelf = it.dataset.shelf; sel.id = it.dataset.id; }
+  } else return;
+  note = null;
+  render();
+});
+
+// 国語: 本文のタップ。read＝線の on/off（送らない。確定で送る）／para＝段落を選ぶ／menu・match（本文から）＝その文節を選ぶ
+// （線の有無は問わない。線の無い文節はサーバが線を足して残す）／それ以外＝線の on/off をすぐ送る
+function tapSent(cur, id, pn) {
+  if (cur && cur.type === "read") {
+    sel.lines.has(id) ? sel.lines.delete(id) : sel.lines.add(id);
+    note = null; render(); return;
+  }
+  if (cur && cur.type === "para") {
+    const n = pn != null ? pn : paraOf(id);
+    sel.para = sel.para === n ? null : n;
+    note = null; render(); return;
+  }
+  if (cur && (cur.type === "menu" || cur.type === "match") && cur.from === TEXT) {
+    if (sel.shelf === TEXT && sel.id === id) { sel.shelf = null; sel.id = null; } else { sel.shelf = TEXT; sel.id = id; }
+    note = null; render(); return;
+  }
+  if (!readDone() || busy) return;
+  const lined = (IT.lines || []).includes(id);
+  busy = true;
+  call("line", { s: SID, item: IT.id, id, on: !lined }).then(r => {
+    busy = false;
+    if (!r || r.error) throw new Error(r && r.error || "返事が無い");
+    IT = S.items[idx] = r.item;
+    render();
+  }).catch(e => { busy = false; fail(e); });
+}
+
+function submit(cur) {
+  const go = document.getElementById("go");
+  if (go) go.disabled = true;
+  const payload = {};
+  if (cur.type === "mark") payload.marks = [...new Set([...sel.marks, ...cur.shown])].sort((a, b) => a - b);
+  if (cur.type === "read") payload.lines = textIds().filter(i => sel.lines.has(i));   // 本文の順
+  if (cur.type === "para") payload.para = sel.para;
+  if (cur.type === "assemble") { payload.shelf = sel.shelf || cur.from; payload.ids = [...new Set([...sel.ids, ...(cur.shown || [])])]; }
+  else if (cur.type === "order") { payload.shelf = sel.shelf || cur.from; payload.ids = [...sel.seq]; }   // 並べかえ（11/01 夜2）: タップした順
+  else if (cur.type === "answer" && cur.multi) { payload.shelf = "答え"; payload.ids = [...sel.ids]; }   // 複数選択
+  else if (cur.type === "label") { payload.shelf = FIG; payload.vals = { ...sel.vals }; }
+  else if (sel.shelf) { payload.shelf = sel.shelf; payload.id = sel.id; }
+  else if (cur.type === "judge") { payload.shelf = "○×"; payload.id = sel.at !== null ? "ng" : "ok"; }
+  if (sel.at !== null) { payload.opt = sel.opt; payload.at = sel.at; }
+  if (cur.type === "match") payload.mark = sel.mark;
+  if (cur.type === "text" || cur.type === "number") payload.answer = sel.answer;
+  call("step", { s: SID, item: IT.id, step: cur.id, payload }).then(r => {
+    if (!r || r.error) throw new Error(r && r.error || "返事が無い");
+    IT = S.items[idx] = r.item;
+    if (r.gate && !r.gate.ok) {
+      sel = newSel();
+      note = { cls: "info", text: r.gate.msg };
+    } else if (r.ok) {
+      sel = newSel();
+      note = null;
+    } else if (r.closed) {
+      sel = newSel();
+      note = keyWait(curStep()) ? null : { cls: "info", text: "ここまで。次へ。" };   // 鍵があれば次は鍵の問い（11/01）
+    } else {
+      note = { cls: "ng", text: r.msg || "ちがう" };
+      sel.mark = null;
+      if (cur.type === "mark") curStep() && curStep().shown.forEach(i => sel.marks.add(i));
+      if (cur.type === "assemble") { const c = curStep(); if (c) { sel.shelf = c.from; c.shown.forEach(i => sel.ids.add(i)); } }
+    }
+    render();
+  }).catch(fail);
+}
+
+// 鍵の問い（11/01）: ○→ 正解を見せて次の手へ／key.max 回× → 見せずに次の手へ／× → 「ちがう」
+function submitKey(cur) {
+  const go = document.getElementById("go");
+  if (go) go.disabled = true;
+  call("key", { s: SID, item: IT.id, step: cur.id, payload: { answer: sel.key } }).then(r => {
+    if (!r || r.error) throw new Error(r && r.error || "返事が無い");
+    IT = S.items[idx] = r.item;
+    if (r.opened || r.failed) { sel = newSel(); note = null; }
+    else { sel.key = ""; note = { cls: "ng", text: r.msg || "ちがう" }; }
+    render();
+  }).catch(fail);
+}
+
+function end() { render(); }
+
+function reload(then) {
+  call("session", { s: SID }).then(r => { if (!r || !r.items) throw new Error(r && r.error); S = r; then(); }).catch(fail);
+}
+
+function fail(e) {
+  $app.insertAdjacentHTML("beforeend", `<p class="err">つながらなかった。少し待ってページを開き直してね。（${esc(e && e.message || e)}）</p>`);
+}
+
+call("session", { s: SID }).then(r => {
+  if (!r || !r.items) throw new Error(r && r.error || "このリンクは使えない");
+  S = r;
+  list();
+}).catch(e => { $app.innerHTML = `<p class="err">${esc(e.message || e)}</p>`; });
+</script>
+</body>
+</html>
