@@ -46,6 +46,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:"Hiragino Sans",
 .opt{font:inherit;font-size:20px;padding:12px 6px;border:2px solid var(--line);border-radius:10px;background:#fff;cursor:pointer;color:var(--ink)}
 .opt.sel{border-color:var(--sel);background:var(--selbg)}
 input.txt{font:inherit;font-size:22px;width:100%;padding:10px 12px;border:2px solid var(--sel);border-radius:10px}
+.fld{margin:10px 0}.fld .lab{font-weight:700;margin-bottom:4px}.fld .row{display:flex;align-items:center;gap:6px}.fld .row input.txt{flex:1;width:auto;min-width:0}.fld .row span{font-size:20px}.fld .choices{grid-template-columns:repeat(auto-fill,minmax(120px,1fr))}
 .commit{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
 button.go{font:inherit;padding:14px 10px;border-radius:10px;cursor:pointer;font-size:18px}
 .c-sure{background:var(--ink);color:#fff;border:2px solid var(--ink);font-weight:700}
@@ -211,8 +212,17 @@ function gate(q, key) {
 
 // 入力欄と決定ボタン。conf=true なら「自信あり／なし」の2つ。what は入力欄に薄く出す「何の答えか」（10/25 パパ: 鍵のとき何を書くか迷った）
 function form(lead, type, options, conf, what, submit) {
+  // multi: 当てはまるものを全部選ぶ（選んだ順でなく選択肢の順に「・」でつなぐ）。
+  // fields: 欄が2つ以上の問（options＝[{label, choices?, unit?}]。欄の順に「・」でつなぐ）。2026-11-01
+  const btn = (o, f) => `<button class="opt" data-v="${esc(o)}"${f !== undefined ? ` data-f="${f}"` : ""}>${esc(o)}</button>`;
   const input = type === "choice"
-    ? `<div class="choices">${(options || []).map(o => `<button class="opt" data-v="${esc(o)}">${esc(o)}</button>`).join("")}</div>`
+    ? `<div class="choices">${(options || []).map(o => btn(o)).join("")}</div>`
+    : type === "multi"
+    ? `<div class="small">当てはまるものを全部選ぼう（もう一度押すと外れる）</div><div class="choices">${(options || []).map(o => btn(o)).join("")}</div>`
+    : type === "fields"
+    ? (options || []).map((f, i) => `<div class="fld"><div class="lab">${esc(f.label || "")}</div>${f.choices
+        ? `<div class="choices">${f.choices.map(o => btn(o, i)).join("")}</div>`
+        : `<div class="row"><input class="txt fi" data-f="${i}" autocomplete="off" autocapitalize="off">${f.unit ? `<span>${esc(f.unit)}</span>` : ""}</div>`}</div>`).join("")
     : `<input class="txt" id="ans" autocomplete="off" autocapitalize="off" placeholder="${what}">${type === "number" ? `<div class="small">書き方の例 3/4・1と5/7・2.5</div>` : ""}`;
   const btns = conf
     ? `<div class="commit"><button class="go c-sure" data-c="あり" disabled>自信あり で決定</button>
@@ -222,14 +232,30 @@ function form(lead, type, options, conf, what, submit) {
   let val = "";
   const go = [...document.querySelectorAll("#form .go")];
   const set = v => { val = v; go.forEach(b => b.disabled = !String(v).trim()); };
-  document.querySelectorAll("#form .opt").forEach(b => b.onclick = () => {
-    document.querySelectorAll("#form .opt").forEach(x => x.classList.remove("sel"));
-    b.classList.add("sel"); set(b.dataset.v);
+  const opts = [...document.querySelectorAll("#form .opt")];
+  const fv = [];   // fields の欄ごとの値
+  const setFields = () => set(fv.length === options.length && options.every((_, i) => String(fv[i] || "").trim())
+    ? options.map((_, i) => String(fv[i]).trim()).join("・") : "");
+  opts.forEach(b => b.onclick = () => {
+    if (type === "multi") {
+      b.classList.toggle("sel");
+      return set(opts.filter(x => x.classList.contains("sel")).map(x => x.dataset.v).join("・"));
+    }
+    const same = type === "fields" ? opts.filter(x => x.dataset.f === b.dataset.f) : opts;
+    same.forEach(x => x.classList.remove("sel"));
+    b.classList.add("sel");
+    if (type === "fields") { fv[+b.dataset.f] = b.dataset.v; return setFields(); }
+    set(b.dataset.v);
   });
+  const fis = [...document.querySelectorAll("#form input.fi")];
+  fis.forEach(t => t.oninput = () => { fv[+t.dataset.f] = t.value; setFields(); });
+  if (fis[0]) fis[0].focus();
   const t = document.getElementById("ans");
   if (t) { t.oninput = () => set(t.value); t.focus(); }
   window.resetForm = () => {
-    document.querySelectorAll("#form .opt").forEach(x => x.classList.remove("sel"));
+    opts.forEach(x => x.classList.remove("sel"));
+    fis.forEach(x => x.value = "");
+    fv.length = 0;
     if (t) { t.value = ""; t.focus(); }
     set("");
   };
