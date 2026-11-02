@@ -97,6 +97,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:"Hiragino Sans",
 .fig .ft{font-size:15px;fill:var(--ink);font-family:inherit;text-anchor:middle;dominant-baseline:central;pointer-events:none}
 .fig .rg.off{pointer-events:none}
 .fig .rg.cand{stroke:#8a8d93;stroke-width:1.5;stroke-dasharray:3 3}
+.fig .rg.ln.sel{fill-opacity:0;stroke-width:3}.fig .rg.ln.on{fill-opacity:0;stroke-opacity:0}   /* 横線の区画（line）: 選択中は縁だけ・確定は塗らず直径だけ（11/02 夜） */
 .fig .dia{stroke:#2b5cb8;stroke-width:3;stroke-linecap:round;pointer-events:none}
 .fig .tri{fill:#fff;fill-opacity:.85;stroke:var(--ink);stroke-width:2.5;stroke-linejoin:round;pointer-events:none}
 .fig .blu{fill:#2b5cb8;font-size:16px;font-weight:700;font-family:inherit;text-anchor:middle;dominant-baseline:central;pointer-events:none}
@@ -250,6 +251,14 @@ const workStep = () => { const c = curStep(); return keyWait(c) ? null : c; };  
 const oneTap = s => !!s && ((s.type === "menu" && s.from !== TEXT) || (s.type === "answer" && !s.multi));
 const doneCount = it => it.steps.filter(s => s.status).length;
 const bar = right => `<div class="bar"><h1>${esc(S.title)}</h1><span class="cnt">${right}</span></div>`;
+// 周回の1行（11/03〜 社理の全単元を周回。題 周1-本編-社-01）: 周・段・教科と ○の数／問の数・点（答えの手が○で10pt）。光らせない・祝わない。題が合わなければ空
+const ansStep = it => it.steps.find(s => s.beat === "答え") || it.steps[it.steps.length - 1];   // 記録の○×（11/02 A）と同じ: 答えの手、無ければ最後の手
+function lapLine() {
+  const m = String(S.title || "").match(/^周(\d+)-(本編|EX)-(社|理)-(\d+)/);
+  if (!m) return "";
+  const ok = S.items.filter(it => { const a = ansStep(it); return !!a && a.status === "ok"; }).length;
+  return `周${m[1]} ${m[2]} ${m[3] === "社" ? "社会" : "理科"} ｜ ○${ok}/${S.items.length} ${ok * 10}pt`;
+}
 const itemName = it => [it.round, it.subject, it.material, it.no].filter(Boolean).join(" ");
 const flatItems = sh => sh.items.flatMap(x => [x, ...(x.rows || [])]);   // 年表の棚は 時代 → rows（出来事）の2段
 const ARROW = { up: "↑", down: "↓", none: "・" };   // ・＝動かない／はたらかない（11/02 夜）   // 力の向き（11/02 理科）
@@ -281,7 +290,8 @@ function figureHtml() {
   const cls = (i, kind) => colorOf[i] != null ? `${kind} on c${colorOf[i]}` : selOn(i) ? `${kind} sel c${curK}` : kind;
   // 区画を押せる手（11/02 理科）: steps があれば、その手の間だけ押せる。支点の候補（tri）は押せる間だけ点線の輪
   const live = r => !r.steps || (!!cur && r.steps.includes(cur.id));
-  const rcls = r => cls(r.id, "rg") + (live(r) ? ((r.tri || r.cand) && colorOf[r.id] == null && !selOn(r.id) ? " cand" : "") : " off");
+  // line:"<直径id>"（11/02 夜 パパ: 支点△の手を「滑車をタップして直径に横線」に）: 押せる間は点線の輪、選択中は縁だけ、確定で直径の青線（△なし）
+  const rcls = r => cls(r.id, "rg") + (r.line ? " ln" : "") + (live(r) ? ((r.tri || r.cand || r.line) && colorOf[r.id] == null && !selOn(r.id) ? " cand" : "") : " off");
   const base = (f.lines || []).map(l => `<polyline class="base" points="${l.map(n => xy(n).join(",")).join(" ")}"/>`).join("")
     + (f.arrows || []).map(([a, b]) => { const p = xy(a), q = xy(b); const ang = Math.atan2(q[1] - p[1], q[0] - p[0]); const h = (t, s) => [q[0] - 14 * Math.cos(ang + t * s), q[1] - 14 * Math.sin(ang + t * s)]; const u = h(0.5, 1), w = h(0.5, -1); return `<polyline class="arrow" points="${p.join(",")} ${q.join(",")}"/><polyline class="arrow" points="${u.join(",")} ${q.join(",")} ${w.join(",")}"/>`; }).join("");
   const rgs = (f.regions || []).map(r => `<polygon class="${rcls(r)} fg" data-shelf="${FIG}" data-id="${esc(r.id)}" points="${(r.pts || []).map(n => xy(n).join(",")).join(" ")}"/>`).join("");
@@ -320,7 +330,8 @@ function figureHtml() {
   const diaOf = id => { const d = (f.diameters || []).find(x => x.id === id); if (d) return d;
     const ps = (f.regions || []).filter(r => r.tri && (r.dia || String(r.id).split("_")[0]) === id).map(r => r.at || cen(r.pts || [])).sort((a, b) => a[0] - b[0]);
     return ps.length ? { from: ps[0], to: ps[ps.length - 1] } : null; };
-  const dias = [...new Set(placedT.filter(r => r.dia !== false).map(r => r.dia || String(r.id).split("_")[0]))].map(diaOf).filter(Boolean)
+  const lineOn = (f.regions || []).filter(r => r.line && colorOf[r.id] != null).map(r => r.line);
+  const dias = [...new Set([...placedT.filter(r => r.dia !== false).map(r => r.dia || String(r.id).split("_")[0]), ...lineOn])].map(diaOf).filter(Boolean)
     .map(d => `<line class="dia" x1="${d.from[0]}" y1="${d.from[1]}" x2="${d.to[0]}" y2="${d.to[1]}"/>`).join("");
   const tris = dias + (f.regions || []).filter(triOn).map(r => { const c = r.at || cen(r.pts || []); return `<polygon class="tri" points="${c[0]},${c[1]} ${c[0] - 9},${c[1] + 16} ${c[0] + 9},${c[1] + 16}"/>`; }).join("");
   // 手が○になったら出す注記（notes の step。青の括弧と字）
@@ -356,7 +367,7 @@ function list() {
     const st = !it.started ? "まだ" : it.finished ? (it.allOk ? "揃った" : "おわり") : `手 ${doneCount(it)}/${it.steps.length}`;
     return `<div class="row" data-i="${i}"><span class="n">${esc(itemName(it))}</span><span class="st">${st}</span></div>`;
   }).join("");
-  $app.innerHTML = `${bar(`${S.items.length}問`)}<div class="card">${rows}</div>`;
+  $app.innerHTML = `${bar(lapLine() || `${S.items.length}問`)}<div class="card">${rows}</div>`;
   $app.querySelectorAll(".row").forEach(r => r.onclick = () => openItem(+r.dataset.i));
 }
 
@@ -652,7 +663,8 @@ function render() {
   if (ks0) kScroll = ks0.scrollLeft;
   if (kq0) kqScroll = kq0.scrollLeft;
   $app.classList.toggle("k", !!isK());
-  const top = bar(IT.finished ? "おわり" : `手 ${doneCount(IT)}/${IT.steps.length}`);
+  const lap = lapLine();
+  const top = bar((lap ? `${esc(lap)}　` : "") + (IT.finished ? "おわり" : `手 ${doneCount(IT)}/${IT.steps.length}`));
   const body = isK()
     ? `<div class="kwrap"><div class="kq">${kQHtml()}${kBandHtml()}</div>${kPaneHtml()}</div>${nav}`
     : `<div class="wrap"><div class="main">${problemHtml()}${nav}</div><div class="side">${hudHtml()}</div></div>`;
