@@ -84,8 +84,15 @@ const SID = window.NAOSHI_SID || params.get("s") || "";   // GAS が配ったと
 // script.google.com は13歳未満の Google アカウントでログインしたブラウザだとはじかれるので、ページは外に置く）
 const DEPLOY = params.get("d") || "";
 const API = window.NAOSHI_API || (DEPLOY ? `https://script.google.com/macros/s/${encodeURIComponent(DEPLOY)}/exec` : "api");
+// 試しモード（&try=1。apps/dash/schema.md §3）: サーバは naoshi_try_log にだけ書き、おわりも付けない。上に固定の帯
+const TRY = params.get("try") === "1";
+if (TRY) {
+  document.body.insertAdjacentHTML("afterbegin", '<div id="trybar" style="position:fixed;top:0;left:0;right:0;z-index:50;background:var(--selbg);color:var(--sel);border-bottom:1px solid var(--line);font-size:14px;line-height:1.6;text-align:center;padding:2px 8px">試し（記録しない）</div>');
+  document.body.style.paddingTop = "26px";
+}
 
 function call(op, args) {
+  if (TRY) args = Object.assign({}, args, { try: true });
   if (window.google && google.script && google.script.run) {
     return new Promise((ok, ng) =>
       google.script.run.withSuccessHandler(ok).withFailureHandler(ng).naoshiApi(op, args));
@@ -177,7 +184,7 @@ function step() {
 // 鍵の無い推論の問は、2回目の×のあと1回だけ。鍵の問いも2回まで（10/21 パパ: 演問 5B08 で比の1桁を6回当てにいった）。
 // 計算は数が大きく当てにならないので、今までどおり正解するまで。回数は端末に覚える（開き直しで戻らない）
 const capped = q => q.kind !== "知識" && !/^計算/.test(S.title || "");
-const triesKey = q => `naoshi:${SID}:${q.id}`;
+const triesKey = q => `${TRY ? "naoshi.try" : "naoshi"}:${SID}:${q.id}`;   // 試しは本番の回数を減らさない
 function triesUsed(q) { try { return +localStorage.getItem(triesKey(q)) || 0; } catch (e) { return 0; } }
 function useTry(q) { try { localStorage.setItem(triesKey(q), triesUsed(q) + 1); } catch (e) {} }
 function closed(q) {
