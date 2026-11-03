@@ -117,3 +117,10 @@ details.dads-disclosure:first-of-type{border-top:0}
   .dz-bar .b{grid-column:1 / -1;grid-row:2}
   .dz-plan li{grid-template-columns:22px 3.2em 1fr;gap:2px 6px}
 }
+.dz-search{width:100%;box-sizing:border-box;font-size:1rem;padding:10px 12px;margin:0 0 8px;border:1px solid var(--color-neutral-solid-gray-420);border-radius:6px}
+.dz-links{list-style:none;margin:0 0 8px;padding:0}
+.dz-links li{display:flex;align-items:baseline;gap:6px;min-height:44px;padding:8px 0;border-bottom:1px solid var(--color-neutral-solid-gray-200,#ddd)}
+.dz-links .d{color:var(--sub);font-size:calc(14/16*1rem);flex:none;min-width:3.2em}
+.dz-links .dz-tag{margin-left:0;flex:none}
+.dz-links .t{flex:1;min-width:0;overflow-wrap:anywhere}
+.dz-links .s{color:var(--sub);font-size:calc(13/16*1rem);margin-top:2px}

@@ -75,9 +75,55 @@
         + `<span class="n">${esc(r.done)}／${esc(r.total)}　<span class="dz-muted">${esc(r.last || "")}</span></span></div>`;
     }).join("");
   }
+  // 共有したリンク（検索＋もっと見る）。データは DOM API だけで組む（innerHTML に入れない）
+  let LQ = "", LALL = false;
+  function linksCard() {
+    return `<section class="dz-card"><h2 class="dz-h">共有したリンク</h2><div id="dz-links"></div></section>`;
+  }
+  function paintLinks() {
+    const box = document.getElementById("dz-links");
+    if (!box) return;
+    const all = (D.links || []).filter(x => x && typeof x.url === "string");
+    const q = LQ.trim().toLowerCase();
+    const hit = q ? all.filter(x => [x.title, x.kind, x.note, x.path].join(" ").toLowerCase().indexOf(q) >= 0) : all;
+    const shown = LALL ? hit : hit.slice(0, 30);
+    let list = box.querySelector("ul");
+    if (!box.querySelector("input")) {
+      const inp = document.createElement("input");
+      inp.type = "search"; inp.className = "dz-search"; inp.placeholder = "題・フォルダで探す"; inp.setAttribute("aria-label", "題・フォルダで探す");
+      inp.addEventListener("input", () => { LQ = inp.value; paintLinks(); });
+      box.appendChild(inp);
+      list = null;
+    }
+    box.querySelector("input").value = LQ;
+    [].slice.call(box.children).forEach(c => { if (c.tagName !== "INPUT") box.removeChild(c); });
+    if (!shown.length) {
+      const p = document.createElement("p"); p.className = "dz-empty"; p.textContent = all.length ? "なし" : "まだ無い"; box.appendChild(p); return;
+    }
+    list = document.createElement("ul"); list.className = "dz-links";
+    shown.forEach(x => {
+      const li = document.createElement("li");
+      const d = document.createElement("span"); d.className = "d"; d.textContent = (x.at || "").slice(0, 5);
+      const k = document.createElement("span"); k.className = "dz-tag"; k.textContent = x.kind || "ほか";
+      const a = document.createElement("a"); a.href = /^https?:\/\//i.test(x.url) ? x.url : "#"; a.target = "_blank"; a.rel = "noopener";
+      a.textContent = x.title || "(題なし)"; a.title = x.n > 1 ? `${x.n}回共有` : "";
+      const w = document.createElement("div"); w.className = "t"; w.appendChild(a);
+      const sub = [x.note, x.path].filter(Boolean).join("　");   // 会話での呼び名・Drive のフォルダ
+      if (sub) { const s2 = document.createElement("div"); s2.className = "s"; s2.textContent = sub; w.appendChild(s2); }
+      li.appendChild(d); li.appendChild(k); li.appendChild(w); list.appendChild(li);
+    });
+    box.appendChild(list);
+    if (!LALL && hit.length > shown.length) {
+      const b = document.createElement("button"); b.type = "button"; b.className = "dads-button"; b.setAttribute("data-type", "outline"); b.setAttribute("data-size", "sm");
+      b.textContent = `もっと見る（残り ${hit.length - shown.length}）`;
+      b.addEventListener("click", () => { LALL = true; paintLinks(); });
+      box.appendChild(b);
+    }
+  }
   function tabKyou() {
     const n = D.nendai || {};
     return card("worker", workerLine())
+      + linksCard()
       + card("日割りと実行", planDays())
       + `<div class="dz-grid">`
       + card("LINE 提出（直近3日）", table(D.submits, [
@@ -202,6 +248,7 @@
       + `<nav aria-label="ページ内の切り替え"><ul class="dads-menu-list dz-tabs">${TABS.map(([k, l]) =>
           `<li><button type="button" class="dads-menu-list__item" data-type="standard" data-size="regular" data-tab="${k}"${k === TAB ? ` data-current aria-current="page"` : ""}>${l}</button></li>`).join("")}</ul></nav>`
       + body;
+    if (TAB === "kyou") paintLinks();
   }
   function onClick(e) {
     const t = e.target.closest("[data-tab]");
