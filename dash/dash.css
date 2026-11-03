@@ -1,0 +1,116 @@
+/* てみぷろ 親ページ（apps/dash/schema.md §8・§9）。DADS の global.css・components.css の上に乗せる自前の1枚。
+   公開 Pages に置く（データは私用デプロイからしか来ない）。 */
+:root{
+  --ink: var(--color-neutral-solid-gray-800);
+  --sub: var(--color-neutral-solid-gray-600);
+  --line: var(--color-neutral-solid-gray-200);
+  --bg: var(--color-neutral-solid-gray-50);
+  --ok: var(--color-semantic-success-1);
+  --ng: var(--color-semantic-error-1);
+  --s-算: var(--color-primitive-blue-600);
+  --s-国: var(--color-primitive-magenta-600);
+  --s-理: var(--color-primitive-green-600);
+  --s-社: var(--color-primitive-orange-600);
+  --s-計: var(--color-neutral-solid-gray-600);
+  --s-漢: var(--color-primitive-purple-600);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);-webkit-text-size-adjust:100%}
+#app{max-width:1080px;margin:0 auto;padding:12px 16px 48px;font-size:calc(17/16*1rem);line-height:1.7}
+.dz-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:4px 0 8px}
+.dz-head h1{margin:0;font-size:calc(22/16*1rem);line-height:1.4}
+.dz-small{font-size:calc(14/16*1rem);color:var(--sub);line-height:1.5}
+.dz-muted{color:var(--sub)}
+h2.dz-h{font-size:calc(18/16*1rem);line-height:1.5;margin:0 0 8px}
+h3.dz-h{font-size:calc(16/16*1rem);line-height:1.5;margin:12px 0 4px}
+
+/* 上部タブ（menu-list を横に。狭い幅では横スクロール） */
+.dz-tabs{display:flex;flex-wrap:nowrap;gap:4px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;
+  border-bottom:1px solid var(--line);margin-bottom:16px;padding:2px 2px 6px;position:sticky;top:0;background:var(--bg);z-index:5}
+.dz-tabs::-webkit-scrollbar{display:none}
+.dz-tabs li{flex:none}
+.dz-tabs .dads-menu-list__item{width:auto;white-space:nowrap}
+
+.dz-card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 16px;margin-bottom:16px;min-width:0}
+.dz-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:0 16px}
+
+/* 表（Dns-16） */
+.dz-tbl{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.dz-tbl table{border-collapse:collapse;width:100%}
+.dz-tbl th,.dz-tbl td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;white-space:nowrap}
+.dz-tbl thead th{font-size:calc(14/16*1rem);color:var(--sub);font-weight:700;background:var(--color-neutral-solid-gray-50)}
+.dz-tbl td.num,.dz-tbl th.num{text-align:right;font-variant-numeric:tabular-nums}
+.dz-tbl td.wrap{white-space:normal;min-width:12em}
+.dz-tbl td.wide{white-space:normal;min-width:min(28em,70vw)}
+.dz-tbl tr.fail td{color:var(--ng);background:var(--color-primitive-red-50)}
+.dz-empty{color:var(--sub);font-size:calc(14/16*1rem)}
+
+/* 状態の行 */
+.dz-state{display:flex;flex-wrap:wrap;gap:4px 16px;align-items:center}
+.dz-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:1px}
+.dz-dot.ok{background:var(--ok)} .dz-dot.ng{background:var(--ng)}
+.dz-errs{margin:6px 0 0;padding-left:1.2em;color:var(--ng);font-size:calc(14/16*1rem)}
+
+/* 日割り */
+.dz-plan{list-style:none;margin:0;padding:0}
+.dz-plan li{display:grid;grid-template-columns:24px 4.2em 1fr;gap:2px 8px;padding:6px 0;border-top:1px solid var(--line);align-items:baseline}
+.dz-plan li:first-child{border-top:0}
+.dz-plan .st{text-align:center;font-size:calc(18/16*1rem)}
+.dz-plan .st.ok{color:var(--ok)}
+.dz-plan .tm{color:var(--sub);font-size:calc(14/16*1rem);font-variant-numeric:tabular-nums}
+.dz-plan .ev{grid-column:3;font-size:calc(14/16*1rem);color:var(--sub)}
+.dz-plan li.fixed{color:var(--sub)}
+.dz-tag{display:inline-block;border:1px solid var(--color-neutral-solid-gray-420);border-radius:4px;padding:0 5px;font-size:calc(14/16*1rem);line-height:1.5;color:var(--sub);margin-left:6px;white-space:nowrap}
+.dz-tag.must{border-color:var(--ink);color:var(--ink)}
+details.dads-disclosure{border-top:1px solid var(--line);padding:8px 0}
+details.dads-disclosure:first-of-type{border-top:0}
+.dads-disclosure__summary{min-height:44px;align-items:center;font-weight:700;cursor:pointer}
+.dads-disclosure__content{padding-left:8px;margin:4px 0 8px}
+
+/* 帯 */
+.dz-bar{display:grid;grid-template-columns:minmax(8em,1.2fr) 2fr auto;gap:8px;align-items:center;padding:6px 0;border-top:1px solid var(--line)}
+.dz-bar:first-child{border-top:0}
+.dz-bar .b{height:10px;border-radius:5px;background:var(--color-neutral-solid-gray-100);overflow:hidden}
+.dz-bar .b i{display:block;height:100%;border-radius:5px;background:var(--color-key-600)}
+.dz-bar .n{font-variant-numeric:tabular-nums;white-space:nowrap;font-size:calc(14/16*1rem)}
+
+/* 成績の小さな折れ線（教科ごとの small multiples。y は 40〜70 共通、58 に基準線） */
+.dz-charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:12px}
+.dz-chart{position:relative}
+.dz-chart h3{margin:0 0 2px;font-size:calc(16/16*1rem);display:flex;align-items:center;gap:6px}
+.dz-chart h3 .sw{width:12px;height:3px;border-radius:2px;display:inline-block}
+.dz-chart svg{display:block;width:100%;height:auto;overflow:visible}
+.dz-chart .grid{stroke:var(--color-neutral-solid-gray-100);stroke-width:1}
+.dz-chart .ref{stroke:var(--color-neutral-solid-gray-536);stroke-width:1;stroke-dasharray:4 3}
+.dz-chart .ax{fill:var(--sub);font-size:11px;font-family:var(--font-family-sans)}
+.dz-chart .lbl{fill:var(--ink);font-size:12px;font-weight:700;font-family:var(--font-family-sans)}
+.dz-chart .hit{fill:transparent;cursor:default}
+.dz-tip{position:absolute;pointer-events:none;background:#fff;border:1px solid var(--line);border-radius:6px;box-shadow:var(--elevation-2);
+  padding:4px 8px;font-size:calc(14/16*1rem);line-height:1.4;white-space:nowrap;display:none;z-index:3}
+
+/* イシューの要約 */
+.dz-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+.dz-chip{border:1px solid var(--line);border-radius:8px;padding:4px 12px;background:#fff;font-size:calc(16/16*1rem)}
+.dz-chip b{font-size:calc(20/16*1rem);margin-left:6px;font-variant-numeric:tabular-nums}
+.dz-subj{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;color:#fff;font-size:12px;font-weight:700;vertical-align:1px}
+
+/* コベツバ 回×教科 */
+.dz-kgrid td.num.z{color:var(--color-neutral-solid-gray-300)}
+
+/* 手を確かめる */
+.dz-btns{display:flex;gap:8px;flex-wrap:nowrap}
+.dz-btns .dads-button{white-space:nowrap}
+.dz-code{display:flex;align-items:stretch;gap:8px;flex-wrap:wrap}
+.dz-code code{flex:1;min-width:0;display:block;background:var(--color-neutral-solid-gray-50);border:1px solid var(--line);border-radius:6px;
+  padding:8px 10px;font-family:var(--font-family-mono);font-size:calc(14/16*1rem);overflow-x:auto;white-space:pre}
+
+.dz-err{padding:40px 0;text-align:center}
+.dz-foot{text-align:center;margin-top:24px}
+
+@media (max-width:600px){
+  #app{padding:8px 12px 40px}
+  .dz-card{padding:10px 12px}
+  .dz-bar{grid-template-columns:1fr auto}
+  .dz-bar .b{grid-column:1 / -1;grid-row:2}
+  .dz-plan li{grid-template-columns:22px 3.2em 1fr;gap:2px 6px}
+}
