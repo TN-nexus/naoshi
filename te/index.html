@@ -203,8 +203,12 @@ const PREVIEW = params.get("preview") === "1";
 const SID = window.TE_SID || params.get("s") || "";
 const DEPLOY = params.get("d") || "";
 const API = PREVIEW ? "/api" : (DEPLOY ? `https://script.google.com/macros/s/${encodeURIComponent(DEPLOY)}/exec` : "api");
+// 試しモード（&try=1。apps/dash/schema.md §3）: サーバは te_try_log にだけ書く。帯はページの上の流れの中（棚・HUD の sticky に重ねない）
+const TRY = params.get("try") === "1";
+if (TRY) document.body.insertAdjacentHTML("afterbegin", '<div id="trybar" style="background:var(--selbg);color:var(--sel);border-bottom:1px solid var(--line);font-size:14px;line-height:1.6;text-align:center;padding:2px 8px">試し（記録しない）</div>');
 
 function call(op, args) {
+  if (TRY) args = Object.assign({}, args, { try: true });
   if (!PREVIEW && window.google && google.script && google.script.run) {
     return new Promise((ok, ng) =>
       google.script.run.withSuccessHandler(ok).withFailureHandler(ng).teApi(op, args));
