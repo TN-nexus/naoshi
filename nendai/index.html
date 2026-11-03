@@ -114,7 +114,9 @@ const N = window.NENDAI || { sheet: "", eras: [], items: [] };
 const params = new URLSearchParams(location.search);
 const DEPLOY = params.get("d") || "";
 const API = DEPLOY ? `https://script.google.com/macros/s/${encodeURIComponent(DEPLOY)}/exec` : "";
-const PKEY = "nendai.progress.v1", QKEY = "nendai.queue.v1", DKEY = "nendai.dev";
+// 試しモード（&try=1。apps/dash/schema.md §3）: 端末「テスト-パパ」で送る（pull.py が捨てる）。進み・キューは本番と別の鍵
+const TRY = params.get("try") === "1";
+const PKEY = TRY ? "nendai.progress.try" : "nendai.progress.v1", QKEY = TRY ? "nendai.queue.try" : "nendai.queue.v1", DKEY = "nendai.dev";
 const $app = document.getElementById("app");
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const ERA = Object.fromEntries(N.eras.map(e => [e.id, e]));
@@ -137,7 +139,7 @@ const eraBundles = id => BUNDLES.filter(b => b.era === id);
 // 端末・進み・ログのキュー（localStorage が使えなくても止めない）
 const ls = { get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
              set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} } };
-let DEV = ls.get(DKEY, "");
+let DEV = TRY ? "テスト-パパ" : ls.get(DKEY, "");
 if (!DEV) { DEV = "n" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); ls.set(DKEY, DEV); }
 // 進み: jb[束]=1（じゅんばん 全○）、mz[束]=0..3（まぜる 済んだ段）
 let P = ls.get(PKEY, { jb: {}, mz: {} });
@@ -391,6 +393,10 @@ $app.addEventListener("click", ev => {
   else if (a === "mazeru") startRun("mazeru", el.dataset.b, +el.dataset.st);
   else if (a === "naraberu") naraberu(el.dataset.era);
 });
+if (TRY) {   // 上に固定の帯。本文と重ね画面（.ov）は帯の下から
+  document.body.insertAdjacentHTML("afterbegin", '<div id="trybar" style="position:fixed;top:0;left:0;right:0;z-index:55;background:var(--selbg);color:var(--sel);border-bottom:1px solid var(--line);font-size:14px;line-height:1.6;text-align:center;padding:2px 8px">試し（記録しない）</div><style>.ov{top:26px}</style>');
+  document.body.style.paddingTop = "26px";
+}
 if (!API) { const t = document.createElement("div"); t.id = "norec"; t.textContent = "きろくなし"; document.body.appendChild(t); $app.style.paddingTop = "16px"; }
 // デバッグ: #test=junban:弥生 / #test=mazeru:平安①:2 / #test=naraberu:平安 / #test=oboeru:弥生 / #test=junban:弥生:ng（×の画面）/ #test=ov:heian
 (function boot() {
