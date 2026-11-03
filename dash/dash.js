@@ -1,3 +1,16 @@
+// CSS を自分で足す（GAS の HtmlService は <head> の <link> が効かないことがある。Pages の自分の場所から相対で。二重には足さない）
+(function () {
+  var me = document.currentScript && document.currentScript.src;
+  if (!me) return;
+  var base = me.replace(/dash\/dash\.js.*$/, "");
+  var v = (me.match(/[?&]v=([^&]+)/) || [])[1] || "";
+  var q = v ? "?v=" + v : "";
+  var has = function (name) { return !![].slice.call(document.querySelectorAll('link[rel=stylesheet]')).filter(function (l) { return l.href.indexOf(name) >= 0 && l.sheet; }).length; };
+  [["dads/global.css", ""], ["dads/components.css", ""], ["dash/dash.css", q]].forEach(function (f) {
+    if (has(f[0])) return;
+    var l = document.createElement("link"); l.rel = "stylesheet"; l.href = base + f[0] + f[1]; document.head.appendChild(l);
+  });
+})();
 // てみぷろ 親ページの UI（apps/dash/schema.md §8・§9）。公開 Pages に置く。データは私用デプロイの殻から渡る。
 // 殻（GAS Dash.html／ローカル dash/index.html）が window.renderParent(jsonString) か window.renderError(err) を呼ぶ。
 // 読むだけ。依存なし。
