@@ -1,3 +1,6 @@
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap");
+@import url("../dads/global.css");
+@import url("../dads/components.css");
 /* てみぷろ 親ページ（apps/dash/schema.md §8・§9）。DADS の global.css・components.css の上に乗せる自前の1枚。
    公開 Pages に置く（データは私用デプロイからしか来ない）。 */
 :root{
