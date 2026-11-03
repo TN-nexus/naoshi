@@ -117,7 +117,7 @@ async function load() {
   return j;
 }
 
-function fail() { $app.innerHTML = `<p class="err">きろくを読めなかった</p>`; }
+function fail(e) { $app.innerHTML = `<p class="err">きろくを読めなかった</p><p class="small">（${esc((e && e.message) || e)}）パパにこの画面を見せてね</p>`; }
 
 function stGlyph(done) { return done === "済" ? "☑" : done === "途中" ? "◐" : "☐"; }
 function stLabel(done) { return done === "済" ? "すんだ" : done === "途中" ? "とちゅう" : "まだ"; }
