@@ -66,6 +66,30 @@ table.sum .re{font-size:14px;color:var(--sub)}
 .err{color:var(--ng)}
 .note{margin-top:6px;padding:8px 10px;border-radius:8px;background:var(--hintbg);font-size:16px}
 .note b{color:var(--hint)}
+/* なぜ（2026-11-04 設計 steady-honking-sutherland）: 並べ・なぜ・明かす */
+.wtag{display:inline-block;font-size:12px;line-height:1.5;color:var(--sel);border:1px solid var(--sel);border-radius:6px;padding:0 6px;margin-left:6px;white-space:nowrap;vertical-align:1px}
+.narabe{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0}
+@media (max-width:560px){.narabe{grid-template-columns:1fr}}
+.col{border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:17px}
+.col .h{font-weight:700;font-size:14px;color:var(--sub);margin-bottom:4px}
+.col ol{margin:0;padding-left:1.5em}
+.col li{margin:3px 0}
+.col .ok{color:var(--ok);font-weight:700} .col .ng{color:var(--ng);font-weight:700}
+.kb{display:inline-block;margin-top:8px;font-size:16px;color:var(--sel)}
+.ask{font-weight:700;margin:16px 0 6px}
+.steps{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px}
+.steps .opt{font-size:17px}
+.premise{border:2px solid var(--line);border-radius:10px;padding:10px 12px;margin:10px 0;font-size:17px}
+.premise b{color:var(--sub)}
+.fill{font-size:19px;line-height:2.2;margin:6px 0}
+.fill b.w{color:var(--sel)}
+input.blank{font:inherit;font-size:19px;width:250px;max-width:100%;padding:2px 8px;border:2px solid var(--sel);border-radius:8px;margin:0 4px}
+input.blank::placeholder{font-size:14px}
+.wopts{display:grid;gap:8px;margin:12px 0 0}
+.opt.wide{font-size:17px;text-align:left;padding:12px 14px;line-height:1.5}
+.rb{font-size:20px;font-weight:800;color:var(--ng);margin-bottom:4px}
+.rbt{font-size:19px;font-weight:700}
+.lab2{font-weight:700;color:var(--sub);font-size:15px}
 </style>
 </head>
 <body>
@@ -124,7 +148,8 @@ const bar = right => `<div class="bar"><h1>${esc(S.title)}</h1><span class="cnt"
 // ---------------------------------------------------------------- 一覧
 function list() {
   const ng = S.items.filter(q => !q.first.ok);
-  todo = ng.filter(q => q.state !== "open");
+  // なぜの問は○でも直す（○ → なぜ）。なぜの無い問は今までどおり ×で開いていないもの
+  todo = S.items.filter(q => q.why ? q.state !== "open" : (!q.first.ok && q.state !== "open"));
   const rows = S.items.map(q => {
     const open = q.first.ok || q.state === "open";
     const tail = q.first.ok ? "　正解" : open ? `　→ 正解 ${esc(q.answer)}` : "　→ 直す";
@@ -132,7 +157,7 @@ function list() {
     <div class="row">
       <span class="mk ${q.first.ok ? "ok" : "ng"}">${q.first.ok ? "○" : "×"}</span>
       <span class="n">${esc(q.no)}</span>
-      <span class="a">てみ回答: ${mineAns(q)}${tail}
+      <span class="a">てみ回答: ${mineAns(q)}${tail}${q.why ? `<span class="wtag">${q.first.ok ? "○ → なぜ" : "なぜ"}</span>` : ""}
         ${q.first.ok && q.note ? `<div class="note"><b>ひとこと</b>　${esc(q.note)}</div>` : ""}
         ${open && q.explain ? `<details><summary>解説</summary>${esc(q.explain)}${yoshiri(q)}</details>` : ""}
       </span>
@@ -153,6 +178,7 @@ function list() {
 function step() {
   if (cur >= todo.length) return done();
   const q = todo[cur];
+  if (q.why) return whyStep(q);   // なぜの問は鍵・回数の上限・端末の回数を通らない
   $app.innerHTML = `
     ${bar(`直し ${cur + 1}/${todo.length}`)}
     <div class="card" id="card">
@@ -165,11 +191,7 @@ function step() {
     <button class="next" id="next" style="display:none">${cur + 1 < todo.length ? "次の問題へ" : "おわり"}</button>`;
   document.getElementById("next").onclick = () => { cur++; step(); };
   if (q.state === "tried") return gate(q, q.key);   // 前に2回目まで答えた問は鍵から
-  const lead = q.kind === "知識"
-    ? `<div class="box hint"><div class="h">調べて書こう</div>覚える問題。見る場所を開いて、正しい答えを書こう。${look(q)}${yoshiri(q)}</div>`
-    : `<div class="box hint"><div class="h">考える手がかり</div>${esc(q.hint)}${look(q)}${yoshiri(q)}</div>
-       <div class="small">見る場所を開いて確かめてから答えてもいい。</div>`;
-  form(lead, q.type, q.options, true, "この問題の答え", (val, conf) =>
+  form(leadOf(q), q.type, q.options, true, "この問題の答え", (val, conf) =>
     call("answer", { s: SID, id: q.id, answer: val, conf }).then(r => {
       if (r.error) throw new Error(r.error);
       clearWork();
@@ -179,6 +201,13 @@ function step() {
       showNext();
       gate(q, r.key);
     }));
+}
+
+function leadOf(q) {
+  return q.kind === "知識"
+    ? `<div class="box hint"><div class="h">調べて書こう</div>覚える問題。見る場所を開いて、正しい答えを書こう。${look(q)}${yoshiri(q)}</div>`
+    : `<div class="box hint"><div class="h">考える手がかり</div>${esc(q.hint)}${look(q)}${yoshiri(q)}</div>
+       <div class="small">見る場所を開いて確かめてから答えてもいい。</div>`;
 }
 
 // 鍵の無い推論の問は、2回目の×のあと1回だけ。鍵の問いも2回まで（10/21 パパ: 演問 5B08 で比の1桁を6回当てにいった）。
@@ -279,15 +308,176 @@ function mark(label, val, ok) {
   addWork(`<div class="mine">${label}<b style="color:${ok ? "var(--ok)" : "var(--ng)"}">${esc(val)}</b>　${ok ? "○" : "×"}</div>`);
 }
 
-function opened(r) {
-  addWork(`
+// 正解・解説・予シリ・図の箱。head は大きい字の1行（鍵の流れと なぜ の流れで共用）
+function revealBox(r, head) {
+  const im = r.image || r.revealImage, note = r.imageNote || r.revealImageNote;
+  return `
     <div class="box ok">
-      <div class="big">${r.ok ? "正解" : "🔑 開いた　正解: " + esc(r.answer)}</div>
+      <div class="big">${head}</div>
       <div>${esc(r.explain)}</div>
       ${r.yoshiri ? `<div class="yoshiri">📖 ${esc(r.yoshiri)}</div>` : ""}
-      ${r.image ? `<img class="img" src="${esc(r.image)}" alt="">` : r.imageNote ? `<div class="imgslot">${esc(r.imageNote)}</div>` : ""}
-    </div>`);
+      ${im ? `<img class="img" src="${esc(im)}" alt="">` : note ? `<div class="imgslot">${esc(note)}</div>` : ""}
+    </div>`;
+}
+function opened(r) {
+  addWork(revealBox(r, r.ok ? "正解" : "🔑 開いた　正解: " + esc(r.answer)));
   showNext();
+}
+
+// ---------------------------------------------------------------- なぜ（2026-11-04）
+// ×: 解き直し1回 → 並べ（どこまで同じだった？）→ なぜ（一言 → 3択＋自信）→ 明かす。○: なぜ → 明かす。
+// 一言・どこまでは判定しない（記録だけ）。判定はサーバ（op=why の なぜ）。開き直したら whyStage から続ける
+const setWork = html => { document.getElementById("work").innerHTML = html; };
+const toTop = () => { const c = document.getElementById("card"); if (c) c.scrollIntoView({ block: "start" }); };
+const okx = ok => ok ? "○" : "×";
+
+function whyStep(q) {
+  const pick = q.why.pick || (q.first.ok ? "○" : "×");
+  $app.innerHTML = `
+    ${bar(`直し ${cur + 1}/${todo.length}`)}
+    <div class="card" id="card">
+      <div class="tag">${esc(q.no)}<span class="wtag">${pick === "○" ? "○ → なぜ" : "なぜ"}</span></div>
+      <div class="q">${esc(q.text)}</div>
+      ${img(q)}
+      <div class="mine">てみ回答: <b${pick === "○" ? ` style="color:var(--ok)"` : ""}>${mineAns(q)}</b>　${pick === "○" ? "○" : q.first.unread ? "読めなかった" : "不正解"}</div>
+      <div id="work"></div>
+    </div>
+    <button class="next" id="next" style="display:none">${cur + 1 < todo.length ? "次の問題へ" : "おわり"}</button>`;
+  document.getElementById("next").onclick = () => { cur++; step(); };
+  const w = q.why.on ? null : q.why;   // {on:1} は×で解き直し前（なぜの中身はまだ届いていない）
+  if (pick === "○") return naze(q, w, q.whyStage === "一言");
+  if (!q.second || !w) {
+    return form(leadOf(q) + `<div class="small">解き直しは1回。</div>`, q.type, q.options, true, "この問題の答え", (val, conf) =>
+      call("answer", { s: SID, id: q.id, answer: val, conf }).then(r => {
+        if (r.error) throw new Error(r.error);
+        q.second = r.second || { answer: val, ok: !!r.ok };
+        q.why = r.why; q.whyStage = "";
+        clearWork();
+        narabe(q, r.why, true);
+      }));
+  }
+  if (q.whyStage === "どこまで") return naze(q, w, false);
+  if (q.whyStage === "一言" || q.whyStage === "なぜ") return naze(q, w, true);
+  narabe(q, w, false);
+}
+
+// 並べ: 左に てみの答え（1回目・2回目）、右に 正しい解き方（番号つきの段。最後は答え）
+function narabe(q, w, fresh) {
+  const steps = w.steps || [];
+  const sec = q.second || {};
+  const upto = [];
+  for (let i = 1; i < steps.length; i++) upto.push([String(i), `${i}まで`]);
+  upto.push(["最初から", "最初から違う"], ["わからない", "わからない"]);
+  addWork(`
+    ${fresh ? `<div class="mine">2回目: <b style="color:${sec.ok ? "var(--ok)" : "var(--ng)"}">${esc(sec.answer)}</b>　${okx(sec.ok)}</div>` : ""}
+    <div class="narabe">
+      <div class="col"><div class="h">てみの答え</div>
+        <div>1回目: ${mineAns(q)}（<span class="ng">×</span>）</div>
+        <div>2回目: ${sec.answer ? esc(sec.answer) : "（空欄）"}（<span class="${sec.ok ? "ok" : "ng"}">${okx(sec.ok)}</span>）</div>
+      </div>
+      <div class="col"><div class="h">正しい解き方</div>
+        <ol>${steps.map(s => `<li>${esc(s)}</li>`).join("")}</ol>
+        ${w.kobetsuba ? `<a class="kb" href="https://www.youtube.com/watch?v=${encodeURIComponent(w.kobetsuba)}" target="_blank" rel="noopener">▶ コベツバの解説を見る</a>` : ""}
+      </div>
+    </div>
+    <div id="dm">
+      <div class="ask">どこまで同じだった？</div>
+      <div class="steps">${upto.map(([v, t]) => `<button class="opt" data-v="${esc(v)}">${esc(t)}</button>`).join("")}</div>
+    </div>`);
+  const bs = [...document.querySelectorAll("#dm .opt")];
+  bs.forEach(b => b.onclick = () => {
+    bs.forEach(x => x.disabled = true);
+    b.classList.add("sel");
+    call("why", { s: SID, id: q.id, stage: "どこまで", answer: b.dataset.v, conf: "" }).then(r => {
+      if (r.error) throw new Error(r.error);
+      q.whyStage = "どこまで";
+      setWork("");
+      naze(q, w, false);
+      toTop();
+    }).catch(e => { bs.forEach(x => x.disabled = false); b.classList.remove("sel"); fail(e); });
+  });
+}
+
+// なぜ: 前提 → 問い → 穴埋めに一言 → 3択 → 自信あり／なしで決定
+function naze(q, w, optsNow) {
+  const parts = String(w.穴埋め || "").split(/［[\s　]*］/);
+  const before = parts[0], after = parts.slice(1).join("［　］");
+  const blank = optsNow
+    ? `<b class="w">［　］</b>`
+    : `<input class="blank" id="hito" maxlength="10" placeholder="ことばを1つ。わからなければ ？" inputmode="text" autocomplete="off" autocapitalize="off">`;
+  addWork(`
+    <div class="premise"><b>前提:</b> ${esc(w.前提)}</div>
+    <div class="ask">${esc(w.問い)}</div>
+    <div class="fill">${esc(before)}${blank}${esc(after)}</div>
+    ${optsNow ? "" : `<div class="commit" style="grid-template-columns:1fr" id="hb"><button class="go c-sure" id="hgo" disabled>決めた</button></div>`}
+    <div id="wo"></div>`);
+  if (optsNow) return nazeOpts(q, w);
+  const t = document.getElementById("hito"), g = document.getElementById("hgo");
+  t.oninput = () => { g.disabled = !t.value.trim(); };
+  t.onkeydown = e => { if (e.key === "Enter" && !g.disabled) g.click(); };
+  g.onclick = () => {
+    const word = t.value.trim();
+    if (!word) return;
+    g.disabled = true; t.disabled = true;
+    call("why", { s: SID, id: q.id, stage: "一言", answer: word, conf: "" }).then(r => {
+      if (r.error) throw new Error(r.error);
+      q.whyStage = "一言";
+      t.outerHTML = `<b class="w">［${esc(word)}］</b>`;
+      document.getElementById("hb").remove();
+      nazeOpts(q, w);
+    }).catch(e => { g.disabled = false; t.disabled = false; fail(e); });
+  };
+}
+
+function nazeOpts(q, w) {
+  const opts = w.選択肢 || [];
+  document.getElementById("wo").innerHTML = `
+    <div class="ask">どれがいちばん近い？</div>
+    <div class="wopts">${opts.map((o, i) => `<button class="opt wide" data-i="${i}">${esc(o)}</button>`).join("")}</div>
+    <div class="commit" id="wc" style="display:none"><button class="go c-sure" data-c="あり">自信あり で決定</button>
+      <button class="go c-unsure" data-c="なし">自信なし で決定</button></div>`;
+  const bs = [...document.querySelectorAll("#wo .opt")], go = [...document.querySelectorAll("#wc .go")];
+  let chosen = null;
+  bs.forEach(b => b.onclick = () => {
+    bs.forEach(x => x.classList.remove("sel"));
+    b.classList.add("sel");
+    chosen = opts[+b.dataset.i];
+    document.getElementById("wc").style.display = "grid";
+  });
+  go.forEach(b => b.onclick = () => {
+    if (chosen == null) return;
+    const conf = b.dataset.c;
+    go.concat(bs).forEach(x => x.disabled = true);
+    call("why", { s: SID, id: q.id, stage: "なぜ", answer: chosen, conf }).then(r => {
+      if (r.error) throw new Error(r.error);
+      akasu(q, r, conf, chosen);
+    }).catch(e => { go.concat(bs).forEach(x => x.disabled = false); fail(e); });
+  });
+}
+
+// 明かす: 正しい理由・反駁・反証例・正解と解説。自信ありで外したときは反駁を先に太く
+function akasu(q, r, conf, chosen) {
+  q.state = "open"; q.whyStage = "なぜ"; q.whyOk = r.ok ? "正" : "誤"; q.whyConf = conf;
+  if (r.answer !== undefined) q.answer = r.answer;
+  if (r.explain !== undefined) q.explain = r.explain;
+  const rb = r.反駁 || {};
+  const sel = `<div class="mine">えらんだ理由: ${okx(r.ok)}${conf ? `（自信${esc(conf)}）` : ""}</div>`;
+  const seitext = `<div class="box ok"><div class="lab2">正しい理由</div><div class="rbt">${esc(r.正文)}</div></div>`;
+  const ex = r.反証例 ? `<div class="box hint"><div class="h">たとえば</div>${esc(r.反証例)}</div>` : "";
+  const rbLabel = rb.key === "隣との違い" ? "隣との違い" : `『${esc(chosen)}』は…`;
+  let html;
+  if (conf === "あり" && !r.ok) {
+    html = `${sel}
+      <div class="box ng"><div class="rb">『${esc(chosen)}』は…</div><div class="rbt">${esc(rb.文)}</div></div>
+      ${seitext}${ex}`;
+  } else {
+    html = `${sel}${seitext}
+      ${rb.文 ? `<div class="box ${rb.key === "隣との違い" ? "hint" : "ng"}"><div class="${rb.key === "隣との違い" ? "h" : "lab2"}">${rbLabel}</div><div>${esc(rb.文)}</div></div>` : ""}
+      ${ex}`;
+  }
+  setWork(html + revealBox(r, "正解: " + esc(r.answer)));
+  showNext();
+  toTop();
 }
 
 function done() {
@@ -302,17 +492,20 @@ function summary() {
     if (!r || !r.rows) throw new Error(r && r.error || "表が出せない");
     const ng = r.rows.filter(x => x.mark !== "○");
     const left = ng.filter(x => !x.open).length;
+    // なぜ の列はなぜの問があるときだけ（無ければ表は今までどおり）
+    const hasWhy = r.rows.some(x => x.why !== undefined && x.why !== null && x.why !== "") || (S && S.items.some(q => q.why));
+    const whyMark = v => { if (v && typeof v === "object") v = v.ok; return v === "正" || v === true || v === "○" ? "○" : v === "誤" || v === false || v === "×" ? "×" : "—"; };
     const body = r.rows.map(x => `
       <tr><td>${esc(x.no)}</td><td>${x.first ? esc(x.first) : "（空欄）"}</td>
         <td class="m ${x.mark === "○" ? "ok" : "ng"}">${esc(x.mark)}</td>
         <td>${x.open ? esc(x.answer) : `<span class="re">まだ</span>`}</td>
-        <td class="re">${x.second ? `${x.second.ok ? "○" : "×"} ${esc(x.second.answer)}` : ""}</td></tr>`).join("");
+        <td class="re">${x.second ? `${x.second.ok ? "○" : "×"} ${esc(x.second.answer)}` : ""}</td>${hasWhy ? `<td class="m ${whyMark(x.why) === "○" ? "ok" : whyMark(x.why) === "×" ? "ng" : ""}">${whyMark(x.why)}</td>` : ""}</tr>`).join("");
     $app.innerHTML = `
       ${bar("おわり")}
       <div class="card">
         ${ng.length ? `<p>直し ${ng.length}問のうち、正解が開いたのは <b>${ng.length - left}問</b>。</p>` : ""}
         <p class="small">この表を見ながら、教材に丸をつけよう。正誤は1回目の答え。</p>
-        <table class="sum"><tr><th>問題</th><th>てみ回答</th><th>正誤</th><th>正解</th><th>直し</th></tr>${body}</table>
+        <table class="sum"><tr><th>問題</th><th>てみ回答</th><th>正誤</th><th>正解</th><th>直し</th>${hasWhy ? "<th>なぜ</th>" : ""}</tr>${body}</table>
         ${r.skipped && r.skipped.length ? `<p class="small">このページに無い問題（寸評シートを見てね）: ${r.skipped.map(esc).join("・")}</p>` : ""}
         ${S.later ? `<p class="small">${esc(S.later)}</p>` : ""}
       </div>
