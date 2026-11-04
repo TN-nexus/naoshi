@@ -400,15 +400,14 @@ function narabe(q, w, fresh) {
 
 // なぜ: 前提 → 問い → 穴埋めに一言 → 3択 → 自信あり／なしで決定
 function naze(q, w, optsNow) {
-  const parts = String(w.穴埋め || "").split(/［[\s　]*］/);
-  const before = parts[0], after = parts.slice(1).join("［　］");
+  // 穴埋めの文は見せない（11/4 パパ。正解の選択肢と同じ文なので、見比べるだけで3択が当たっていた）
   const blank = optsNow
-    ? `<b class="w">［　］</b>`
+    ? ""
     : `<input class="blank" id="hito" maxlength="10" placeholder="ことばを1つ。わからなければ ？" inputmode="text" autocomplete="off" autocapitalize="off">`;
   addWork(`
     <div class="premise"><b>前提:</b> ${esc(w.前提)}</div>
     <div class="ask">${esc(w.問い)}</div>
-    <div class="fill">${esc(before)}${blank}${esc(after)}</div>
+    ${optsNow ? "" : `<div class="fill">なぜ？をひとことで: ${blank}</div>`}
     ${optsNow ? "" : `<div class="commit" style="grid-template-columns:1fr" id="hb"><button class="go c-sure" id="hgo" disabled>決めた</button></div>`}
     <div id="wo"></div>`);
   if (optsNow) return nazeOpts(q, w);
@@ -422,7 +421,7 @@ function naze(q, w, optsNow) {
     call("why", { s: SID, id: q.id, stage: "一言", answer: word, conf: "" }).then(r => {
       if (r.error) throw new Error(r.error);
       q.whyStage = "一言";
-      t.outerHTML = `<b class="w">［${esc(word)}］</b>`;
+      t.outerHTML = `<b class="w">${esc(word)}</b>`;
       document.getElementById("hb").remove();
       nazeOpts(q, w);
     }).catch(e => { g.disabled = false; t.disabled = false; fail(e); });
