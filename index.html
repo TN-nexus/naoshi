@@ -405,7 +405,7 @@ function naze(q, w, optsNow) {
     ? ""
     : `<input class="blank" id="hito" maxlength="10" placeholder="ことばを1つ。わからなければ ？" inputmode="text" autocomplete="off" autocapitalize="off">`;
   addWork(`
-    <div class="premise"><b>前提:</b> ${esc(w.前提)}</div>
+    ${w.前提 ? `<div class="premise"><b>前提:</b> ${esc(w.前提)}</div>` : ""}
     <div class="ask">${esc(w.問い)}</div>
     ${optsNow ? "" : `<div class="fill">なぜ？をひとことで: ${blank}</div>`}
     ${optsNow ? "" : `<div class="commit" style="grid-template-columns:1fr" id="hb"><button class="go c-sure" id="hgo" disabled>決めた</button></div>`}
