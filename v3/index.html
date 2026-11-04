@@ -1,0 +1,623 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>直し</title>
+<link rel="icon" href="data:,">
+<style>
+/* 見分けドリル（apps/miwake/index.html）と同じ色・字の大きさ。スマホ幅を先に作る */
+:root{
+  --bg:#f6f5f1; --card:#fff; --ink:#1f2328; --sub:#6b6f76; --line:#d9d6cf;
+  --ok:#1f7a4d; --okbg:#e3f3ea; --ng:#b3261e; --ngbg:#fbe7e5; --sel:#2b5cb8; --selbg:#e6eefc;
+  --hint:#7a5a00; --hintbg:#fff6d6;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;font-size:18px;line-height:1.6}
+#app{max-width:760px;margin:0 auto;padding:16px}
+.bar{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:4px 2px 10px;border-bottom:1px solid var(--line);margin-bottom:14px}
+.bar h1{font-size:18px;margin:0}
+.bar .cnt{font-size:16px;color:var(--sub);white-space:nowrap}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:12px}
+.row{display:flex;gap:10px;align-items:baseline;padding:10px 0;border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:0}
+.mk{font-weight:800;width:1.4em;text-align:center}
+.mk.ok{color:var(--ok)} .mk.ng{color:var(--ng)}
+.row .n{color:var(--sub);min-width:3.2em}
+.row .a{flex:1}
+.row details{margin-top:4px;font-size:16px;color:var(--sub)}
+.tag{font-size:13px;color:var(--sub)}
+.q{font-size:18px;font-weight:500;line-height:1.55;margin:4px 0 10px;white-space:pre-line}
+.img{display:block;max-width:100%;max-height:340px;margin:8px auto 12px;border:1px solid var(--line);border-radius:6px}
+.imgslot{border:2px dashed var(--line);border-radius:8px;padding:18px;text-align:center;color:var(--sub);font-size:15px;margin:8px 0 12px}
+.mine{font-size:17px}
+.mine b{color:var(--ng)}
+.box{border-radius:10px;padding:12px 14px;margin:12px 0}
+.box.hint{background:var(--hintbg)}
+.box.hint{white-space:pre-line}
+.box.hint .h{font-weight:700;color:var(--hint);font-size:15px}
+.look{font-size:16px;margin-top:8px}
+.box.ok{background:var(--okbg)}
+.box.ng{background:var(--ngbg)}
+.box .big{font-size:24px;font-weight:800}
+.box.ok .big{color:var(--ok)} .box.ng .big{color:var(--ng)}
+.yoshiri{font-size:15px;color:var(--sub);margin-top:6px}
+.choices{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:8px;margin:8px 0}
+.opt{font:inherit;font-size:20px;padding:12px 6px;border:2px solid var(--line);border-radius:10px;background:#fff;cursor:pointer;color:var(--ink)}
+.opt.sel{border-color:var(--sel);background:var(--selbg)}
+input.txt{font:inherit;font-size:22px;width:100%;padding:10px 12px;border:2px solid var(--sel);border-radius:10px}
+.fld{margin:10px 0}.fld .lab{font-weight:700;margin-bottom:4px}.fld .row{display:flex;align-items:center;gap:6px}.fld .row input.txt{flex:1;width:auto;min-width:0}.fld .row span{font-size:20px}.fld .choices{grid-template-columns:repeat(auto-fill,minmax(120px,1fr))}
+.commit{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+button.go{font:inherit;padding:14px 10px;border-radius:10px;cursor:pointer;font-size:18px}
+.c-sure{background:var(--ink);color:#fff;border:2px solid var(--ink);font-weight:700}
+.c-unsure{background:#fff;color:#8a8f98;border:2px solid #c9c6bf}
+button.go:disabled{opacity:.35;cursor:default}
+.next{display:block;width:100%;margin-top:14px;font:inherit;padding:14px;border-radius:10px;border:2px solid var(--ink);background:#fff;cursor:pointer;font-size:18px}
+.small{font-size:14px;color:var(--sub)}
+.vs{font-size:18px;margin-bottom:6px}
+.vs b.ng{color:var(--ng)} .vs b.ok{color:var(--ok)}
+.cmt{margin:6px 0 8px;font-weight:600}
+table.sum{width:100%;border-collapse:collapse;font-size:16px}
+table.sum th,table.sum td{padding:8px 4px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+table.sum th{font-size:13px;color:var(--sub);font-weight:600;white-space:nowrap}
+table.sum td.m{font-weight:800;text-align:center;width:2em}
+table.sum td.m.ok{color:var(--ok)} table.sum td.m.ng{color:var(--ng)}
+table.sum .re{font-size:14px;color:var(--sub)}
+.err{color:var(--ng)}
+.note{margin-top:6px;padding:8px 10px;border-radius:8px;background:var(--hintbg);font-size:16px}
+.note b{color:var(--hint)}
+/* なぜ（2026-11-04 設計 steady-honking-sutherland）: 並べ・なぜ・明かす */
+.wtag{display:inline-block;font-size:12px;line-height:1.5;color:var(--sel);border:1px solid var(--sel);border-radius:6px;padding:0 6px;margin-left:6px;white-space:nowrap;vertical-align:1px}
+.narabe{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0}
+@media (max-width:560px){.narabe{grid-template-columns:1fr}}
+.col{border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:17px}
+.col .h{font-weight:700;font-size:14px;color:var(--sub);margin-bottom:4px}
+.col ol{margin:0;padding-left:1.5em}
+.col li{margin:3px 0}
+.col .ok{color:var(--ok);font-weight:700} .col .ng{color:var(--ng);font-weight:700}
+.kb{display:inline-block;margin-top:8px;font-size:16px;color:var(--sel)}
+.ask{font-weight:700;margin:16px 0 6px}
+.steps{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px}
+.steps .opt{font-size:17px}
+.premise{border:2px solid var(--line);border-radius:10px;padding:10px 12px;margin:10px 0;font-size:17px}
+.premise b{color:var(--sub)}
+.fill{font-size:19px;line-height:2.2;margin:6px 0}
+.fill b.w{color:var(--sel)}
+input.blank{font:inherit;font-size:19px;width:250px;max-width:100%;padding:2px 8px;border:2px solid var(--sel);border-radius:8px;margin:0 4px}
+input.blank::placeholder{font-size:14px}
+.wopts{display:grid;gap:8px;margin:12px 0 0}
+.opt.wide{font-size:17px;text-align:left;padding:12px 14px;line-height:1.5}
+.rb{font-size:20px;font-weight:800;color:var(--ng);margin-bottom:4px}
+.rbt{font-size:19px;font-weight:700}
+.lab2{font-weight:700;color:var(--sub);font-size:15px}
+
+.why-ask{font-weight:700;font-size:18px;margin:14px 0 8px}
+.wopt{display:block;width:100%;text-align:left;font:inherit;font-size:17px;line-height:1.5;padding:12px 14px;margin:8px 0;border:2px solid var(--line);border-radius:10px;background:#fff;color:inherit}
+.wopt.sel{border-color:var(--sel);background:var(--selbg)}
+.wopt.is-ok{border-color:var(--ok);background:var(--okbg)}
+.wopt.is-ng{border-color:var(--ng);background:var(--ngbg)}
+.wopt.dim{opacity:.55}
+.wopt .res{display:block;font-weight:800;font-size:15px;margin-bottom:2px}
+.wopt.is-ok .res{color:var(--ok)} .wopt.is-ng .res{color:var(--ng)}
+.wopt .fix{display:block;margin-top:6px;font-size:16px}
+.ans3{background:var(--okbg);border-radius:10px;padding:12px 14px;margin:12px 0;font-size:16px;line-height:1.55}
+.ans3 .big{font-size:20px;font-weight:800;color:var(--ok);margin-bottom:6px}
+.ans3 .fix{margin:8px 0}
+.ans3 ol{margin:6px 0 0;padding-left:1.4em}
+.ans3 .lab{font-weight:700;font-size:14px;color:var(--sub);margin-top:8px}
+</style>
+</head>
+<body>
+<div id="app"><p class="small">読みこみ中…</p></div>
+<script>
+// 直しページ（M209・決定ログ 10/19 未明、10/19 夜 パパ）。
+// 流れ: 1回目○→正解と解説／×→答えを言わない手がかり→解き直し→○なら正解と解説、
+//       ×ならその答えへのコメントと「鍵の問い」（1つ手前の途中の値・取り違えの相手など）→鍵に正解したら正解と解説。
+//       鍵の無い推論の問はもう1回だけ、鍵は2回まで（計算は除く）。知識の問（見る場所を開いて調べて書く）と計算は、正解するまで解き直し。先へは進める（開かない問は表で「まだ」）。
+// 正解はページに持たない。判定はサーバ（GAS か preview.py）が返す。
+// サーバとの話し方は2通り: GAS が配ったときは google.script.run、それ以外（見本・将来のミニアプリ）は fetch。
+
+const params = new URLSearchParams(location.search);
+const SID = window.NAOSHI_SID || params.get("s") || "";   // GAS が配ったときは Naoshi.gs が差し込む
+// fetch のときの宛先。GitHub Pages に置いたときは URL の d（GAS のデプロイ ID）から exec を組む（2026-10-21:
+// script.google.com は13歳未満の Google アカウントでログインしたブラウザだとはじかれるので、ページは外に置く）
+const DEPLOY = params.get("d") || "";
+const API = window.NAOSHI_API || (DEPLOY ? `https://script.google.com/macros/s/${encodeURIComponent(DEPLOY)}/exec` : "api");
+// 試しモード（&try=1。apps/dash/schema.md §3）: サーバは naoshi_try_log にだけ書き、おわりも付けない。上に固定の帯
+const TRY = params.get("try") === "1";
+if (TRY) {
+  document.body.insertAdjacentHTML("afterbegin", '<div id="trybar" style="position:fixed;top:0;left:0;right:0;z-index:50;background:var(--selbg);color:var(--sel);border-bottom:1px solid var(--line);font-size:14px;line-height:1.6;text-align:center;padding:2px 8px">試し（記録しない）</div>');
+  document.body.style.paddingTop = "26px";
+}
+
+function call(op, args) {
+  if (TRY) args = Object.assign({}, args, { try: true });
+  if (window.google && google.script && google.script.run) {
+    return new Promise((ok, ng) =>
+      google.script.run.withSuccessHandler(ok).withFailureHandler(ng).naoshiApi(op, args));
+  }
+  return fetch(API, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },   // 単純リクエスト（GAS でも CORS の事前確認が要らない）
+    credentials: "omit",   // Google のログインを乗せない（乗ると子どものアカウントではじかれる）
+    body: JSON.stringify({ app: "naoshi", op, args }),
+  }).then(r => r.json());
+}
+
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const $app = document.getElementById("app");
+let S;          // セッション（問題の一覧。正解は○と開いた問だけ）
+let todo = [];  // 直す問題の順番
+let cur = 0;
+
+function img(q) {
+  if (q.image) return `<img class="img" src="${esc(q.image)}" alt="${esc(q.imageAlt || "")}">`;
+  if (q.imageNote) return `<div class="imgslot">${esc(q.imageNote)}</div>`;
+  return "";
+}
+const yoshiri = q => q.yoshiri ? `<div class="yoshiri">📖 ${esc(q.yoshiri)}</div>` : "";
+const look = q => q.look ? `<div class="look">👀 見る: ${esc(q.look)}</div>` : "";
+const mineAns = q => q.first.answer ? esc(q.first.answer) : "（空欄）";
+const bar = right => `<div class="bar"><h1>${esc(S.title)}</h1><span class="cnt">${right}</span></div>`;
+
+// ---------------------------------------------------------------- 一覧
+function list() {
+  const ng = S.items.filter(q => !q.first.ok);
+  // なぜの問は○でも直す（○ → なぜ）。なぜの無い問は今までどおり ×で開いていないもの
+  todo = S.items.filter(q => q.why ? q.state !== "open" : (!q.first.ok && q.state !== "open"));
+  const rows = S.items.map(q => {
+    const open = q.first.ok || q.state === "open";
+    const tail = q.first.ok ? "　正解" : open ? `　→ 正解 ${esc(q.answer)}` : "　→ 直す";
+    return `
+    <div class="row">
+      <span class="mk ${q.first.ok ? "ok" : "ng"}">${q.first.ok ? "○" : "×"}</span>
+      <span class="n">${esc(q.no)}</span>
+      <span class="a">てみ回答: ${mineAns(q)}${tail}${q.why ? `<span class="wtag">${q.first.ok ? "○ → なぜ" : "なぜ"}</span>` : ""}
+        ${q.first.ok && q.note ? `<div class="note"><b>ひとこと</b>　${esc(q.note)}</div>` : ""}
+        ${open && q.explain ? `<details><summary>解説</summary>${esc(q.explain)}${yoshiri(q)}</details>` : ""}
+      </span>
+    </div>`;
+  }).join("");
+  $app.innerHTML = `
+    ${bar(`○${S.items.length - ng.length}　×${ng.length}`)}
+    <div class="card">${rows}</div>
+    ${todo.length ? `<button class="next" id="start">直しを始める（${todo.length}問）</button>`
+                  : `<p>${ng.length ? "直しは全部おわり。" : "全部○。"}解説は上でひらける。</p>`}
+    <button class="next" id="end">結果の表へ</button>`;
+  const b = document.getElementById("start");
+  if (b) b.onclick = () => { cur = 0; step(); };
+  document.getElementById("end").onclick = done;
+}
+
+// ---------------------------------------------------------------- 1問ずつ
+function step() {
+  if (cur >= todo.length) return done();
+  const q = todo[cur];
+  if (q.why) return whyStep(q);   // なぜの問は鍵・回数の上限・端末の回数を通らない
+  $app.innerHTML = `
+    ${bar(`直し ${cur + 1}/${todo.length}`)}
+    <div class="card" id="card">
+      <div class="tag">${esc(q.no)}</div>
+      <div class="q">${esc(q.text)}</div>
+      ${img(q)}
+      <div class="mine">てみ回答: <b>${mineAns(q)}</b>　${q.first.unread ? "読めなかった" : "不正解"}</div>
+      <div id="work"></div>
+    </div>
+    <button class="next" id="next" style="display:none">${cur + 1 < todo.length ? "次の問題へ" : "おわり"}</button>`;
+  document.getElementById("next").onclick = () => { cur++; step(); };
+  if (q.state === "tried") return gate(q, q.key);   // 前に2回目まで答えた問は鍵から
+  form(leadOf(q), q.type, q.options, true, "この問題の答え", (val, conf) =>
+    call("answer", { s: SID, id: q.id, answer: val, conf }).then(r => {
+      if (r.error) throw new Error(r.error);
+      clearWork();
+      mark(`2回目: `, val, r.open);
+      if (r.open) return opened(r);
+      if (r.comment) addWork(`<div class="box ng"><div class="cmt">${esc(r.comment)}</div></div>`);
+      showNext();
+      gate(q, r.key);
+    }));
+}
+
+function leadOf(q) {
+  return q.kind === "知識"
+    ? `<div class="box hint"><div class="h">調べて書こう</div>覚える問題。見る場所を開いて、正しい答えを書こう。${look(q)}${yoshiri(q)}</div>`
+    : `<div class="box hint"><div class="h">考える手がかり</div>${esc(q.hint)}${look(q)}${yoshiri(q)}</div>
+       <div class="small">見る場所を開いて確かめてから答えてもいい。</div>`;
+}
+
+// 鍵の無い推論の問は、2回目の×のあと1回だけ。鍵の問いも2回まで（10/21 パパ: 演問 5B08 で比の1桁を6回当てにいった）。
+// 計算は数が大きく当てにならないので、今までどおり正解するまで。回数は端末に覚える（開き直しで戻らない）
+const capped = q => q.kind !== "知識" && !/^計算/.test(S.title || "");
+const triesKey = q => `${TRY ? "naoshi.try" : "naoshi"}:${SID}:${q.id}`;   // 試しは本番の回数を減らさない
+function triesUsed(q) { try { return +localStorage.getItem(triesKey(q)) || 0; } catch (e) { return 0; } }
+function useTry(q) { try { localStorage.setItem(triesKey(q), triesUsed(q) + 1); } catch (e) {} }
+function closed(q) {
+  addWork(`<div class="box hint"><div class="h">ここは紙で</div>見る場所を開いて紙で解いてから、もう一度 LINE で送ろう。${look(q)}${yoshiri(q)}</div>`);
+  showNext();
+}
+
+// 2回目が×のあと。鍵の問い（無ければ、もう一度解く。推論は1回まで）
+function gate(q, key) {
+  const k = key || { none: true };
+  const limit = k.none ? 1 : 2;
+  if (capped(q) && triesUsed(q) >= limit) return closed(q);
+  const lead = k.none
+    ? `<div class="box hint"><div class="h">もう一度</div>${q.kind === "知識" ? "見る場所をもう一度開いて、書き直そう。" : "手がかりにもどって、もう一度解こう。"}${q.hint && q.kind !== "知識" ? `<div class="small">${esc(q.hint)}</div>` : ""}${look(q)}</div>`
+    : `<div class="box hint"><div class="h">🔑 鍵の問い（答えると正解と解説が開く）</div>${esc(k.q)}${k.look ? `<div class="look">👀 見る: ${esc(k.look)}</div>` : ""}</div>`;
+  const type = k.none ? q.type : k.type, options = k.none ? q.options : k.options;
+  showNext();
+  form(lead, type, options, false, k.none ? "この問題の答え" : "鍵の問いへの答え", val =>
+    call(k.none ? "answer" : "key", { s: SID, id: q.id, answer: val, conf: "" }).then(r => {
+      if (r.error) throw new Error(r.error);
+      if (r.open) { clearWork(); mark(k.none ? "もう一度: " : "鍵: ", val, true); return opened(r); }
+      if (capped(q)) {
+        useTry(q);
+        if (triesUsed(q) >= limit) { clearWork(); mark(k.none ? "もう一度: " : "鍵: ", val, false); return closed(q); }
+      }
+      const msg = document.getElementById("again");
+      msg.textContent = `「${val}」はちがう。もう一度。`;
+      if (r.comment) msg.textContent += " " + r.comment;
+      resetForm();
+    }));
+}
+
+// 入力欄と決定ボタン。conf=true なら「自信あり／なし」の2つ。what は入力欄に薄く出す「何の答えか」（10/25 パパ: 鍵のとき何を書くか迷った）
+function form(lead, type, options, conf, what, submit) {
+  // multi: 当てはまるものを全部選ぶ（選んだ順でなく選択肢の順に「・」でつなぐ）。
+  // fields: 欄が2つ以上の問（options＝[{label, choices?, unit?}]。欄の順に「・」でつなぐ）。2026-11-01
+  const btn = (o, f) => `<button class="opt" data-v="${esc(o)}"${f !== undefined ? ` data-f="${f}"` : ""}>${esc(o)}</button>`;
+  const input = type === "choice"
+    ? `<div class="choices">${(options || []).map(o => btn(o)).join("")}</div>`
+    : type === "multi"
+    ? `<div class="small">当てはまるものを全部選ぼう（もう一度押すと外れる）</div><div class="choices">${(options || []).map(o => btn(o)).join("")}</div>`
+    : type === "fields"
+    ? (options || []).map((f, i) => `<div class="fld"><div class="lab">${esc(f.label || "")}</div>${f.choices
+        ? `<div class="choices">${f.choices.map(o => btn(o, i)).join("")}</div>`
+        : `<div class="row"><input class="txt fi" data-f="${i}" autocomplete="off" autocapitalize="off">${f.unit ? `<span>${esc(f.unit)}</span>` : ""}</div>`}</div>`).join("")
+    : `<input class="txt" id="ans" autocomplete="off" autocapitalize="off" placeholder="${what}">${type === "number" ? `<div class="small">書き方の例 3/4・1と5/7・2.5</div>` : ""}`;
+  const btns = conf
+    ? `<div class="commit"><button class="go c-sure" data-c="あり" disabled>自信あり で決定</button>
+       <button class="go c-unsure" data-c="なし" disabled>自信なし で決定</button></div>`
+    : `<div class="commit" style="grid-template-columns:1fr"><button class="go c-sure" data-c="" disabled>決定</button></div>`;
+  addWork(`<div id="form">${lead}${input}<div class="small err" id="again"></div>${btns}</div>`);
+  let val = "";
+  const go = [...document.querySelectorAll("#form .go")];
+  const set = v => { val = v; go.forEach(b => b.disabled = !String(v).trim()); };
+  const opts = [...document.querySelectorAll("#form .opt")];
+  const fv = [];   // fields の欄ごとの値
+  const setFields = () => set(fv.length === options.length && options.every((_, i) => String(fv[i] || "").trim())
+    ? options.map((_, i) => String(fv[i]).trim()).join("・") : "");
+  opts.forEach(b => b.onclick = () => {
+    if (type === "multi") {
+      b.classList.toggle("sel");
+      return set(opts.filter(x => x.classList.contains("sel")).map(x => x.dataset.v).join("・"));
+    }
+    const same = type === "fields" ? opts.filter(x => x.dataset.f === b.dataset.f) : opts;
+    same.forEach(x => x.classList.remove("sel"));
+    b.classList.add("sel");
+    if (type === "fields") { fv[+b.dataset.f] = b.dataset.v; return setFields(); }
+    set(b.dataset.v);
+  });
+  const fis = [...document.querySelectorAll("#form input.fi")];
+  fis.forEach(t => t.oninput = () => { fv[+t.dataset.f] = t.value; setFields(); });
+  if (fis[0]) fis[0].focus();
+  const t = document.getElementById("ans");
+  if (t) { t.oninput = () => set(t.value); t.focus(); }
+  window.resetForm = () => {
+    opts.forEach(x => x.classList.remove("sel"));
+    fis.forEach(x => x.value = "");
+    fv.length = 0;
+    if (t) { t.value = ""; t.focus(); }
+    set("");
+  };
+  go.forEach(b => b.onclick = () => {
+    go.forEach(x => x.disabled = true);
+    submit(val, b.dataset.c).catch(fail);
+  });
+}
+
+const addWork = html => document.getElementById("work").insertAdjacentHTML("beforeend", html);
+const clearWork = () => { const f = document.getElementById("form"); if (f) f.remove(); };
+const showNext = () => { document.getElementById("next").style.display = "block"; };
+function mark(label, val, ok) {
+  addWork(`<div class="mine">${label}<b style="color:${ok ? "var(--ok)" : "var(--ng)"}">${esc(val)}</b>　${ok ? "○" : "×"}</div>`);
+}
+
+// 正解・解説・予シリ・図の箱。head は大きい字の1行（鍵の流れと なぜ の流れで共用）
+function revealBox(r, head) {
+  const im = r.image || r.revealImage, note = r.imageNote || r.revealImageNote;
+  return `
+    <div class="box ok">
+      <div class="big">${head}</div>
+      <div>${esc(r.explain)}</div>
+      ${r.yoshiri ? `<div class="yoshiri">📖 ${esc(r.yoshiri)}</div>` : ""}
+      ${im ? `<img class="img" src="${esc(im)}" alt="">` : note ? `<div class="imgslot">${esc(note)}</div>` : ""}
+    </div>`;
+}
+function opened(r) {
+  addWork(revealBox(r, r.ok ? "正解" : "🔑 開いた　正解: " + esc(r.answer)));
+  showNext();
+}
+
+// ---------------------------------------------------------------- なぜ（2026-11-04）
+// ×: 解き直し1回 → 並べ（どこまで同じだった？）→ なぜ（一言 → 3択＋自信）→ 明かす。○: なぜ → 明かす。
+// 一言・どこまでは判定しない（記録だけ）。判定はサーバ（op=why の なぜ）。開き直したら whyStage から続ける
+const setWork = html => { document.getElementById("work").innerHTML = html; };
+const toTop = () => { const c = document.getElementById("card"); if (c) c.scrollIntoView({ block: "start" }); };
+const okx = ok => ok ? "○" : "×";
+
+// 見本 v3: 問題の中から「イ 徳川家康」の文を引く
+function ansText(q, a) {
+  a = String(a || "");
+  if (!/^[アイウエオカ]$/.test(a)) return a;
+  const m = String(q.text || "").match(new RegExp("(?:^|[\\n　 ])" + a + "[ 　]+([^\\n　]+)"));
+  return m ? a + " " + m[1].trim() : a;
+}
+const ansOf = (q, a) => a ? esc(ansText(q, a)) : "（空欄）";
+
+function whyStep(q) {
+  const pick = q.why.pick || (q.first.ok ? "○" : "×");
+  $app.innerHTML = `
+    ${bar(`直し ${cur + 1}/${todo.length}`)}
+    <div class="card" id="card">
+      <div class="tag">${esc(q.no)}</div>
+      <div class="q">${esc(q.text)}</div>
+      ${img(q)}
+      <div class="mine">てみの答え: <b${pick === "○" ? ` style="color:var(--ok)"` : ""}>${ansOf(q, q.first.answer)}</b>　${pick === "○" ? "○" : q.first.unread ? "読めなかった" : "×"}</div>
+      <div id="work"></div>
+    </div>
+    <button class="next" id="next" style="display:none">${cur + 1 < todo.length ? "次の問題へ" : "おわり"}</button>`;
+  document.getElementById("next").onclick = () => { cur++; step(); };
+  const w = q.why.on ? null : q.why;
+  if (pick === "○") return ask3(q, w);
+  if (!q.second || !w) {
+    return form(leadOf(q) + `<div class="small">解き直しは1回。</div>`, q.type, q.options, true, "この問題の答え", (val, conf) =>
+      call("answer", { s: SID, id: q.id, answer: val, conf }).then(r => {
+        if (r.error) throw new Error(r.error);
+        q.second = r.second || { answer: val, ok: !!r.ok };
+        q.why = r.why; q.whyStage = "";
+        clearWork();
+        ask3(q, r.why);
+      }));
+  }
+  ask3(q, w);
+}
+
+// 記録の順（どこまで→一言→なぜ）を GAS が強制しているので、見本では裏で「省略」を送る。本番に入れるときは GAS を直す
+function skipStages(q, isO) {
+  const send = (stage) => call("why", { s: SID, id: q.id, stage, answer: "省略", conf: "" });
+  if (isO) return q.whyStage ? Promise.resolve() : send("一言");
+  if (q.whyStage === "一言" || q.whyStage === "なぜ") return Promise.resolve();
+  return (q.whyStage === "どこまで" ? Promise.resolve() : send("どこまで")).then(() => send("一言"));
+}
+
+function ask3(q, w) {
+  const isO = (q.why.pick || (q.first.ok ? "○" : "×")) === "○";
+  const ready = skipStages(q, isO);
+  const sec = q.second || {};
+  const opts = w.選択肢 || [];
+  addWork(`
+    ${isO ? "" : `<div class="mine">2回目: <b style="color:${sec.ok ? "var(--ok)" : "var(--ng)"}">${ansOf(q, sec.answer)}</b>　${okx(sec.ok)}</div>`}
+    ${w.前提 ? `<div class="premise"><b>前提:</b> ${esc(w.前提)}</div>` : ""}
+    <div class="why-ask">${esc(w.問い)}</div>
+    <div id="wo">${opts.map((o, i) => `<button class="wopt" data-i="${i}">${esc(o)}</button>`).join("")}</div>
+    <div class="commit" id="wc" style="display:none"><button class="go c-sure" data-c="あり">自信あり で決定</button>
+      <button class="go c-unsure" data-c="なし">自信なし で決定</button></div>`);
+  const bs = [...document.querySelectorAll("#wo .wopt")], go = [...document.querySelectorAll("#wc .go")];
+  let chosen = null, ci = -1;
+  bs.forEach(b => b.onclick = () => {
+    bs.forEach(x => x.classList.remove("sel"));
+    b.classList.add("sel");
+    ci = +b.dataset.i; chosen = opts[ci];
+    document.getElementById("wc").style.display = "grid";
+  });
+  go.forEach(b => b.onclick = () => {
+    if (chosen == null) return;
+    const conf = b.dataset.c;
+    go.concat(bs).forEach(x => x.disabled = true);
+    ready.then(() => call("why", { s: SID, id: q.id, stage: "なぜ", answer: chosen, conf })).then(r => {
+      if (r.error) throw new Error(r.error);
+      reveal3(q, w, r, conf, ci, bs);
+    }).catch(e => { go.concat(bs).forEach(x => x.disabled = false); fail(e); });
+  });
+}
+
+// 画面を切り替えず、選んだ3択の上に結果を重ねる。下に答えの訂正を足す
+function reveal3(q, w, r, conf, ci, bs) {
+  q.state = "open"; q.whyStage = "なぜ"; q.whyOk = r.ok ? "正" : "誤"; q.whyConf = conf;
+  if (r.answer !== undefined) q.answer = r.answer;
+  if (r.explain !== undefined) q.explain = r.explain;
+  document.getElementById("wc").remove();
+  const norm = s => String(s).replace(/[\s　]/g, "");
+  const rb = r.反駁 || {};
+  bs.forEach((b, i) => {
+    const t = b.textContent, isOk = norm(t) === norm(r.正文), mine = i === ci;
+    b.className = "wopt" + (isOk ? " is-ok" : mine ? " is-ng" : " dim");
+    b.disabled = true;
+    b.innerHTML = (isOk ? `<span class="res">○ 正しい${mine ? "（えらんだ）" : ""}</span>` : mine ? `<span class="res">× えらんだ</span>` : "")
+      + esc(t) + (mine && !isOk && rb.文 ? `<span class="fix">${esc(rb.文)}</span>` : "");
+  });
+  const sec = q.second || {};
+  const steps = (w.steps || []).filter(s => !/^答え/.test(s));
+  const wrongs = [];
+  if (!q.first.ok) wrongs.push(q.first.answer);
+  addWork(`
+    <div class="ans3">
+      <div class="big">正解: ${esc(ansText(q, r.answer))}</div>
+      ${q.first.ok ? "" : `<div class="fix"><b>てみの答え ${ansOf(q, q.first.answer)}</b><br>${esc(r.explain || "")}</div>`}
+      ${r.反証例 ? `<div class="fix">たとえば: ${esc(r.反証例)}</div>` : ""}
+      ${steps.length ? `<div class="lab">解き方</div><ol>${steps.map(s => `<li>${esc(s)}</li>`).join("")}</ol>` : ""}
+      ${r.yoshiri ? `<div class="yoshiri">📖 ${esc(r.yoshiri)}</div>` : ""}
+    </div>`);
+  showNext();
+}
+
+// 並べ: 左に てみの答え（1回目・2回目）、右に 正しい解き方（番号つきの段。最後は答え）
+function narabe(q, w, fresh) {
+  const steps = w.steps || [];
+  const sec = q.second || {};
+  const upto = [];
+  for (let i = 1; i < steps.length; i++) upto.push([String(i), `${i}まで`]);
+  upto.push(["最初から", "最初から違う"], ["わからない", "わからない"]);
+  addWork(`
+    ${fresh ? `<div class="mine">2回目: <b style="color:${sec.ok ? "var(--ok)" : "var(--ng)"}">${esc(sec.answer)}</b>　${okx(sec.ok)}</div>` : ""}
+    <div class="narabe">
+      <div class="col"><div class="h">てみの答え</div>
+        <div>1回目: ${mineAns(q)}（<span class="ng">×</span>）</div>
+        <div>2回目: ${sec.answer ? esc(sec.answer) : "（空欄）"}（<span class="${sec.ok ? "ok" : "ng"}">${okx(sec.ok)}</span>）</div>
+      </div>
+      <div class="col"><div class="h">正しい解き方</div>
+        <ol>${steps.map(s => `<li>${esc(s)}</li>`).join("")}</ol>
+        ${w.kobetsuba ? `<a class="kb" href="https://www.youtube.com/watch?v=${encodeURIComponent(w.kobetsuba)}" target="_blank" rel="noopener">▶ コベツバの解説を見る</a>` : ""}
+      </div>
+    </div>
+    <div id="dm">
+      <div class="ask">どこまで同じだった？</div>
+      <div class="steps">${upto.map(([v, t]) => `<button class="opt" data-v="${esc(v)}">${esc(t)}</button>`).join("")}</div>
+    </div>`);
+  const bs = [...document.querySelectorAll("#dm .opt")];
+  bs.forEach(b => b.onclick = () => {
+    bs.forEach(x => x.disabled = true);
+    b.classList.add("sel");
+    call("why", { s: SID, id: q.id, stage: "どこまで", answer: b.dataset.v, conf: "" }).then(r => {
+      if (r.error) throw new Error(r.error);
+      q.whyStage = "どこまで";
+      setWork("");
+      naze(q, w, false);
+      toTop();
+    }).catch(e => { bs.forEach(x => x.disabled = false); b.classList.remove("sel"); fail(e); });
+  });
+}
+
+// なぜ: 前提 → 問い → 穴埋めに一言 → 3択 → 自信あり／なしで決定
+function naze(q, w, optsNow) {
+  // 穴埋めの文は見せない（11/4 パパ。正解の選択肢と同じ文なので、見比べるだけで3択が当たっていた）
+  const blank = optsNow
+    ? ""
+    : `<input class="blank" id="hito" maxlength="10" placeholder="ことばを1つ。わからなければ ？" inputmode="text" autocomplete="off" autocapitalize="off">`;
+  addWork(`
+    ${w.前提 ? `<div class="premise"><b>前提:</b> ${esc(w.前提)}</div>` : ""}
+    <div class="ask">${esc(w.問い)}</div>
+    ${optsNow ? "" : `<div class="fill">なぜ？をひとことで: ${blank}</div>`}
+    ${optsNow ? "" : `<div class="commit" style="grid-template-columns:1fr" id="hb"><button class="go c-sure" id="hgo" disabled>決めた</button></div>`}
+    <div id="wo"></div>`);
+  if (optsNow) return nazeOpts(q, w);
+  const t = document.getElementById("hito"), g = document.getElementById("hgo");
+  t.oninput = () => { g.disabled = !t.value.trim(); };
+  t.onkeydown = e => { if (e.key === "Enter" && !g.disabled) g.click(); };
+  g.onclick = () => {
+    const word = t.value.trim();
+    if (!word) return;
+    g.disabled = true; t.disabled = true;
+    call("why", { s: SID, id: q.id, stage: "一言", answer: word, conf: "" }).then(r => {
+      if (r.error) throw new Error(r.error);
+      q.whyStage = "一言";
+      t.outerHTML = `<b class="w">${esc(word)}</b>`;
+      document.getElementById("hb").remove();
+      nazeOpts(q, w);
+    }).catch(e => { g.disabled = false; t.disabled = false; fail(e); });
+  };
+}
+
+function nazeOpts(q, w) {
+  const opts = w.選択肢 || [];
+  document.getElementById("wo").innerHTML = `
+    <div class="ask">どれがいちばん近い？</div>
+    <div class="wopts">${opts.map((o, i) => `<button class="opt wide" data-i="${i}">${esc(o)}</button>`).join("")}</div>
+    <div class="commit" id="wc" style="display:none"><button class="go c-sure" data-c="あり">自信あり で決定</button>
+      <button class="go c-unsure" data-c="なし">自信なし で決定</button></div>`;
+  const bs = [...document.querySelectorAll("#wo .opt")], go = [...document.querySelectorAll("#wc .go")];
+  let chosen = null;
+  bs.forEach(b => b.onclick = () => {
+    bs.forEach(x => x.classList.remove("sel"));
+    b.classList.add("sel");
+    chosen = opts[+b.dataset.i];
+    document.getElementById("wc").style.display = "grid";
+  });
+  go.forEach(b => b.onclick = () => {
+    if (chosen == null) return;
+    const conf = b.dataset.c;
+    go.concat(bs).forEach(x => x.disabled = true);
+    call("why", { s: SID, id: q.id, stage: "なぜ", answer: chosen, conf }).then(r => {
+      if (r.error) throw new Error(r.error);
+      akasu(q, r, conf, chosen);
+    }).catch(e => { go.concat(bs).forEach(x => x.disabled = false); fail(e); });
+  });
+}
+
+// 明かす: 正しい理由・反駁・反証例・正解と解説。自信ありで外したときは反駁を先に太く
+function akasu(q, r, conf, chosen) {
+  q.state = "open"; q.whyStage = "なぜ"; q.whyOk = r.ok ? "正" : "誤"; q.whyConf = conf;
+  if (r.answer !== undefined) q.answer = r.answer;
+  if (r.explain !== undefined) q.explain = r.explain;
+  const rb = r.反駁 || {};
+  const sel = `<div class="mine">えらんだ理由: ${okx(r.ok)}${conf ? `（自信${esc(conf)}）` : ""}</div>`;
+  const seitext = `<div class="box ok"><div class="lab2">正しい理由</div><div class="rbt">${esc(r.正文)}</div></div>`;
+  const ex = r.反証例 ? `<div class="box hint"><div class="h">たとえば</div>${esc(r.反証例)}</div>` : "";
+  const rbLabel = rb.key === "隣との違い" ? "隣との違い" : `『${esc(chosen)}』は…`;
+  let html;
+  if (conf === "あり" && !r.ok) {
+    html = `${sel}
+      <div class="box ng"><div class="rb">『${esc(chosen)}』は…</div><div class="rbt">${esc(rb.文)}</div></div>
+      ${seitext}${ex}`;
+  } else {
+    html = `${sel}${seitext}
+      ${rb.文 ? `<div class="box ${rb.key === "隣との違い" ? "hint" : "ng"}"><div class="${rb.key === "隣との違い" ? "h" : "lab2"}">${rbLabel}</div><div>${esc(rb.文)}</div></div>` : ""}
+      ${ex}`;
+  }
+  setWork(html + revealBox(r, "正解: " + esc(r.answer)));
+  showNext();
+  toTop();
+}
+
+function done() {
+  call("done", { s: SID }).catch(() => {});
+  summary();
+}
+
+// おわりの表: 1回目の答え・正誤・正解（○と開いた問だけ）・直し。紙の教材を丸つけするときに横に置いて見る
+function summary() {
+  $app.innerHTML = `${bar("おわり")}<p class="small">読みこみ中…</p>`;
+  call("summary", { s: SID }).then(r => {
+    if (!r || !r.rows) throw new Error(r && r.error || "表が出せない");
+    const ng = r.rows.filter(x => x.mark !== "○");
+    const left = ng.filter(x => !x.open).length;
+    // なぜ の列はなぜの問があるときだけ（無ければ表は今までどおり）
+    const hasWhy = r.rows.some(x => x.why !== undefined && x.why !== null && x.why !== "") || (S && S.items.some(q => q.why));
+    const whyMark = v => { if (v && typeof v === "object") v = v.ok; return v === "正" || v === true || v === "○" ? "○" : v === "誤" || v === false || v === "×" ? "×" : "—"; };
+    const body = r.rows.map(x => `
+      <tr><td>${esc(x.no)}</td><td>${x.first ? esc(x.first) : "（空欄）"}</td>
+        <td class="m ${x.mark === "○" ? "ok" : "ng"}">${esc(x.mark)}</td>
+        <td>${x.open ? esc(x.answer) : `<span class="re">まだ</span>`}</td>
+        <td class="re">${x.second ? `${x.second.ok ? "○" : "×"} ${esc(x.second.answer)}` : ""}</td>${hasWhy ? `<td class="m ${whyMark(x.why) === "○" ? "ok" : whyMark(x.why) === "×" ? "ng" : ""}">${whyMark(x.why)}</td>` : ""}</tr>`).join("");
+    $app.innerHTML = `
+      ${bar("おわり")}
+      <div class="card">
+        ${ng.length ? `<p>直し ${ng.length}問のうち、正解が開いたのは <b>${ng.length - left}問</b>。</p>` : ""}
+        <p class="small">この表を見ながら、教材に丸をつけよう。正誤は1回目の答え。</p>
+        <table class="sum"><tr><th>問題</th><th>てみ回答</th><th>正誤</th><th>正解</th><th>直し</th>${hasWhy ? "<th>なぜ</th>" : ""}</tr>${body}</table>
+        ${r.skipped && r.skipped.length ? `<p class="small">このページに無い問題（寸評シートを見てね）: ${r.skipped.map(esc).join("・")}</p>` : ""}
+        ${S.later ? `<p class="small">${esc(S.later)}</p>` : ""}
+      </div>
+      ${left ? `<button class="next" id="back">まだの問題を直す（${left}問）</button>` : ""}`;
+    const b = document.getElementById("back");
+    if (b) b.onclick = () => reload(() => { list(); cur = 0; step(); });
+  }).catch(fail);
+}
+
+function reload(then) {
+  call("session", { s: SID }).then(r => { if (!r || !r.items) throw new Error(r && r.error); S = r; then(); }).catch(fail);
+}
+
+function fail(e) {
+  $app.insertAdjacentHTML("beforeend", `<p class="err">つながらなかった。少し待ってページを開き直してね。（${esc(e && e.message || e)}）</p>`);
+}
+
+call("session", { s: SID }).then(r => {
+  if (!r || !r.items) throw new Error(r && r.error || "このリンクは使えない");
+  S = r;
+  if (r.done) summary(); else list();
+}).catch(e => { $app.innerHTML = `<p class="err">${esc(e.message || e)}</p>`; });
+</script>
+</body>
+</html>
