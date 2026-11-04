@@ -444,7 +444,7 @@ function reveal3(q, w, r, conf, ci, bs) {
   addWork(`
     <div class="ans3">
       <div class="big">正解: ${esc(ansText(q, r.answer))}</div>
-      ${q.first.ok ? "" : `<div class="fix"><b>てみの答え ${ansOf(q, q.first.answer)}</b><br>${esc(r.explain || "")}</div>`}
+      ${q.first.ok || (rb.文 && rb.文 === r.explain) ? "" : `<div class="fix"><b>てみの答え ${ansOf(q, q.first.answer)}</b><br>${esc(r.explain || "")}</div>`}
       ${r.反証例 ? `<div class="fix">たとえば: ${esc(r.反証例)}</div>` : ""}
       ${steps.length ? `<div class="lab">解き方</div><ol>${steps.map(s => `<li>${esc(s)}</li>`).join("")}</ol>` : ""}
       ${r.yoshiri ? `<div class="yoshiri">📖 ${esc(r.yoshiri)}</div>` : ""}
