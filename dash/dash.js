@@ -235,6 +235,10 @@
         ["題", r => esc(r.title), "wrap"], ["日", r => esc(r.date)], ["送った", r => r.sent ? esc(r.sent) : `<span class="dz-muted">未送信</span>`],
         ["直した", r => `${esc(r.fixed)}／${esc(r.ng)}`, "num"], ["", two]]))
       + card("ねんだい", nd.url || nd.try_url ? two(nd) : `<p class="dz-empty">なし</p>`)
+      + card("コア確認（理科。パパの Mac だけ）", s.core
+          ? `<p class="dz-small">先に Mac のターミナルでこれを動かす。試すは正本に載らない。iPhone では開けない。</p>`
+            + `<div class="dz-code"><code id="dz-corecmd">${esc(s.core.cmd)}</code><button type="button" class="dads-button" data-type="outline" data-size="xs" data-copy="dz-corecmd">コピー</button></div>${two(s.core)}`
+          : `<p class="dz-empty">なし</p>`)
       + card("開発中（put 前）をローカルで", D.preview_cmd
           ? `<div class="dz-code"><code id="dz-cmd">${esc(D.preview_cmd)}</code><button type="button" class="dads-button" data-type="outline" data-size="sm" data-copy="dz-cmd">コピー</button></div>`
           : `<p class="dz-empty">なし</p>`);
