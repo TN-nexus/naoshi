@@ -189,7 +189,9 @@ function render() {
   const upd = /T(\d{2}:\d{2})/.exec(D.updated || "");
   let body = "";
   if (TAB === "kyou") {
-    body = `<section class="card"><h2>きょう</h2>${planHtml()}</section>`
+    const tp = (D.links || {}).today_page;   // 組分け前日の今日専用ページ（家の Wi-Fi の中だけ開く）
+    body = (tp ? `<section class="card"><a class="dads-button" data-type="solid-fill" data-size="lg" style="display:block;text-align:center" href="${esc(tp)}">今日はここだけ見る</a></section>` : "")
+         + `<section class="card"><h2>きょう</h2>${planHtml()}</section>`
          + `<section class="card"><h2>つづき</h2>${todoHtml()}</section>`
          + `<section class="card"><h2>きょうの進み</h2>${progHtml()}</section>`;
   } else if (TAB === "kiroku") {
