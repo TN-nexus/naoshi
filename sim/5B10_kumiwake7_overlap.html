@@ -30,6 +30,7 @@ button{min-height:44px}
   <input type="range" id="slider" min="0" max="18" step="0.1" value="0" style="width:260px;max-width:100%">
   <button id="reset">はじめから</button>
 </div>
+<div id="note" style="font-size:17px;font-weight:bold;min-height:1.6em;padding:2px 4px;color:#c00"></div>
 <div id="ask"><div class="t" id="askq"></div><div id="askin"></div><div class="msg" id="askmsg"></div></div>
 <canvas id="graph" width="860" height="300"></canvas>
 <div class="ctl small">
@@ -75,6 +76,15 @@ const STOPS = [
     ] },
 ];
 let t = 0, playing = false, stopIdx = 0, qIdx = 0, tries = 0, shown = new Set(), asking = false;
+let revIdx = 0;   // 自由に動かす（再生のみ）: 止まる所を通るたびに、その所で分かる長さを図に出す
+const NOTE = ['', 'グラフが折れた＝アの右の辺が段に来た。横9cm、108÷9＝12cm', 'もう一度折れた＝アの左の辺が段に来た。横11cm、88÷11＝8cm', '□＝12−8＝4cm'];
+function revealTo(nt) {
+  while (revIdx < STOPS.length && nt >= STOPS[revIdx].t - 1e-9) {
+    STOPS[revIdx].qs.forEach(q => { if (q.reveal) shown.add(q.reveal); });
+    const n = $('note'); if (n && NOTE[revIdx]) n.textContent = NOTE[revIdx];
+    revIdx++;
+  }
+}
 
 // ───── 図 ─────
 const fig = $('fig'), g = fig.getContext('2d');
@@ -226,7 +236,7 @@ function tick(ts) {
     let nt = t + dt * 1.0;          // 1秒で1秒
     const free = $('free').checked;
     if (!free && stopIdx < STOPS.length && nt >= STOPS[stopIdx].t) { t = STOPS[stopIdx].t; draw(); ask(); }
-    else { t = Math.min(nt, TEND); if (t >= TEND) { playing = false; $('play').textContent = '▶ 動かす'; } draw(); }
+    else { t = Math.min(nt, TEND); if (free) revealTo(t); if (t >= TEND) { playing = false; $('play').textContent = '▶ 動かす'; } draw(); }
   }
   last = ts; requestAnimationFrame(tick);
 }
@@ -236,8 +246,8 @@ $('play').onclick = () => {
   playing = !playing; $('play').textContent = playing ? '⏸ 止める' : '▶ 動かす';
 };
 $('free').onchange = () => { $('slider').disabled = !$('free').checked && stopIdx < STOPS.length; };
-$('slider').oninput = e => { t = +e.target.value; playing = false; $('play').textContent = '▶ 動かす'; draw(); };
-$('reset').onclick = () => { t = 0; playing = false; stopIdx = 0; qIdx = 0; asking = false; shown.clear(); $('ask').style.display = 'none'; $('play').disabled = false; $('play').textContent = '▶ 動かす'; $('slider').disabled = false; draw(); };
+$('slider').oninput = e => { t = +e.target.value; playing = false; $('play').textContent = '▶ 動かす'; if ($('free').checked) revealTo(t); draw(); };
+$('reset').onclick = () => { t = 0; playing = false; stopIdx = 0; qIdx = 0; revIdx = 0; asking = false; shown.clear(); if ($('note')) $('note').textContent = ''; $('ask').style.display = 'none'; $('play').disabled = false; $('play').textContent = '▶ 動かす'; $('slider').disabled = false; draw(); };
 
 logN(); draw(); requestAnimationFrame(tick);
 </script>
