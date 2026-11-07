@@ -14,5 +14,5 @@ a.b small{display:block;font-size:14px;font-weight:400;color:#6b6f76;margin-top:
 </div>
 <script>
 // GAS のデプロイ ID（d）と openExternalBrowser は URL でだけ渡す（公開リポに書かない）
-const q = location.search; if (q) document.getElementById("nitaku").href = "../nitaku/" + q;
+const q = location.search; document.getElementById("nitaku").href = "../nitaku/" + (q || "?") + "&v=" + Date.now();   // v は古い版のキャッシュよけ（Safari）
 </script></body></html>
