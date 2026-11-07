@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>5B10 組分け対策 7(1) 平行移動の重なり</title>
+<style>
+body{font-family:-apple-system,"Hiragino Sans",sans-serif;margin:16px;max-width:900px;color:#222}
+h1{font-size:18px;margin:0 0 6px}
+.q{font-size:15px;line-height:1.7;background:#f6f6f6;padding:8px 12px;border-radius:6px}
+canvas{border:1px solid #ccc;display:block;margin:8px 0;max-width:100%}
+.ctl{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:6px 0}
+button{font-size:15px;padding:6px 14px;border-radius:6px;border:1px solid #888;background:#fff;cursor:pointer}
+button:disabled{opacity:.4;cursor:default}
+#ask{border:2px solid #d33;border-radius:8px;padding:10px 14px;margin:8px 0;display:none;background:#fff8f8}
+#ask .t{font-size:16px;font-weight:bold;margin-bottom:6px}
+#ask input{font-size:18px;width:90px;padding:4px}
+#ask .msg{margin-top:6px;font-size:15px}
+.ok{color:#080}.ng{color:#c00}
+.small{font-size:12px;color:#666}
+</style></head><body>
+<h1>組分け対策（昨年度 第10回組分け）7(1)　平行移動の重なり</h1>
+<div class="q">直線ℓ上に1辺16cmの正方形アと、大きな長方形から小さな長方形を切り取った図形イがある。アを毎秒2cmで右へ動かす。グラフは、重なり始めてからの時間と、重なっている部分の面積。<b>図の□にあてはまる数は？</b></div>
+
+<canvas id="fig" width="860" height="300"></canvas>
+<div class="ctl">
+  <button id="play">▶ 動かす</button>
+  <span id="tlabel" style="font-size:16px;min-width:230px"></span>
+  <label><input type="checkbox" id="free"> 自由に動かす（止まらない）</label>
+  <input type="range" id="slider" min="0" max="18" step="0.1" value="0" style="width:260px" disabled>
+  <button id="reset">はじめから</button>
+</div>
+<div id="ask"><div class="t" id="askq"></div><div id="askin"></div><div class="msg" id="askmsg"></div></div>
+<canvas id="graph" width="860" height="300"></canvas>
+<div class="ctl small">
+  <span id="logn"></span><button id="exp">記録を書き出す</button>
+  <span>（書き出した CSV は _inbox に落ちる → Claude が apps/sim/ingest.py で シミュ詳細.csv へ）</span>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+// ───── 問題の数（解説 9105-29-0032 と一致を確認済み 11/02）─────
+const SIDE = 16, V = 2, W1 = 9, H1 = 12, W2 = 11, H2 = 8, IW = W1 + W2, TEND = (SIDE + IW) / V; // 18秒
+const hAt = x => (x < W1 ? H1 : H2);
+function area(t) {           // 重なりの面積
+  const front = V * t, rear = front - SIDE;
+  const a = Math.max(0, rear), b = Math.min(IW, front);
+  if (b <= a) return 0;
+  const p1 = Math.max(0, Math.min(b, W1) - a) , p2 = Math.max(0, b - Math.max(a, W1));
+  return p1 * H1 + p2 * H2;
+}
+// ───── 止まる所と問い（パパと一緒に使う。止めて予想→確かめる）─────
+// reveal: 答えたあと図に出す長さ
+const STOPS = [
+  { t: 0, label: '動かす前',
+    qs: [
+      { q: 'グラフで、重なりがなくなるのは18秒。それまでにアは何cm動く？', type: 'num', ans: 36, unit: 'cm' },
+      { q: 'アの右の辺がイの左はしに着いてから、アの左の辺がイの右はしをはなれるまで。イの横の長さは何cm？', type: 'num', ans: 20, unit: 'cm', reveal: 'IW' },
+    ] },
+  { t: 4.5, label: '4.5秒（グラフが1回目に折れた）',
+    qs: [
+      { q: 'グラフがここで折れた。アの右の辺は、イのどこに来た？', type: 'choice', opts: ['イの左はしのすぐあと', '段（高さが変わる所）', 'イの右はし'], ans: '段（高さが変わる所）' },
+      { q: '4.5秒で、アはイに何cm重なっている？（横の長さ）', type: 'num', ans: 9, unit: 'cm', reveal: 'W1' },
+      { q: '重なりは108cm²。イの左の部分の高さは何cm？', type: 'num', ans: 12, unit: 'cm', reveal: 'H1' },
+    ] },
+  { t: 12.5, label: '重なりが88cm²（グラフが折れた）',
+    qs: [
+      { q: 'グラフがここで折れた。アの左の辺は、イのどこに来た？', type: 'choice', opts: ['イの左はし', '段（高さが変わる所）', 'イの右はし'], ans: '段（高さが変わる所）' },
+      { q: 'このとき重なっているのはイの右の部分だけ。その横の長さは何cm？', type: 'num', ans: 11, unit: 'cm', reveal: 'W2' },
+      { q: '重なりは88cm²。イの右の部分の高さは何cm？', type: 'num', ans: 8, unit: 'cm', reveal: 'H2' },
+    ] },
+  { t: TEND, label: '18秒（重なりがなくなった）',
+    qs: [
+      { q: '図の□は何cm？', type: 'num', ans: 4, unit: 'cm', reveal: 'BOX' },
+    ] },
+];
+let t = 0, playing = false, stopIdx = 0, qIdx = 0, tries = 0, shown = new Set(), asking = false;
+
+// ───── 図 ─────
+const fig = $('fig'), g = fig.getContext('2d');
+const S = 14, OX = 16 * S + 60, BASE = 250;    // イの左はしの x
+const X = cm => OX + cm * S, Y = cm => BASE - cm * S;
+function txt(c, s, x, y, col = '#222', size = 14, align = 'center') { c.fillStyle = col; c.font = `${size}px sans-serif`; c.textAlign = align; c.fillText(s, x, y); }
+function drawFig() {
+  g.clearRect(0, 0, fig.width, fig.height);
+  // ℓ
+  g.strokeStyle = '#000'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(20, BASE); g.lineTo(fig.width - 20, BASE); g.stroke();
+  txt(g, 'ℓ', 12, BASE + 5, '#000', 16);
+  // イ
+  g.fillStyle = 'rgba(80,140,230,.18)'; g.strokeStyle = '#2a5bd7'; g.lineWidth = 2;
+  g.beginPath(); g.moveTo(X(0), Y(0)); g.lineTo(X(0), Y(H1)); g.lineTo(X(W1), Y(H1)); g.lineTo(X(W1), Y(H2)); g.lineTo(X(IW), Y(H2)); g.lineTo(X(IW), Y(0)); g.closePath(); g.fill(); g.stroke();
+  txt(g, 'イ', X(5), Y(4), '#2a5bd7', 18);
+  // 重なり
+  const front = V * t, rear = front - SIDE, a = Math.max(0, rear), b = Math.min(IW, front);
+  if (b > a) {
+    g.fillStyle = 'rgba(230,60,60,.45)';
+    const seg = (l, r, h) => { if (r > l) g.fillRect(X(l), Y(h), (r - l) * S, h * S); };
+    seg(a, Math.min(b, W1), H1); seg(Math.max(a, W1), b, H2);
+  }
+  // ア
+  g.strokeStyle = '#222'; g.lineWidth = 2.5; g.strokeRect(X(rear), Y(SIDE), SIDE * S, SIDE * S);
+  txt(g, 'ア', X(rear + 2), Y(SIDE - 2), '#222', 18);
+  txt(g, '16cm', X(rear + 8), BASE + 22, '#222', 13);
+  // 矢印
+  g.strokeStyle = '#222'; g.lineWidth = 2; g.beginPath(); g.moveTo(X(rear + 5), Y(SIDE + 1)); g.lineTo(X(rear + 11), Y(SIDE + 1)); g.stroke();
+  g.beginPath(); g.moveTo(X(rear + 11), Y(SIDE + 1)); g.lineTo(X(rear + 10.2), Y(SIDE + 1.5)); g.lineTo(X(rear + 10.2), Y(SIDE + 0.5)); g.fill();
+  // □
+  if (shown.has('BOX')) txt(g, '□＝4cm', X(W1 + 1), Y(H1) + 4, '#c00', 15, 'left');
+  else { g.strokeStyle = '#222'; g.lineWidth = 1; g.strokeRect(X(W1 + 0.7), Y(H2 + 3.2), 14, 14); txt(g, 'cm', X(W1 + 2), Y(H2 + 2.3), '#222', 13, 'left'); }
+  // わかった長さ
+  const red = '#c00';
+  if (shown.has('IW')) { dim(X(0), X(IW), BASE + 42, '20cm'); }
+  if (shown.has('W1')) dim(X(0), X(W1), Y(H1) - 12, '9cm');
+  if (shown.has('W2')) dim(X(W1), X(IW), Y(H2) - 12, '11cm');
+  if (shown.has('H1')) txt(g, '12cm', X(0) - 6, Y(H1 / 2), red, 14, 'right');
+  if (shown.has('H2')) txt(g, '8cm', X(IW) + 6, Y(H2 / 2), red, 14, 'left');
+  // アの辺の位置の目印（予想を聞いている間）
+  if (asking) {
+    g.setLineDash([4, 4]); g.strokeStyle = '#c00'; g.lineWidth = 1;
+    [front, rear].forEach(x => { g.beginPath(); g.moveTo(X(x), 20); g.lineTo(X(x), BASE); g.stroke(); });
+    g.setLineDash([]);
+  }
+}
+function dim(x1, x2, y, s) {
+  g.strokeStyle = '#c00'; g.lineWidth = 1; g.beginPath(); g.moveTo(x1, y); g.lineTo(x2, y); g.moveTo(x1, y - 5); g.lineTo(x1, y + 5); g.moveTo(x2, y - 5); g.lineTo(x2, y + 5); g.stroke();
+  txt(g, s, (x1 + x2) / 2, y - 4, '#c00', 14);
+}
+
+// ───── グラフ ─────
+const gr = $('graph'), c = gr.getContext('2d');
+const GX0 = 70, GY0 = 260, GW = 740, GH = 220, AMAX = 180;
+const gx = s => GX0 + s / TEND * GW, gy = a => GY0 - a / AMAX * GH;
+function drawGraph() {
+  c.clearRect(0, 0, gr.width, gr.height);
+  c.strokeStyle = '#000'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(GX0, 20); c.lineTo(GX0, GY0); c.lineTo(GX0 + GW + 20, GY0); c.stroke();
+  txt(c, '(cm²)', GX0 - 10, 16, '#000', 12); txt(c, '(秒)', GX0 + GW + 30, GY0 + 4, '#000', 12);
+  // 問題に書いてある目盛りだけ
+  c.setLineDash([3, 3]); c.strokeStyle = '#999'; c.lineWidth = 1;
+  [[4.5, 108], [12.5, 88]].forEach(([s, a]) => { c.beginPath(); c.moveTo(GX0, gy(a)); c.lineTo(gx(s), gy(a)); c.lineTo(gx(s), GY0); c.stroke(); });
+  [[8, 164], [10, 148]].forEach(([s, a]) => { c.beginPath(); c.moveTo(GX0, gy(a)); c.lineTo(gx(s), gy(a)); c.lineTo(gx(s), GY0); c.stroke(); });
+  c.setLineDash([]);
+  txt(c, '108', GX0 - 6, gy(108) + 4, '#000', 13, 'right'); txt(c, '88', GX0 - 6, gy(88) + 4, '#000', 13, 'right'); txt(c, '0', GX0 - 6, GY0 + 4, '#000', 13, 'right');
+  txt(c, '4.5', gx(4.5), GY0 + 18, '#000', 13); txt(c, '18', gx(18), GY0 + 18, '#000', 13);
+  if (t >= 12.5 - 1e-9 && shown.has('H2')) txt(c, '12.5', gx(12.5), GY0 + 18, '#c00', 13);
+  // 問題のグラフ（うすく）
+  c.strokeStyle = '#bbb'; c.lineWidth = 1.5; c.beginPath();
+  for (let s = 0; s <= TEND + 1e-9; s += 0.05) { const p = [gx(s), gy(area(s))]; s === 0 ? c.moveTo(...p) : c.lineTo(...p); }
+  c.stroke();
+  // ここまで（こく）
+  c.strokeStyle = '#d33'; c.lineWidth = 3; c.beginPath();
+  for (let s = 0; s <= t + 1e-9; s += 0.05) { const p = [gx(s), gy(area(s))]; s === 0 ? c.moveTo(...p) : c.lineTo(...p); }
+  c.stroke();
+  c.fillStyle = '#d33'; c.beginPath(); c.arc(gx(t), gy(area(t)), 6, 0, 7); c.fill();
+}
+function draw() {
+  drawFig(); drawGraph();
+  $('tlabel').textContent = `${t.toFixed(1)} 秒　重なり ${Math.round(area(t) * 10) / 10} cm²`;
+  $('slider').value = t;
+}
+
+// ───── 予想を聞く ─────
+const LOGKEY = 'sim_5B10_kumiwake7_log';
+const logGet = () => JSON.parse(localStorage.getItem(LOGKEY) || '[]');
+function logN() { $('logn').textContent = `たまっている記録 ${logGet().length} 件`; }
+function logPush(q, pred, act, ok) {
+  const L = logGet(), now = new Date(), ts = new Date(now - now.getTimezoneOffset() * 60000).toISOString().slice(0, 19);
+  L.push([ts, '5B10', '算数', '平行移動の重なり', '組分け対策', '7(1)', '正方形ア（16cm・毎秒2cm）と図形イの重なりのグラフから□を求める', q, pred, act, ok ? '○' : '×']);
+  localStorage.setItem(LOGKEY, JSON.stringify(L)); logN();
+}
+$('exp').onclick = () => {
+  const q = v => '"' + String(v).replace(/"/g, '""') + '"';
+  const head = ['日時', '単元', '教科', 'シミュレーター', '教材', '問題番号', '問題', '設問', '予想', '実際', '正誤'];
+  const csv = '﻿' + [head, ...logGet()].map(r => r.map(q).join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  a.download = `シミュ5B10_記録_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+};
+
+function ask() {
+  const st = STOPS[stopIdx], Q = st.qs[qIdx];
+  asking = true; tries = 0; playing = false; $('play').textContent = '▶ 動かす'; $('play').disabled = true;
+  $('ask').style.display = 'block';
+  $('askq').textContent = `【${st.label}】 ${Q.q}`;
+  $('askmsg').textContent = '';
+  const box = $('askin'); box.innerHTML = '';
+  if (Q.type === 'num') {
+    const inp = document.createElement('input'); inp.type = 'text'; inp.inputMode = 'decimal';
+    const b = document.createElement('button'); b.textContent = 'これで確かめる';
+    const go = () => answer(inp.value.trim()); b.onclick = go; inp.onkeydown = e => { if (e.key === 'Enter') go(); };
+    box.append(inp, ' ' + (Q.unit || '') + ' ', b); inp.focus();
+  } else {
+    Q.opts.forEach(o => { const b = document.createElement('button'); b.textContent = o; b.style.marginRight = '8px'; b.onclick = () => answer(o); box.append(b); });
+  }
+  draw();
+}
+function answer(v) {
+  const Q = STOPS[stopIdx].qs[qIdx];
+  const ok = Q.type === 'num' ? Math.abs(parseFloat(v.replace(/[^\d.\-]/g, '')) - Q.ans) < 1e-9 : v === Q.ans;
+  if (tries === 0) logPush(Q.q, v + (Q.type === 'num' ? (Q.unit || '') : ''), Q.ans + (Q.type === 'num' ? (Q.unit || '') : ''), ok);
+  tries++;
+  const m = $('askmsg');
+  if (!ok) {
+    m.className = 'msg ng';
+    m.textContent = tries >= 2 ? `ちがう。答えは ${Q.ans}${Q.unit || ''}。` : 'ちがう。図の赤い点線（アの両はし）を見て、もう一度。';
+    if (tries < 2) return;
+  } else { m.className = 'msg ok'; m.textContent = '○'; }
+  if (Q.reveal) shown.add(Q.reveal);
+  $('askin').innerHTML = '';
+  const nb = document.createElement('button'); nb.textContent = '次へ'; nb.onclick = next; $('askin').append(nb);
+  draw();
+}
+function next() {
+  qIdx++;
+  if (qIdx < STOPS[stopIdx].qs.length) return ask();
+  qIdx = 0; stopIdx++; asking = false; $('ask').style.display = 'none'; $('play').disabled = false;
+  if (stopIdx >= STOPS.length) { $('ask').style.display = 'block'; $('askq').textContent = 'おわり。□＝12−8＝4cm'; $('askin').innerHTML = ''; $('askmsg').textContent = ''; $('slider').disabled = false; }
+  draw();
+}
+
+// ───── 動かす ─────
+let last = null;
+function tick(ts) {
+  if (playing) {
+    const dt = last == null ? 0 : (ts - last) / 1000;
+    let nt = t + dt * 1.0;          // 1秒で1秒
+    const free = $('free').checked;
+    if (!free && stopIdx < STOPS.length && nt >= STOPS[stopIdx].t) { t = STOPS[stopIdx].t; draw(); ask(); }
+    else { t = Math.min(nt, TEND); if (t >= TEND) { playing = false; $('play').textContent = '▶ 動かす'; } draw(); }
+  }
+  last = ts; requestAnimationFrame(tick);
+}
+$('play').onclick = () => {
+  if (!$('free').checked && stopIdx < STOPS.length && Math.abs(t - STOPS[stopIdx].t) < 1e-9) return ask();
+  if (t >= TEND) t = 0;
+  playing = !playing; $('play').textContent = playing ? '⏸ 止める' : '▶ 動かす';
+};
+$('free').onchange = () => { $('slider').disabled = !$('free').checked && stopIdx < STOPS.length; };
+$('slider').oninput = e => { t = +e.target.value; playing = false; $('play').textContent = '▶ 動かす'; draw(); };
+$('reset').onclick = () => { t = 0; playing = false; stopIdx = 0; qIdx = 0; asking = false; shown.clear(); $('ask').style.display = 'none'; $('play').disabled = false; $('play').textContent = '▶ 動かす'; $('slider').disabled = !$('free').checked; draw(); };
+
+logN(); draw(); requestAnimationFrame(tick);
+</script>
+</body></html>
