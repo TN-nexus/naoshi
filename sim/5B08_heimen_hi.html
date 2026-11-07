@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>5B08 平面図形と比</title>
+<style>
+body{font-family:-apple-system,"Hiragino Sans",sans-serif;margin:0;color:#222;background:#fff}
+.simtabs{padding:10px 12px 0}
+.simtabs button,.tabs button{font-size:15px;padding:6px 14px;border:1px solid #222;background:#fff;margin:0 4px 4px 0}
+.simtabs button.on,.tabs button.on{background:#222;color:#fff}
+#cuts button{font-size:13px;padding:4px 8px}
+.wrap{display:flex;flex-wrap:wrap;gap:16px;padding:12px;align-items:flex-start}
+canvas{border:1px solid #ccc;max-width:100%;height:auto}
+.panel{width:380px;font-size:15px;line-height:1.5}
+.box{border:1px solid #ddd;padding:8px 10px;margin:8px 0}
+.q{margin-top:8px}
+label{display:block;margin:3px 0}
+input[type=number]{width:64px;font-size:15px}
+input[type=text]{width:110px;font-size:15px}
+input[type=range]{width:100%}
+table{border-collapse:collapse;width:100%;margin-top:6px;font-size:14px}
+td,th{border:1px solid #ddd;padding:3px 6px;text-align:left}
+th{background:#f5f5f5}
+.ok{color:#06c;font-weight:bold}.ng{color:#c30;font-weight:bold}
+.ctl button{font-size:16px;padding:4px 10px;margin:2px}
+button:disabled,input:disabled{opacity:.35}
+.mono{font-variant-numeric:tabular-nums}
+.small{font-size:13px;color:#666}
+#bd div{margin:2px 0}#bd .cur{font-weight:bold}
+a{color:#06c}
+@media(max-width:600px){.ctl button,.tabs button,#cuts button,#go,#next{min-height:44px;min-width:44px}.panel{width:100%}.simtabs button{min-height:40px}}
+#viewonly #cuts,#viewonly .simtabs button,#viewonly #pred .small,#viewonly #exp,#viewonly #logn,#viewonly #qs,#viewonly #go,#viewonly #next,#viewonly #result{display:none}#viewonly .wrap{padding:8px;gap:8px}#viewonly .panel{width:100%}
+</style></head><body>
+<div class="simtabs">
+  <a href="index.html" class="small">← 単元を選ぶ</a><br>
+  <button data-sim="sim" class="on">相似（ピラミッド・砂時計）</button>
+  <button data-sim="area">面積の比（2乗か、そのままか）</button>
+  <button data-sim="benz">線の比＝面積の比</button>
+  <button data-sim="hojo">補助線で砂時計</button>
+</div>
+<div class="simtabs" id="cuts"><span class="small">教材の問題へ:</span></div>
+<div class="wrap">
+<canvas id="cv" width="640" height="560"></canvas>
+<div class="panel">
+  <div class="tabs"><button id="tPred" class="on">予想モード</button><button id="tFree">フリーモード</button></div>
+  <div id="pred" class="box">
+    <div id="qText"></div>
+    <div id="qs"></div>
+    <div class="small" style="margin-top:6px">分数は 24と12/13 のように書く</div>
+    <div style="margin-top:10px"><button id="go" disabled>答えを決めて動かす</button> <button id="next">次の問題</button></div>
+    <div id="result"></div>
+  </div>
+  <div id="free" class="box" hidden><div id="fc"></div></div>
+  <div class="ctl box">
+    <button id="bStart" title="最初へ">⏮</button>
+    <button id="bRev" title="逆再生">◀</button>
+    <button id="bPause" title="止める">⏸</button>
+    <button id="bPlay" title="再生">▶</button>
+    <button id="bEnd" title="最後へ">⏭</button>
+    速さ <select id="spd"><option value="0.5">ゆっくり</option><option value="1" selected>ふつう</option><option value="2">はやい</option></select>
+    <input id="scrub" type="range" min="0" max="1" step="0.001" value="0">
+  </div>
+  <div id="bd" class="box"></div>
+  <div class="small"><button id="exp">記録を書き出す</button> <span id="logn"></span></div>
+</div></div>
+
+<!-- 図と問題（DOM に触らない。apps/sim/test_5B08.js が答えを解答 CSV と照合する） -->
+<script id="data">
+const D = Math.PI/180;
+const add = (p, q, k = 1) => [p[0]+q[0]*k, p[1]+q[1]*k];
+const sub = (p, q) => [p[0]-q[0], p[1]-q[1]];
+const mul = (p, k) => [p[0]*k, p[1]*k];
+const lerp = (p, q, t) => [p[0]+(q[0]-p[0])*t, p[1]+(q[1]-p[1])*t];
+const dist = (p, q) => Math.hypot(p[0]-q[0], p[1]-q[1]);
+const unit = p => mul(p, 1/Math.hypot(p[0], p[1]));
+const rot = (p, a) => [p[0]*Math.cos(a) - p[1]*Math.sin(a), p[0]*Math.sin(a) + p[1]*Math.cos(a)];
+const polar = (r, deg) => [r*Math.cos(deg*D), r*Math.sin(deg*D)];
+const div = (P, Q, m, n) => lerp(P, Q, m/(m+n));          // PQ を m:n に分ける点
+function meet(P1, P2, Q1, Q2) {                            // 直線 P1P2 と Q1Q2 の交点
+  const d1 = sub(P2, P1), d2 = sub(Q2, Q1), den = d1[0]*d2[1] - d1[1]*d2[0];
+  return add(P1, d1, ((Q1[0]-P1[0])*d2[1] - (Q1[1]-P1[1])*d2[0])/den);
+}
+// 三角形ABCの中の点O（△OBC:△OCA:△OAB = a:b:c）
+const bary = (A, B, C, a, b, c) => [(a*A[0]+b*B[0]+c*C[0])/(a+b+c), (a*A[1]+b*B[1]+c*C[1])/(a+b+c)];
+function shoelace(pts) {
+  let s = 0;
+  pts.forEach((p, i) => { const q = pts[(i+1) % pts.length]; s += p[0]*q[1] - q[0]*p[1]; });
+  return Math.abs(s)/2;
+}
+
+// 数の書き方: 整数／小数（割り切れるとき）／帯分数
+function frac(x, maxD = 1000) {
+  for (let d = 1; d <= maxD; d++) { const n = Math.round(x*d); if (Math.abs(n/d - x) < 1e-7*Math.max(1, Math.abs(x))) return [n, d]; }
+  return null;
+}
+function fmtNum(x) {
+  const f = frac(x);
+  if (!f) return String(Math.round(x*100)/100);
+  const [n, d] = f;
+  if (d === 1) return String(n);
+  if (100 % d === 0) return String(+(n/d).toFixed(2));
+  const w = Math.floor(n/d), r = n - w*d;
+  return (w ? w + 'と' : '') + r + '/' + d;
+}
+function ratio(x, y) { const f = frac(x/y); return f || [Math.round(x/y*100)/100, 1]; }
+const fmtR = (x, y) => ratio(x, y).join(':');
+const sumA = (g, list) => list.reduce((t, s) => t + g.A(s), 0);
+
+// 図の上の計算（面積は unit で実際の値にそろえる）
+function ctxOf(F) {
+  const pts = s => [...s].map(c => F.P[c]);
+  const A = s => shoelace(pts(s))*F.K, L = s => dist(F.P[s[0]], F.P[s[1]])*Math.sqrt(F.K);
+  return {A, L, a:s => fmtNum(A(s)), l:s => fmtNum(L(s)), ra:(s, t) => fmtR(A(s), A(t)), rl:(s, t) => fmtR(L(s), L(t)),
+    n:fmtNum, r:fmtR,
+    par:(s, t) => { const u = unit(sub(F.P[s[1]], F.P[s[0]])), v = unit(sub(F.P[t[1]], F.P[t[0]])); return Math.abs(u[0]*v[1] - u[1]*v[0]); }};
+}
+function makeFig(f) {
+  const F = {P:f.P, lines:f.lines.split(' '), marks:f.marks || [], labels:f.labels || [], hide:f.hide || '', K:1};
+  if (f.unit) F.K = f.unit[1]/shoelace([...f.unit[0]].map(c => f.P[c]));
+  return F;
+}
+
+// ───── 説明の手順の型 ─────
+// 点Yが辺XZの上、直線 V-O-Y（V は向かいの頂点）→ XY:YZ = △XVO:△ZVO（ひき算）
+function sideSteps(g, X, Y, Z, V, O) {
+  return [
+    {k:'hl', polys:[[X+V+Y, 0], [Z+V+Y, 1]], cap:`頂点${V}から見ると △${X}${V}${Y} と △${Z}${V}${Y} は高さが同じ → 面積の比 ＝ ${X}${Y}:${Y}${Z}`},
+    {k:'hl', polys:[[X+O+Y, 0], [Z+O+Y, 1]], cap:`点${O}から見ても高さが同じ → △${X}${O}${Y}:△${Z}${O}${Y} も ${X}${Y}:${Y}${Z}`},
+    {k:'hl', polys:[[X+V+O, 0], [Z+V+O, 1]], cap:`大きい方から小さい方をひいても同じ比 → ${X}${Y}:${Y}${Z} ＝ △${X}${V}${O}:△${Z}${V}${O} ＝ ${g.a(X+V+O)}:${g.a(Z+V+O)} ＝ ${g.ra(X+V+O, Z+V+O)}`},
+  ];
+}
+const oneSide = (g, X, Y, Z, V, O) => ({k:'hl', polys:[[X+V+O, 0], [Z+V+O, 1]],
+  cap:`${X}${Y}:${Y}${Z} ＝ △${X}${V}${O}:△${Z}${V}${O}（${Y}の向かいの2つ）＝ ${g.a(X+V+O)}:${g.a(Z+V+O)} ＝ ${g.ra(X+V+O, Z+V+O)}`});
+// 直線 X-O-Y、両側の頂点 U・W → XO:OY = (△UXO+△WXO):(△UYO+△WYO)（たし算）
+function kiteSteps(g, X, O, Y, U, W) {
+  const a = g.A(U+X+O) + g.A(W+X+O), b = g.A(U+Y+O) + g.A(W+Y+O);
+  return [
+    {k:'hl', polys:[[U+X+O, 0], [U+Y+O, 1]], cap:`頂点${U}から見ると △${U}${X}${O} と △${U}${Y}${O} は高さが同じ → 面積の比 ＝ ${X}${O}:${O}${Y}`},
+    {k:'hl', polys:[[W+X+O, 0], [W+Y+O, 1]], cap:`頂点${W}から見ても同じ → △${W}${X}${O}:△${W}${Y}${O} も ${X}${O}:${O}${Y}`},
+    {k:'hl', polys:[[U+X+O, 0], [W+X+O, 0], [U+Y+O, 1], [W+Y+O, 1]],
+      cap:`たしても同じ比 → ${X}${O}:${O}${Y} ＝ (${g.a(U+X+O)}＋${g.a(W+X+O)}):(${g.a(U+Y+O)}＋${g.a(W+Y+O)}) ＝ ${fmtNum(a)}:${fmtNum(b)} ＝ ${fmtR(a, b)}`},
+  ];
+}
+function oneKite(g, X, O, Y, U, W) {
+  const a = g.A(U+X+O) + g.A(W+X+O), b = g.A(U+Y+O) + g.A(W+Y+O);
+  return {k:'hl', polys:[[U+X+O, 0], [W+X+O, 0], [U+Y+O, 1], [W+Y+O, 1]],
+    cap:`${X}${O}:${O}${Y} ＝ （${X}側の2つ）:（${Y}側の2つ）＝ (${g.a(U+X+O)}＋${g.a(W+X+O)}):(${g.a(U+Y+O)}＋${g.a(W+Y+O)}) ＝ ${fmtR(a, b)}`};
+}
+
+// ───── 問題（mat・no は記録の教材名と問題番号。exp は算数_正解_5B08.csv の答え） ─────
+const TABS = {};
+
+TABS.sim = {title:'相似（ピラミッド・砂時計）', presets:[
+  {mat:'確認テスト', no:'1(1)(2)', text:'辺DEと辺BCは平行。AD＝5cm、DB＝2cm、DE＝4cm。',
+    fig() {
+      const B = [0, 0], A = polar(7, 70), D = div(A, B, 5, 2), E = add(D, [4, 0]), C = meet(A, E, B, [1, 0]);
+      return {P:{A, B, C, D, E}, lines:'ABC DE', marks:[['A', 'D', '5cm'], ['D', 'B', '2cm'], ['D', 'E', '4cm']]};
+    },
+    given:g => [[g.L('AD'), 5], [g.L('DB'), 2], [g.L('DE'), 4], [g.par('DE', 'BC'), 0]],
+    qs:[{text:'辺BCの長さ', t:'num', unit:'cm', v:g => g.L('BC'), exp:'5.6'},
+        {text:'三角形ADE：台形DBCE', t:'ratio', v:g => [g.A('ADE'), g.A('DBCE')], exp:'25:24'}],
+    steps:g => [
+      {k:'hl', polys:[['ADE', 0], ['ABC', 1]], cap:'平行な線 DE で切ると、上の小さい三角形と全体の三角形が同じ形（ピラミッド）'},
+      {k:'morph', from:'ADE', to:'ABC', cap:`対応するのは AD と AB（DB ではない）→ AD:AB ＝ 5:7 → DE:BC ＝ 5:7 → BC ＝ 4×7/5 ＝ ${g.l('BC')}cm`},
+      {k:'tile', a:['ADE', 5], b:['ABC', 7], cap:`面積は同じ大きさの三角形の数で比べる → 5×5 ＝ 25 個 : 7×7 ＝ 49 個 → 台形は 49−25 ＝ 24 → ${g.ra('ADE', 'DBCE')}`},
+    ]},
+  {mat:'予シリ', no:'基本1(1)②', text:'ABとCDは平行。AB＝28cm、BD＝20cm、CD＝12cm。□（DO）の長さは？',
+    fig() {
+      const B = [0, 0], A = polar(28, 48), D = [20, 0], C = add(D, unit(sub(A, B)), 12), O = meet(A, C, B, D);
+      return {P:{A, B, C, D, O}, lines:'AB BO AO CD', marks:[['A', 'B', '28cm'], ['B', 'D', '20cm'], ['C', 'D', '12cm'], ['D', 'O', '□']]};
+    },
+    given:g => [[g.L('AB'), 28], [g.L('BD'), 20], [g.L('CD'), 12], [g.par('AB', 'CD'), 0]],
+    qs:[{text:'□（DO）の長さ', t:'num', unit:'cm', v:g => g.L('DO'), exp:'15'}],
+    steps:g => [
+      {k:'hl', polys:[['OCD', 0], ['OAB', 1]], cap:'頂点Oの小さい三角形 OCD と大きい三角形 OAB が同じ形（ピラミッド）'},
+      {k:'morph', from:'OCD', to:'OAB', cap:`CD:AB ＝ 12:28 ＝ 3:7 → OD:OB も 3:7 → DB は 7−3 ＝ ④ ＝ 20cm → ① ＝ 5cm → OD ＝ ③ ＝ ${g.l('DO')}cm`},
+    ]},
+  {mat:'演問', no:'反復基本1(3)', text:'長方形ABCD。AB＝11cm、AE＝10cm、ED＝2cm。①EF:FB　②三角形AFEの面積',
+    fig() {
+      const A = [0, 11], B = [0, 0], C = [12, 0], D = [12, 11], E = [10, 11], F = meet(A, C, B, E);
+      return {P:{A, B, C, D, E, F}, lines:'ABCD AC BE', marks:[['A', 'B', '11cm'], ['A', 'E', '10cm'], ['E', 'D', '2cm']]};
+    },
+    given:g => [[g.L('AB'), 11], [g.L('AE'), 10], [g.L('ED'), 2]],
+    qs:[{text:'EF:FB', t:'ratio', v:g => [g.L('EF'), g.L('FB')], exp:'5:6'},
+        {text:'三角形AFEの面積', t:'num', unit:'cm²', v:g => g.A('AFE'), exp:'25'}],
+    steps:g => [
+      {k:'hl', polys:[['FAE', 0], ['FCB', 1]], cap:'AE と BC が平行 → 砂時計の形（△FAE と △FCB が同じ形）'},
+      {k:'morph', from:'FAE', to:'FCB', cap:`AE:CB ＝ 10:12 ＝ 5:6 → EF:FB ＝ ${g.rl('EF', 'FB')}`},
+      {k:'hl', polys:[['ABE', 1]], cap:`△ABE ＝ 10×11÷2 ＝ ${g.a('ABE')}cm²（÷2 を忘れない）`},
+      {k:'hl', polys:[['AFE', 0], ['AFB', 1]], cap:`頂点Aから見ると高さが同じ → △AFE は △ABE の 5/11 → ${g.a('ABE')}×5/11 ＝ ${g.a('AFE')}cm²`},
+    ]},
+  {mat:'予シリ', no:'基本1(3)', text:'長方形ABCD。AB＝12cm、BE＝8cm、EC＝12cm。①DF:FE　②三角形FECの面積',
+    fig() {
+      const A = [0, 12], B = [0, 0], C = [20, 0], D = [20, 12], E = [8, 0], F = meet(A, C, D, E);
+      return {P:{A, B, C, D, E, F}, lines:'ABCD AC DE', marks:[['A', 'B', '12cm'], ['B', 'E', '8cm'], ['E', 'C', '12cm']]};
+    },
+    given:g => [[g.L('AB'), 12], [g.L('BE'), 8], [g.L('EC'), 12]],
+    qs:[{text:'DF:FE', t:'ratio', v:g => [g.L('DF'), g.L('FE')], exp:'5:3'},
+        {text:'三角形FECの面積', t:'num', unit:'cm²', v:g => g.A('FEC'), exp:'27'}],
+    steps:g => [
+      {k:'hl', polys:[['FDA', 0], ['FEC', 1]], cap:'AD と EC が平行 → 砂時計（△FDA と △FEC が同じ形）'},
+      {k:'morph', from:'FDA', to:'FEC', cap:`AD:EC ＝ 20:12 ＝ 5:3 → DF:FE ＝ ${g.rl('DF', 'FE')}`},
+      {k:'hl', polys:[['DEC', 1]], cap:`△DEC ＝ 12×12÷2 ＝ ${g.a('DEC')}cm²`},
+      {k:'hl', polys:[['FEC', 0], ['FDC', 1]], cap:`頂点Cから見ると高さが同じ → △FEC は △DEC の 3/8 → ${g.a('DEC')}×3/8 ＝ ${g.a('FEC')}cm²`},
+    ]},
+  {mat:'演問', no:'反復練習1', text:'台形ABCD（角B・角Cは直角）。AB＝12cm、BC＝20cm、DC＝16cm、EはDCの真ん中。(1)AF:FC　(2)四角形AFEDの面積',
+    fig() {
+      const A = [0, 12], B = [0, 0], C = [20, 0], D = [20, 16], E = div(D, C, 1, 1), F = meet(A, C, B, E);
+      return {P:{A, B, C, D, E, F}, lines:'ABCD AC BE', marks:[['A', 'B', '12cm'], ['B', 'C', '20cm'], ['D', 'C', '16cm']]};
+    },
+    given:g => [[g.L('AB'), 12], [g.L('BC'), 20], [g.L('DC'), 16], [g.L('DE'), 8]],
+    qs:[{text:'AF:FC', t:'ratio', v:g => [g.L('AF'), g.L('FC')], exp:'3:2'},
+        {text:'四角形AFEDの面積', t:'num', unit:'cm²', v:g => g.A('AFED'), exp:'128'}],
+    steps:g => [
+      {k:'hl', polys:[['FAB', 0], ['FCE', 1]], cap:'AB と CE が平行（どちらも BC に直角）→ 砂時計'},
+      {k:'morph', from:'FAB', to:'FCE', cap:`AB:CE ＝ 12:8 ＝ 3:2 → AF:FC ＝ ${g.rl('AF', 'FC')}、BF:FE も 3:2`},
+      {k:'hl', polys:[['BCE', 1], ['FCE', 0]], cap:`△BCE ＝ 8×20÷2 ＝ ${g.a('BCE')} → △FCE はその 2/5 ＝ ${g.a('FCE')}cm²`},
+      {k:'hl', polys:[['ACD', 0], ['FCE', 1]], cap:`四角形AFED ＝ △ACD − △FCE ＝ ${g.a('ACD')} − ${g.a('FCE')} ＝ ${g.a('AFED')}cm²`},
+    ]},
+], free:{
+  cfg:{type:'pyr', a:5, b:2},
+  specs:[{type:'select', id:'type', label:'形', options:[['pyr', 'ピラミッド'], ['hour', '砂時計']]},
+         {type:'range', id:'a', label:'a', min:1, max:8, step:1}, {type:'range', id:'b', label:'b', min:1, max:8, step:1}],
+  make(c) {
+    const {a, b} = c;
+    if (c.type === 'pyr') return {text:`AD:DB ＝ ${a}:${b}、DE と BC は平行`,
+      fig:() => { const B = [0, 0], C = [10, 0], A = [3.5, 8.5], D = div(A, B, a, b), E = div(A, C, a, b);
+        return {P:{A, B, C, D, E}, lines:'ABC DE', marks:[['A', 'D', `${a}`], ['D', 'B', `${b}`]]}; },
+      steps:g => [
+        {k:'morph', from:'ADE', to:'ABC', cap:`対応するのは AD と AB → 相似比 ${a}:${a+b}（DB の ${b} ではない）→ DE:BC も ${fmtR(a, a+b)}`},
+        {k:'tile', a:['ADE', a], b:['ABC', a+b], cap:`面積は ${a}×${a} ＝ ${a*a} 個 : ${a+b}×${a+b} ＝ ${(a+b)**2} 個（台形は ${(a+b)**2 - a*a}）`},
+      ]};
+    return {text:`AB と CD は平行、AO:OD ＝ ${a}:${b}`,
+      fig:() => { const O = [0, 0], A = mul([-1.2, 0.9], a), B = mul([-0.6, -0.9], a), D = mul([1.2, -0.9], b), C = mul([0.6, 0.9], b);
+        return {P:{A, B, C, D, O}, lines:'AB CD AD BC', marks:[['A', 'O', `${a}`], ['O', 'D', `${b}`]]}; },
+      steps:g => [
+        {k:'morph', from:'OAB', to:'ODC', cap:`ひっくり返すと重なる → 相似比 AO:DO ＝ ${a}:${b} → AB:DC も ${fmtR(a, b)}`},
+        {k:'tile', a:['OAB', a], b:['ODC', b], cap:`面積は ${a*a} 個 : ${b*b} 個 → ${fmtR(a*a, b*b)}`},
+      ]};
+  }}};
+
+TABS.area = {title:'面積の比（2乗か、そのままか）', presets:[
+  {mat:'演問', no:'反復基本1(2)①', text:'アとイの面積の比は？（LP＝21cm、PT＝28cm）',
+    fig() {
+      const L = [0, 0], T = [23.5, 16.5], R = [16.5, 0], P = div(L, T, 21, 28);
+      return {P:{L, T, R, P}, lines:'LTR PR', marks:[['L', 'P', '21cm'], ['P', 'T', '28cm']], labels:[['ア', 'LPR'], ['イ', 'PTR']]};
+    },
+    given:g => [[g.L('LP')/g.L('PT'), 21/28]],
+    qs:[{text:'ア：イ', t:'ratio', v:g => [g.A('LPR'), g.A('PTR')], exp:'3:4'}],
+    steps:g => [
+      {k:'hl', polys:[['LPR', 0], ['PTR', 1]], cap:'ア と イ は頂点Rが同じで、底辺 LP・PT が同じ直線の上 → 高さが同じ。形は違う（相似ではない）'},
+      {k:'fan', apex:'R', from:'L', to:'T', n:7, split:3, cap:`底辺を 3 と 4 に分けると、細い三角形はみな同じ面積 → ア:イ ＝ 3:4 ＝ ${g.ra('LPR', 'PTR')}（2乗しない）`},
+    ]},
+  {mat:'予シリ', no:'基本1(2)③', text:'ABとCDは平行。BO＝8cm、OC＝10cm。アとイの面積の比は？',
+    fig() {
+      const O = [0, 0], u = unit([115, 55]), v = unit([-52, 30]);
+      const C = add(O, u, 10), B = add(O, u, -8), A = add(O, v, 5), D = add(O, v, -6.25);
+      return {P:{A, B, C, D, O}, lines:'AB CD AD BC', marks:[['B', 'O', '8cm'], ['O', 'C', '10cm']], labels:[['ア', 'AOB'], ['イ', 'COD']]};
+    },
+    given:g => [[g.L('BO'), 8], [g.L('OC'), 10], [g.par('AB', 'CD'), 0]],
+    qs:[{text:'ア：イ', t:'ratio', v:g => [g.A('AOB'), g.A('COD')], exp:'16:25'}],
+    steps:g => [
+      {k:'hl', polys:[['OBA', 0], ['OCD', 1]], cap:'AB と CD が平行 → 砂時計。ア と イ は同じ形（相似）'},
+      {k:'morph', from:'OBA', to:'OCD', cap:'ひっくり返すと重なる → 相似比 OB:OC ＝ 8:10 ＝ 4:5'},
+      {k:'tile', a:['OBA', 4], b:['OCD', 5], cap:`同じ形なので、同じ大きさの三角形で数えると 4×4 ＝ 16 個 : 5×5 ＝ 25 個 → ${g.ra('AOB', 'COD')}（2乗）`},
+    ]},
+], free:{
+  cfg:{a:3, b:4},
+  specs:[{type:'range', id:'a', label:'a', min:1, max:7, step:1}, {type:'range', id:'b', label:'b', min:1, max:7, step:1}],
+  make(c) {
+    const {a, b} = c, ox = a + 1, ox2 = ox + b + 1.5, h = Math.max(b*0.8, 4);
+    return {text:`左: 同じ形（辺の比 ${a}:${b}）。右: 高さが同じ（底辺の比 ${a}:${b}）`,
+      fig:() => ({P:{A:[0, 0], B:[a, 0], C:[a*0.4, a*0.8], D:[ox, 0], E:[ox+b, 0], F:[ox+b*0.4, b*0.8],
+        P:[ox2, 0], M:[ox2+a, 0], Q:[ox2+a+b, 0], X:[ox2+(a+b)*0.35, h]},
+        lines:'ABC DEF PQX XM', marks:[['A', 'B', `${a}`], ['D', 'E', `${b}`], ['P', 'M', `${a}`], ['M', 'Q', `${b}`]]}),
+      steps:g => [
+        {k:'tile', keep:true, a:['ABC', a], b:['DEF', b], cap:`同じ形（相似）: 辺が ${a}:${b} → 面積は ${a}×${a}:${b}×${b} ＝ ${fmtR(a*a, b*b)}（2乗）`},
+        {k:'fan', apex:'X', from:'P', to:'Q', n:a+b, split:a, cap:`高さが同じ: 底辺が ${a}:${b} → 面積も ${fmtR(a, b)}（2乗しない）`},
+      ]};
+  }}};
+
+TABS.benz = {title:'線の比＝面積の比', presets:[
+  {mat:'演問', no:'トレ3(1)', text:'△OAB＝28cm²、△OBC＝12cm²、△OCA＝20cm²。',
+    fig() {
+      const A = [7.5, 8], B = [0, 0], C = [11, 0], O = bary(A, B, C, 12, 20, 28);
+      return {P:{A, B, C, O, D:meet(C, O, A, B), E:meet(A, O, B, C), F:meet(B, O, C, A)}, lines:'ABC AE BF CD', unit:['OAB', 28]};
+    },
+    given:g => [[g.A('OAB'), 28], [g.A('OBC'), 12], [g.A('OCA'), 20]],
+    qs:[{text:'AD:DB', t:'ratio', v:g => [g.L('AD'), g.L('DB')], exp:'5:3'},
+        {text:'BE:EC', t:'ratio', v:g => [g.L('BE'), g.L('EC')], exp:'7:5'},
+        {text:'CF:FA', t:'ratio', v:g => [g.L('CF'), g.L('FA')], exp:'3:7'},
+        {text:'AO:OE', t:'ratio', v:g => [g.L('AO'), g.L('OE')], exp:'4:1'},
+        {text:'BO:OF', t:'ratio', v:g => [g.L('BO'), g.L('OF')], exp:'2:1'},
+        {text:'CO:OD', t:'ratio', v:g => [g.L('CO'), g.L('OD')], exp:'8:7'}],
+    steps:g => [...sideSteps(g, 'A', 'D', 'B', 'C', 'O'), oneSide(g, 'B', 'E', 'C', 'A', 'O'), oneSide(g, 'C', 'F', 'A', 'B', 'O'),
+      ...kiteSteps(g, 'B', 'O', 'F', 'A', 'C'), oneKite(g, 'A', 'O', 'E', 'B', 'C'), oneKite(g, 'C', 'O', 'D', 'A', 'B')]},
+  {mat:'演問', no:'トレ3(2)', text:'△OAB＝15cm²、BE:EC＝3:4、CF:FA＝5:3。',
+    fig() {
+      const A = [4, 7.5], B = [0, 0], C = [10, 0], E = div(B, C, 3, 4), F = div(C, A, 5, 3), O = meet(A, E, B, F);
+      return {P:{A, B, C, O, D:meet(C, O, A, B), E, F}, lines:'ABC AE BF CD', unit:['OAB', 15]};
+    },
+    given:g => [[g.A('OAB'), 15], [g.L('BE')/g.L('EC'), 3/4], [g.L('CF')/g.L('FA'), 5/3]],
+    qs:[{text:'三角形OBCの面積', t:'num', unit:'cm²', v:g => g.A('OBC'), exp:'25'},
+        {text:'三角形OCAの面積', t:'num', unit:'cm²', v:g => g.A('OCA'), exp:'20'},
+        {text:'AD:DB', t:'ratio', v:g => [g.L('AD'), g.L('DB')], exp:'4:5'},
+        {text:'AO:OE', t:'ratio', v:g => [g.L('AO'), g.L('OE')], exp:'7:5'},
+        {text:'BO:OF', t:'ratio', v:g => [g.L('BO'), g.L('OF')], exp:'2:1'},
+        {text:'CO:OD', t:'ratio', v:g => [g.L('CO'), g.L('OD')], exp:'3:1'}],
+    steps:g => [
+      {k:'hl', polys:[['BAO', 0], ['CAO', 1]], cap:`BE:EC ＝ △OAB:△OCA（Eの向かいの2つ）＝ 3:4 → △OCA ＝ 15×4/3 ＝ ${g.a('OCA')}cm²`},
+      {k:'hl', polys:[['CBO', 0], ['ABO', 1]], cap:`CF:FA ＝ △OBC:△OAB ＝ 5:3 → △OBC ＝ 15×5/3 ＝ ${g.a('OBC')}cm²`},
+      oneSide(g, 'A', 'D', 'B', 'C', 'O'), ...kiteSteps(g, 'A', 'O', 'E', 'B', 'C'), oneKite(g, 'B', 'O', 'F', 'A', 'C'), oneKite(g, 'C', 'O', 'D', 'A', 'B')]},
+  {mat:'演問', no:'反復基本4', text:'3本の直線が点Oで交わる。△OAB＝6cm²、△OBC＝18cm²、△OCA＝12cm²。',
+    fig() {
+      const A = [4.5, 8.8], B = [0, 0], C = [10, 0], O = bary(A, B, C, 18, 12, 6);
+      return {P:{A, B, C, O, D:meet(C, O, A, B), E:meet(A, O, B, C), F:meet(B, O, C, A)}, lines:'ABC AE BF CD', unit:['OAB', 6]};
+    },
+    given:g => [[g.A('OAB'), 6], [g.A('OBC'), 18], [g.A('OCA'), 12]],
+    qs:[{text:'AF:FC', t:'ratio', v:g => [g.L('AF'), g.L('FC')], exp:'1:3'},
+        {text:'BO:OF', t:'ratio', v:g => [g.L('BO'), g.L('OF')], exp:'2:1'}],
+    steps:g => [oneSide(g, 'A', 'F', 'C', 'B', 'O'), ...kiteSteps(g, 'B', 'O', 'F', 'A', 'C')]},
+  {mat:'予シリ', no:'基本4', text:'3本の直線が点Oで交わる。△OAB＝12cm²、△OBC＝6cm²、△OCA＝8cm²。(1)BE:EC　(2)AO:OE',
+    fig() {
+      const A = [5.2, 9.2], B = [0, 0], C = [11, 0], O = bary(A, B, C, 6, 8, 12);
+      return {P:{A, B, C, O, D:meet(C, O, A, B), E:meet(A, O, B, C), F:meet(B, O, C, A)}, lines:'ABC AE BF CD', unit:['OAB', 12]};
+    },
+    given:g => [[g.A('OAB'), 12], [g.A('OBC'), 6], [g.A('OCA'), 8]],
+    qs:[{text:'BE:EC', t:'ratio', v:g => [g.L('BE'), g.L('EC')], exp:'3:2'},
+        {text:'AO:OE', t:'ratio', v:g => [g.L('AO'), g.L('OE')], exp:'10:3'}],
+    steps:g => [...sideSteps(g, 'B', 'E', 'C', 'A', 'O'), ...kiteSteps(g, 'A', 'O', 'E', 'B', 'C')]},
+  {mat:'演問', no:'反復練習4', text:'AD:DB＝7:5、CF:FD＝3:1、△FBC＝20cm²。(1)△AFC・△ABF　(2)BE:EC・AF:FE',
+    fig() {
+      const A = [3.5, 9.5], B = [0, 0], C = [11, 0], D = div(A, B, 7, 5), F = div(C, D, 3, 1), E = meet(A, F, B, C);
+      return {P:{A, B, C, D, E, F}, lines:'ABC CD AE BF', unit:['FBC', 20]};
+    },
+    given:g => [[g.L('AD')/g.L('DB'), 7/5], [g.L('CF')/g.L('FD'), 3], [g.A('FBC'), 20]],
+    qs:[{text:'三角形AFCの面積', t:'num', unit:'cm²', v:g => g.A('AFC'), exp:'28'},
+        {text:'三角形ABFの面積', t:'num', unit:'cm²', v:g => g.A('ABF'), exp:'16'},
+        {text:'BE:EC', t:'ratio', v:g => [g.L('BE'), g.L('EC')], exp:'4:7'},
+        {text:'AF:FE', t:'ratio', v:g => [g.L('AF'), g.L('FE')], exp:'11:5'}],
+    steps:g => [
+      {k:'hl', polys:[['BCF', 0], ['BDF', 1]], cap:`頂点Bから見ると CF:FD ＝ 3:1 → △BDF ＝ 20×1/3 ＝ ${g.a('BDF')}cm²`},
+      {k:'hl', polys:[['ADF', 0], ['BDF', 1]], cap:`頂点Fから見ると AD:DB ＝ 7:5 → △ADF ＝ ${g.a('BDF')}×7/5 ＝ ${g.a('ADF')} → △ABF ＝ ${g.a('ADF')}＋${g.a('BDF')} ＝ ${g.a('ABF')}cm²`},
+      {k:'hl', polys:[['ACF', 0], ['ADF', 1]], cap:`頂点Aから見ると CF:FD ＝ 3:1 → △AFC ＝ ${g.a('ADF')}×3 ＝ ${g.a('AFC')}cm²`},
+      oneSide(g, 'B', 'E', 'C', 'A', 'F'), ...kiteSteps(g, 'A', 'F', 'E', 'B', 'C')]},
+  {mat:'演問', no:'実戦2', text:'AD:DB＝2:1、BF:FE＝4:3、△FBC＝12cm²。(1)△AFC　(2)四角形ABCF　(3)CF:FD',
+    fig() {
+      // F は △FBC:△FCA:△FAB ＝ 12:24:20 の点（given で問題の条件を確かめる）
+      const A = [5.3, 7.8], B = [0, 0], C = [10, 0], F = bary(A, B, C, 12, 24, 20);
+      return {P:{A, B, C, F, D:meet(C, F, A, B), E:meet(B, F, A, C)}, lines:'ABC CD BE AF', unit:['FBC', 12]};
+    },
+    given:g => [[g.L('AD')/g.L('DB'), 2], [g.L('BF')/g.L('FE'), 4/3], [g.A('FBC'), 12]],
+    qs:[{text:'三角形AFCの面積', t:'num', unit:'cm²', v:g => g.A('AFC'), exp:'24'},
+        {text:'四角形ABCFの面積', t:'num', unit:'cm²', v:g => g.A('ABCF'), exp:'32'},
+        {text:'CF:FD', t:'ratio', v:g => [g.L('CF'), g.L('FD')], exp:'9:5'}],
+    steps:g => [...sideSteps(g, 'A', 'D', 'B', 'C', 'F'),
+      {k:'hl', polys:[['AFC', 0]], cap:`AD:DB ＝ △AFC:△BFC ＝ 2:1 → △AFC ＝ 12×2 ＝ ${g.a('AFC')}cm²`},
+      {k:'hl', polys:[['CBF', 0], ['CEF', 1]], cap:`頂点Cから見ると BF:FE ＝ 4:3 → △CEF ＝ 12×3/4 ＝ ${g.a('CEF')} → △AEF ＝ ${g.a('AFC')}−${g.a('CEF')} ＝ ${g.a('AEF')}`},
+      {k:'hl', polys:[['ABF', 0], ['AEF', 1]], cap:`頂点Aから見ると BF:FE ＝ 4:3 → △ABF ＝ ${g.a('AEF')}×4/3 ＝ ${g.a('ABF')} → 四角形ABCF ＝ ${g.a('ABF')}＋12 ＝ ${g.a('ABCF')}cm²`},
+      ...kiteSteps(g, 'C', 'F', 'D', 'A', 'B')]},
+  {mat:'予シリ', no:'練習4', text:'BE:EC＝1:3、AF:FE＝3:2、△ABF＝30cm²。(1)△AFC・△FBC　(2)AD:DB・CF:FD',
+    fig() {
+      const A = [3.8, 9], B = [0, 0], C = [12, 0], E = div(B, C, 1, 3), F = div(A, E, 3, 2), D = meet(C, F, A, B);
+      return {P:{A, B, C, D, E, F}, lines:'ABC AE CD BF', unit:['ABF', 30]};
+    },
+    given:g => [[g.L('BE')/g.L('EC'), 1/3], [g.L('AF')/g.L('FE'), 3/2], [g.A('ABF'), 30]],
+    qs:[{text:'三角形AFCの面積', t:'num', unit:'cm²', v:g => g.A('AFC'), exp:'90'},
+        {text:'三角形FBCの面積', t:'num', unit:'cm²', v:g => g.A('FBC'), exp:'80'},
+        {text:'AD:DB', t:'ratio', v:g => [g.L('AD'), g.L('DB')], exp:'9:8'},
+        {text:'CF:FD', t:'ratio', v:g => [g.L('CF'), g.L('FD')], exp:'17:3'}],
+    steps:g => [
+      {k:'hl', polys:[['ABF', 0], ['EBF', 1]], cap:`頂点Bから見ると AF:FE ＝ 3:2 → △EBF ＝ 30×2/3 ＝ ${g.a('EBF')}`},
+      {k:'hl', polys:[['EBF', 0], ['ECF', 1]], cap:`頂点Fから見ると BE:EC ＝ 1:3 → △ECF ＝ ${g.a('EBF')}×3 ＝ ${g.a('ECF')} → △FBC ＝ ${g.a('FBC')}cm²`},
+      {k:'hl', polys:[['AFC', 0], ['EFC', 1]], cap:`頂点Cから見ると AF:FE ＝ 3:2 → △AFC ＝ ${g.a('ECF')}×3/2 ＝ ${g.a('AFC')}cm²`},
+      oneSide(g, 'A', 'D', 'B', 'C', 'F'), ...kiteSteps(g, 'C', 'F', 'D', 'A', 'B')]},
+  {mat:'確認テスト', no:'3', text:'AD:DB＝2:3、BE:EC＝3:4、△GBE＝18cm²。(1)△AGC　(2)△ADG',
+    fig() {
+      const A = [4.2, 8.2], B = [0, 0], C = [10, 0], D = div(A, B, 2, 3), E = div(B, C, 3, 4), G = meet(A, E, C, D);
+      return {P:{A, B, C, D, E, G, F:meet(B, G, A, C)}, lines:'ABC AE CD BF', unit:['GBE', 18]};
+    },
+    given:g => [[g.L('AD')/g.L('DB'), 2/3], [g.L('BE')/g.L('EC'), 3/4], [g.A('GBE'), 18]],
+    qs:[{text:'三角形AGCの面積', t:'num', unit:'cm²', v:g => g.A('AGC'), exp:'28'},
+        {text:'三角形ADGの面積', t:'num', unit:'cm²', v:g => g.A('ADG'), exp:'8.4'}],
+    steps:g => [
+      {k:'hl', polys:[['GBE', 0], ['GEC', 1]], cap:`頂点Gから見ると BE:EC ＝ 3:4 → △GEC ＝ 18×4/3 ＝ ${g.a('GEC')} → △GBC ＝ ${g.a('GBC')}`},
+      oneSide(g, 'A', 'D', 'B', 'C', 'G'),
+      {k:'hl', polys:[['AGC', 0]], cap:`AD:DB ＝ △AGC:△BGC ＝ 2:3 → △AGC ＝ ${g.a('GBC')}×2/3 ＝ ${g.a('AGC')}cm²`},
+      oneSide(g, 'B', 'E', 'C', 'A', 'G'),
+      {k:'hl', polys:[['ABG', 0]], cap:`BE:EC ＝ △ABG:△ACG ＝ 3:4 → △ABG ＝ ${g.a('AGC')}×3/4 ＝ ${g.a('ABG')}`},
+      {k:'hl', polys:[['ADG', 0], ['BDG', 1]], cap:`頂点Gから見ると AD:DB ＝ 2:3 → △ADG ＝ ${g.a('ABG')}×2/5 ＝ ${g.a('ADG')}cm²`}]},
+  {mat:'演問', no:'トレ4(1)', text:'四角形ABCDに対角線。AB＝6cm、AD＝8cm、BD＝10cm、DC＝4cm（角A と 角BDC は直角）。a（AO）:b（OC）は？　※点の名前はシミュでつけた',
+    fig() {
+      const ph = Math.atan(0.4)/D, B = [0, 0], Dd = polar(10, ph), A = polar(6, ph + Math.acos(0.6)/D), C = add(Dd, polar(4, ph - 90));
+      return {P:{A, B, C, D:Dd, O:meet(A, C, B, Dd)}, lines:'ABCD AC BD', marks:[['A', 'B', '6cm'], ['A', 'D', '8cm'], ['B', 'D', '10cm'], ['D', 'C', '4cm'], ['A', 'O', 'a'], ['O', 'C', 'b']]};
+    },
+    given:g => [[g.L('AB'), 6], [g.L('AD'), 8], [g.L('BD'), 10], [g.L('DC'), 4]],
+    qs:[{text:'a:b', t:'ratio', v:g => [g.L('AO'), g.L('OC')], exp:'6:5'}],
+    steps:g => [...kiteSteps(g, 'A', 'O', 'C', 'B', 'D'),
+      {k:'hl', polys:[['ABD', 0], ['CBD', 1]], cap:`つまり a:b ＝ △ABD:△CBD ＝ 6×8÷2 : 10×4÷2 ＝ ${g.a('ABD')}:${g.a('CBD')} ＝ ${g.ra('ABD', 'CBD')}`}]},
+  {mat:'演問', no:'トレ4(2)', text:'四角形ABCDに対角線。AB＝6cm、BC＝22cm、AD＝18cm、DC＝14cm（角B と 角D は直角）。a（BO）:b（OD）は？　※点の名前はシミュでつけた',
+    fig() {
+      const B = [0, 0], A = [0, 6], C = [22, 0], u = unit(sub(C, A)), al = Math.acos(18/dist(A, C)), Dd = add(A, rot(u, al), 18);
+      return {P:{A, B, C, D:Dd, O:meet(B, Dd, A, C)}, lines:'ABCD AC BD', marks:[['A', 'B', '6cm'], ['B', 'C', '22cm'], ['A', 'D', '18cm'], ['D', 'C', '14cm'], ['B', 'O', 'a'], ['O', 'D', 'b']]};
+    },
+    given:g => [[g.L('AB'), 6], [g.L('BC'), 22], [g.L('AD'), 18], [g.L('DC'), 14]],
+    qs:[{text:'a:b', t:'ratio', v:g => [g.L('BO'), g.L('OD')], exp:'11:21'}],
+    steps:g => [...kiteSteps(g, 'B', 'O', 'D', 'A', 'C'),
+      {k:'hl', polys:[['ABC', 0], ['ADC', 1]], cap:`つまり a:b ＝ △ABC:△ADC ＝ 6×22÷2 : 18×14÷2 ＝ ${g.a('ABC')}:${g.a('ADC')} ＝ ${g.ra('ABC', 'ADC')}`}]},
+  {mat:'演問', no:'実戦1', text:'平行四辺形ABCD（面積50cm²）。AE:EB＝3:2、AF:FD＝1:2。(1)△ECD　(2)△FED　(3)CG:GF',
+    fig() {
+      const B = [0, 0], C = [12, 0], A = [1.5, 9.75], Dd = [13.5, 9.75], E = div(A, B, 3, 2), F = div(A, Dd, 1, 2);
+      return {P:{A, B, C, D:Dd, E, F, G:meet(F, C, E, Dd)}, lines:'ABCD EF EC ED FC', unit:['ABCD', 50]};
+    },
+    given:g => [[g.A('ABCD'), 50], [g.L('AE')/g.L('EB'), 3/2], [g.L('AF')/g.L('FD'), 1/2]],
+    qs:[{text:'三角形ECDの面積', t:'num', unit:'cm²', v:g => g.A('ECD'), exp:'25'},
+        {text:'三角形FEDの面積', t:'num', unit:'cm²', v:g => g.A('FED'), exp:'10'},
+        {text:'CG:GF', t:'ratio', v:g => [g.L('CG'), g.L('GF')], exp:'5:2'}],
+    steps:g => [
+      {k:'hl', polys:[['ECD', 0]], cap:`△ECD は底辺 CD・高さが平行四辺形と同じ → 半分 ＝ ${g.a('ECD')}cm²`},
+      {k:'hl', polys:[['AED', 0], ['ABD', 1]], cap:`△ABD ＝ 25、頂点Dから見ると AE:AB ＝ 3:5 → △AED ＝ ${g.a('AED')}`},
+      {k:'hl', polys:[['FED', 0], ['AEF', 1]], cap:`頂点Eから見ると FD:AD ＝ 2:3 → △FED ＝ ${g.a('AED')}×2/3 ＝ ${g.a('FED')}cm²`},
+      ...kiteSteps(g, 'C', 'G', 'F', 'E', 'D')]},
+  {mat:'予シリ', no:'基本3', text:'四角形ABCDに対角線（角Bは直角）。AB＝10cm、BC＝12cm、BE＝8cm、ED＝12cm。(1)△ABC:△ACD　(2)△ACD',
+    fig() {
+      const A = [0, 10], B = [0, 0], C = [12, 0], t = (200 + Math.sqrt(200*200 - 4*244*36))/488, E = lerp(A, C, t), Dd = add(B, unit(E), 20);
+      return {P:{A, B, C, D:Dd, E}, lines:'ABCD AC BD', marks:[['A', 'B', '10cm'], ['B', 'C', '12cm'], ['B', 'E', '8cm'], ['E', 'D', '12cm']]};
+    },
+    given:g => [[g.L('AB'), 10], [g.L('BC'), 12], [g.L('BE'), 8], [g.L('ED'), 12]],
+    qs:[{text:'三角形ABC：三角形ACD', t:'ratio', v:g => [g.A('ABC'), g.A('ACD')], exp:'2:3'},
+        {text:'三角形ACDの面積', t:'num', unit:'cm²', v:g => g.A('ACD'), exp:'90'}],
+    steps:g => [...kiteSteps(g, 'B', 'E', 'D', 'A', 'C'),
+      {k:'hl', polys:[['ABC', 0], ['ACD', 1]], cap:`△ABC:△ACD ＝ BE:ED ＝ 2:3。△ABC ＝ 10×12÷2 ＝ ${g.a('ABC')} → △ACD ＝ ${g.a('ABC')}×3/2 ＝ ${g.a('ACD')}cm²`}]},
+], free:{
+  cfg:{x:28, y:12, z:20, q:'BOF'},
+  specs:[{type:'range', id:'x', label:'△OAB', min:1, max:30, step:1}, {type:'range', id:'y', label:'△OBC', min:1, max:30, step:1},
+         {type:'range', id:'z', label:'△OCA', min:1, max:30, step:1},
+         {type:'select', id:'q', label:'見る比', options:[['ADB', 'AD:DB'], ['BEC', 'BE:EC'], ['CFA', 'CF:FA'], ['AOE', 'AO:OE'], ['BOF', 'BO:OF'], ['COD', 'CO:OD']]}],
+  make(c) {
+    const {x, y, z, q} = c;
+    return {text:`△OAB＝${x}、△OBC＝${y}、△OCA＝${z}`,
+      fig:() => { const A = [4, 8.5], B = [0, 0], C = [11, 0], O = bary(A, B, C, y, z, x);
+        return {P:{A, B, C, O, D:meet(C, O, A, B), E:meet(A, O, B, C), F:meet(B, O, C, A)}, lines:'ABC AE BF CD', unit:['OAB', x]}; },
+      steps:g => {
+        const S = {ADB:['A', 'D', 'B', 'C'], BEC:['B', 'E', 'C', 'A'], CFA:['C', 'F', 'A', 'B']}, K = {AOE:['A', 'E', 'B', 'C'], BOF:['B', 'F', 'A', 'C'], COD:['C', 'D', 'A', 'B']};
+        const st = S[q] ? sideSteps(g, ...S[q], 'O') : kiteSteps(g, K[q][0], 'O', K[q][1], K[q][2], K[q][3]);
+        return [...st, {k:'hl', polys:[], cap:`まとめ: AD:DB ${g.rl('AD', 'DB')}、BE:EC ${g.rl('BE', 'EC')}、CF:FA ${g.rl('CF', 'FA')}、AO:OE ${g.rl('AO', 'OE')}、BO:OF ${g.rl('BO', 'OF')}、CO:OD ${g.rl('CO', 'OD')}`}];
+      }};
+  }}};
+
+TABS.hojo = {title:'補助線で砂時計', presets:[
+  {mat:'予シリ', no:'例題3', text:'平行四辺形ABCD。AB＝8cm、BC＝12cm、AF＝6cm（FはADの真ん中）、DE＝6cm、EC＝2cm。FG:GB は？',
+    fig() {
+      const B = [0, 0], C = [12, 0], A = polar(8, 72), Dd = add(A, [12, 0]), F = div(A, Dd, 1, 1), E = div(Dd, C, 6, 2);
+      return {P:{A, B, C, D:Dd, E, F, G:meet(A, E, F, B), H:meet(A, E, B, C)}, lines:'ABCD AE FB', hide:'H',
+        marks:[['A', 'B', '8cm'], ['B', 'C', '12cm'], ['A', 'F', '6cm'], ['D', 'E', '6cm'], ['E', 'C', '2cm']]};
+    },
+    given:g => [[g.L('AB'), 8], [g.L('BC'), 12], [g.L('AF'), 6], [g.L('DE'), 6], [g.L('EC'), 2]],
+    qs:[{text:'FG:GB', t:'ratio', v:g => [g.L('FG'), g.L('GB')], exp:'3:8'}],
+    steps:g => [
+      {k:'ext', segs:[['E', 'H'], ['C', 'H']], show:'H', cap:'AE を BC の先までのばす。BC とぶつかる点を H'},
+      {k:'morph', from:'EDA', to:'ECH', cap:`砂時計 △EDA と △ECH: DE:EC ＝ 6:2 ＝ 3:1 → AD:CH ＝ 3:1 → CH ＝ ${g.l('CH')}cm、BH ＝ ${g.l('BH')}cm`},
+      {k:'morph', from:'GFA', to:'GBH', cap:`砂時計 △GFA と △GBH: FG:GB ＝ AF:BH ＝ 6:${g.l('BH')} ＝ ${g.rl('FG', 'GB')}`},
+    ]},
+  {mat:'予シリ', no:'練習3', text:'長方形ABCD。AB＝12cm、AE＝8cm、BF＝6cm、FC＝3cm。(1)AG:GF　(2)四角形EBFGの面積',
+    fig() {
+      const A = [0, 12], B = [0, 0], C = [9, 0], Dd = [9, 12], E = [0, 4], F = [6, 0];
+      return {P:{A, B, C, D:Dd, E, F, G:meet(A, F, E, Dd), H:meet(Dd, E, B, C)}, lines:'ABCD AF ED', hide:'H',
+        marks:[['A', 'E', '8cm'], ['B', 'F', '6cm'], ['F', 'C', '3cm'], ['D', 'C', '12cm']]};
+    },
+    given:g => [[g.L('AB'), 12], [g.L('AE'), 8], [g.L('BF'), 6], [g.L('FC'), 3]],
+    qs:[{text:'AG:GF', t:'ratio', v:g => [g.L('AG'), g.L('GF')], exp:'6:7'},
+        {text:'四角形EBFGの面積', t:'num', unit:'cm²', v:g => g.A('EBFG'), exp:'24と12/13'}],
+    steps:g => [
+      {k:'ext', segs:[['E', 'H'], ['B', 'H']], show:'H', cap:'DE を AB の先までのばす。CB をのばした線とぶつかる点を H'},
+      {k:'morph', from:'EAD', to:'EBH', cap:`砂時計 △EAD と △EBH: AE:EB ＝ 8:4 ＝ 2:1 → AD:BH ＝ 2:1 → BH ＝ ${g.l('BH')}cm、FH ＝ ${g.l('FH')}cm`},
+      {k:'morph', from:'GAD', to:'GFH', cap:`砂時計 △GAD と △GFH: AG:GF ＝ AD:FH ＝ 9:${g.l('FH')} ＝ ${g.rl('AG', 'GF')}`},
+      {k:'hl', polys:[['AEG', 0], ['GEF', 1]], cap:`頂点Eから見ると AG:GF ＝ 6:7 → △AEG ＝ △AEF×6/13 ＝ ${g.a('AEF')}×6/13 ＝ ${g.a('AEG')}`},
+      {k:'hl', polys:[['EBFG', 0], ['AEG', 1]], cap:`四角形EBFG ＝ △ABF − △AEG ＝ ${g.a('ABF')} − ${g.a('AEG')} ＝ ${g.a('EBFG')}cm²`},
+    ]},
+  {mat:'予シリ', no:'練習6', text:'正六角形（面積72cm²）。AE:EB＝1:1、CF:FD＝2:1。四角形AEFDの面積は？　※下の2つの頂点の名前（G・H）はシミュでつけた',
+    fig() {
+      const h = 3*Math.sqrt(3), A = [-3, h], Dd = [3, h], C = [6, 0], H = [3, -h], G = [-3, -h], B = [-6, 0];
+      return {P:{A, B, C, D:Dd, E:div(A, B, 1, 1), F:div(Dd, C, 1, 2), G, H, P:meet(B, A, C, Dd)}, lines:'ADCHGB EF', hide:'P',
+        unit:['ADCHGB', 72]};
+    },
+    given:g => [[g.A('ADCHGB'), 72], [g.L('AE')/g.L('EB'), 1], [g.L('CF')/g.L('FD'), 2]],
+    qs:[{text:'四角形AEFDの面積', t:'num', unit:'cm²', v:g => g.A('AEFD'), exp:'12'}],
+    steps:g => [
+      {k:'ext', segs:[['A', 'P'], ['D', 'P']], show:'P', cap:'BA と CD を上にのばす（角出し）。ぶつかる点を P'},
+      {k:'hl', polys:[['PAD', 0]], cap:`△PAD は正三角形で、正六角形を6つに分けた1つと同じ → 72÷6 ＝ ${g.a('PAD')}cm²`},
+      {k:'hl', polys:[], cap:'辺の比をそろえる: AE:EB ＝ 1:1 ＝ ③:③、CF:FD ＝ 2:1 ＝ ④:② → 正六角形の1辺が ⑥。PA・PD も ⑥'},
+      {k:'hl', polys:[['PEF', 1], ['PAD', 0]], cap:`△PAD と △PEF は角Pが同じ（形は違う）→ 面積の比 ＝ (PA×PD):(PE×PF) ＝ (6×6):(9×8) ＝ ${g.ra('PAD', 'PEF')} → △PEF ＝ ${g.a('PEF')}cm²`},
+      {k:'hl', polys:[['AEFD', 1]], cap:`四角形AEFD ＝ △PEF − △PAD ＝ ${g.a('PEF')} − ${g.a('PAD')} ＝ ${g.a('AEFD')}cm²`},
+    ]},
+  {mat:'確認テスト', no:'2', text:'長方形ABCD。AB＝5cm、AF＝6cm、FD＝3cm、DE＝3cm。(1)BG:GF　(2)四角形FGEDの面積',
+    fig() {
+      const A = [0, 5], B = [0, 0], C = [9, 0], Dd = [9, 5], F = [6, 5], E = [9, 2];
+      return {P:{A, B, C, D:Dd, E, F, G:meet(A, E, B, F), H:meet(A, E, B, C)}, lines:'ABCD AE BF', hide:'H',
+        marks:[['A', 'B', '5cm'], ['A', 'F', '6cm'], ['F', 'D', '3cm'], ['D', 'E', '3cm']]};
+    },
+    given:g => [[g.L('AB'), 5], [g.L('AF'), 6], [g.L('FD'), 3], [g.L('DE'), 3]],
+    qs:[{text:'BG:GF', t:'ratio', v:g => [g.L('BG'), g.L('GF')], exp:'5:2'},
+        {text:'四角形FGEDの面積', t:'num', unit:'cm²', v:g => g.A('FGED'), exp:'9と3/14'}],
+    steps:g => [
+      {k:'ext', segs:[['E', 'H'], ['C', 'H']], show:'H', cap:'AE を DC の先までのばす。BC をのばした線とぶつかる点を H'},
+      {k:'morph', from:'EDA', to:'ECH', cap:`砂時計 △EDA と △ECH: DE:EC ＝ 3:2 → AD:CH ＝ 3:2 → CH ＝ ${g.l('CH')}cm、BH ＝ ${g.l('BH')}cm`},
+      {k:'morph', from:'GFA', to:'GBH', cap:`砂時計 △GFA と △GBH: BG:GF ＝ BH:AF ＝ ${g.l('BH')}:6 ＝ ${g.rl('BG', 'GF')}`},
+      {k:'hl', polys:[['AFG', 0], ['ABG', 1]], cap:`頂点Aから見ると FG:GB ＝ 2:5 → △AFG ＝ △ABF×2/7 ＝ ${g.a('ABF')}×2/7 ＝ ${g.a('AFG')}`},
+      {k:'hl', polys:[['FGED', 0], ['AFG', 1]], cap:`四角形FGED ＝ △AED − △AFG ＝ ${g.a('AED')} − ${g.a('AFG')} ＝ ${g.a('FGED')}cm²`},
+    ]},
+  {mat:'演問', no:'反復練習3', text:'長方形ABCD。AB＝15cm、BE＝9cm、EC＝15cm、DF＝12cm。(1)DG:GE　(2)四角形GECFの面積',
+    fig() {
+      const A = [0, 15], B = [0, 0], E = [9, 0], C = [24, 0], Dd = [24, 15], F = [24, 3];
+      return {P:{A, B, C, D:Dd, E, F, G:meet(A, F, Dd, E), H:meet(A, F, B, C)}, lines:'ABCD AF DE', hide:'H',
+        marks:[['A', 'B', '15cm'], ['B', 'E', '9cm'], ['E', 'C', '15cm'], ['D', 'F', '12cm']]};
+    },
+    given:g => [[g.L('AB'), 15], [g.L('BE'), 9], [g.L('EC'), 15], [g.L('DF'), 12]],
+    qs:[{text:'DG:GE', t:'ratio', v:g => [g.L('DG'), g.L('GE')], exp:'8:7'},
+        {text:'四角形GECFの面積', t:'num', unit:'cm²', v:g => g.A('GECF'), exp:'64.5'}],
+    steps:g => [
+      {k:'ext', segs:[['F', 'H'], ['C', 'H']], show:'H', cap:'AF を DC の先までのばす。BC をのばした線とぶつかる点を H'},
+      {k:'morph', from:'FDA', to:'FCH', cap:`砂時計 △FDA と △FCH: DF:FC ＝ 12:3 ＝ 4:1 → AD:CH ＝ 4:1 → CH ＝ ${g.l('CH')}cm、EH ＝ ${g.l('EH')}cm`},
+      {k:'morph', from:'GDA', to:'GEH', cap:`砂時計 △GDA と △GEH: DG:GE ＝ AD:EH ＝ 24:${g.l('EH')} ＝ ${g.rl('DG', 'GE')}`},
+      {k:'hl', polys:[['DEC', 1], ['DGF', 0]], cap:`△DEC ＝ 15×15÷2 ＝ ${g.a('DEC')}。△DGF は DG が 8/15、DF が 12/15 → ${g.a('DEC')}×8/15×12/15 ＝ ${g.a('DGF')}`},
+      {k:'hl', polys:[['GECF', 0]], cap:`四角形GECF ＝ ${g.a('DEC')} − ${g.a('DGF')} ＝ ${g.a('GECF')}cm²`},
+    ]},
+], free:{
+  cfg:{p:1, q:1, r:3, s:1},
+  specs:[{type:'range', id:'p', label:'AF', min:1, max:5, step:1}, {type:'range', id:'q', label:'FD', min:1, max:5, step:1},
+         {type:'range', id:'r', label:'DE', min:1, max:5, step:1}, {type:'range', id:'s', label:'EC', min:1, max:5, step:1}],
+  make(c) {
+    const {p, q, r, s} = c;
+    return {text:`平行四辺形ABCD。AF:FD ＝ ${p}:${q}、DE:EC ＝ ${r}:${s}`,
+      fig:() => { const B = [0, 0], C = [12, 0], A = polar(8, 72), Dd = add(A, [12, 0]), F = div(A, Dd, p, q), E = div(Dd, C, r, s);
+        return {P:{A, B, C, D:Dd, E, F, G:meet(A, E, F, B), H:meet(A, E, B, C)}, lines:'ABCD AE FB', hide:'H',
+          marks:[['A', 'F', `${p}`], ['F', 'D', `${q}`], ['D', 'E', `${r}`], ['E', 'C', `${s}`]]}; },
+      steps:g => [
+        {k:'ext', segs:[['E', 'H'], ['C', 'H']], show:'H', cap:'AE をのばして、BC をのばした線とぶつかる点を H'},
+        {k:'morph', from:'EDA', to:'ECH', cap:`砂時計: AD:CH ＝ DE:EC ＝ ${fmtR(r, s)}`},
+        {k:'morph', from:'GFA', to:'GBH', cap:`砂時計: FG:GB ＝ AF:BH ＝ ${g.rl('FG', 'GB')}`},
+      ]};
+  }}};
+</script>
+
+<script>
+const $ = id => document.getElementById(id);
+const cv = $('cv'), ctx = cv.getContext('2d');
+const COL = ['#1a5fd0', '#d07a20'], FILL = ['rgba(26,95,208,.28)', 'rgba(208,122,32,.32)'];
+const TOP = 74;   // 上の説明文の場所
+
+// 画面への写し（y は上向き）
+const V = {sc:30, ox:0, oy:0};
+const X = x => V.ox + x*V.sc, Y = y => V.oy - y*V.sc;
+function fit(pts) {
+  const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys), m = 40, H = cv.height - TOP;
+  V.sc = Math.min((cv.width - 2*m)/(x1 - x0 || 1), (H - 2*m)/(y1 - y0 || 1));
+  V.ox = (cv.width - (x1 - x0)*V.sc)/2 - x0*V.sc;
+  V.oy = TOP + H - (H - (y1 - y0)*V.sc)/2 + y0*V.sc;
+}
+function poly(pts, fill, stroke, w = 1, dash) {
+  ctx.beginPath();
+  pts.forEach((p, i) => i ? ctx.lineTo(X(p[0]), Y(p[1])) : ctx.moveTo(X(p[0]), Y(p[1])));
+  ctx.closePath();
+  if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+  if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = w; ctx.setLineDash(dash || []); ctx.stroke(); ctx.setLineDash([]); }
+}
+function seg(p, q, col, w = 1.5, dash) {
+  ctx.beginPath(); ctx.moveTo(X(p[0]), Y(p[1])); ctx.lineTo(X(q[0]), Y(q[1]));
+  ctx.strokeStyle = col; ctx.lineWidth = w; ctx.setLineDash(dash || []); ctx.stroke(); ctx.setLineDash([]);
+}
+function text(t, sx, sy, col = '#222', size = 15, al = 'center') {
+  ctx.fillStyle = col; ctx.font = size + 'px sans-serif'; ctx.textAlign = al; ctx.textBaseline = 'middle'; ctx.fillText(t, sx, sy);
+}
+function caption(t) {
+  ctx.font = '15px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.fillStyle = '#222';
+  let line = '', y = 8;
+  for (const ch of t) {
+    if (ctx.measureText(line + ch).width > cv.width - 20) { ctx.fillText(line, 10, y); line = ''; y += 21; }
+    line += ch;
+  }
+  ctx.fillText(line, 10, y);
+}
+const ease = t => Math.min(1, t*1.4);
+
+// 小さな三角形のしきつめ（n×n 個。上向き→下向きの順に返す）
+function tiles(P, Q, R, n) {
+  const G = (i, j) => add(add(P, sub(Q, P), i/n), sub(R, P), j/n), out = [];
+  for (let k = 0; k < n; k++)
+    for (let i = 0; i <= k; i++) {
+      const j = k - i;
+      out.push([G(i, j), G(i+1, j), G(i, j+1)]);
+      if (i + j <= n - 2) out.push([G(i+1, j), G(i, j+1), G(i+1, j+1)]);
+    }
+  return out;
+}
+
+let tab = TABS.sim, tabKey = 'sim', cur, F, g, steps = [], s = 0, dir = 0, mode = 'pred', revealed = false, pIdx = 0, shown = false;
+
+function load(item) {
+  cur = item; F = makeFig(item.fig()); g = ctxOf(F); steps = item.steps(g);
+  fit(Object.values(F.P));
+}
+function visible(name) {
+  if (!F.hide.includes(name)) return true;
+  if (!(mode === 'free' || revealed)) return false;
+  const i = steps.findIndex(st => st.k === 'ext' && st.show.includes(name));
+  return i >= 0 && s >= i + 0.6;
+}
+function drawStep(st, t) {
+  const P = F.P, pts = s2 => [...s2].map(c => P[c]);
+  if (st.k === 'hl') for (const [pl, c] of st.polys) poly(pts(pl), FILL[c].replace(/[\d.]+\)$/, m => (parseFloat(m)*t) + ')'), COL[c], 2);
+  if (st.k === 'morph') {
+    const A = pts(st.from), B = pts(st.to);
+    poly(A, FILL[0]); poly(B, null, COL[1], 2, [5, 4]);
+    poly(A.map((p, i) => lerp(p, B[i], t)), 'rgba(26,95,208,.15)', COL[0], 3);
+  }
+  if (st.k === 'tile') {
+    // 大きい方を先に、小さい方は不透明で上に重ねる（ピラミッドで重なっても色が混ざらない）。数は重ならないところに出す
+    const inA = q => { const [a, b, c] = pts(st.a[0]), sg = (p, u, v) => (p[0]-v[0])*(u[1]-v[1]) - (u[0]-v[0])*(p[1]-v[1]);
+      const d1 = sg(q, a, b), d2 = sg(q, b, c), d3 = sg(q, c, a); return !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0)); };
+    [[st.b, 1, 'rgba(208,122,32,.32)'], [st.a, 0, '#c6d6f2']].forEach(([[tri, n], c, fill]) => {
+      const T = tiles(...pts(tri), n), k = Math.round(T.length*t);
+      T.forEach((tr, i) => poly(tr, i < k ? fill : null, '#999', 0.6));
+      const cs = T.map(tr => tr.reduce((a, p) => add(a, p, 1/3), [0, 0])), out = c === 1 ? cs.filter(q => !inA(q)) : cs;
+      const at = (out.length ? out : cs).reduce((a, p, _, l) => add(a, p, 1/l.length), [0, 0]);
+      if (k) text(`${out.length < cs.length ? '全体で ' : ''}${k}個`, X(at[0]), Y(at[1]), COL[c], 16);
+    });
+  }
+  if (st.k === 'fan') {
+    const A = P[st.apex], B0 = P[st.from], B1 = P[st.to], k = Math.round(st.n*t);
+    for (let i = 0; i < st.n; i++) {
+      const u = lerp(B0, B1, i/st.n), v = lerp(B0, B1, (i+1)/st.n);
+      poly([A, u, v], i < k ? FILL[i < st.split ? 0 : 1] : null, '#999', 0.8);
+    }
+  }
+}
+function draw() {
+  const done = mode === 'free' || revealed, P = F.P;
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  const N = steps.length, ci = Math.min(Math.floor(s), N - 1), t = ease(s - ci);
+  const pts = s2 => [...s2].map(c => P[c]);
+  // 補助線（のばした線）は出たあともずっと見せる
+  if (done) steps.forEach((st, i) => {
+    if (st.k !== 'ext' || s <= i) return;
+    const tt = i < ci ? 1 : t;
+    for (const [a, b] of st.segs) seg(P[a], lerp(P[a], P[b], tt), '#2a9d4a', 2, [6, 4]);
+  });
+  // いまの手順（keep のついた手順は、そのあとも残す＝見比べ用）
+  const st = done && N ? steps[ci] : null;
+  if (st) { steps.slice(0, ci).forEach(x => x.keep && drawStep(x, 1)); drawStep(st, t); }
+  // 図の線
+  for (const tok of F.lines) {
+    const ps = [...tok];
+    if (ps.some(c => !visible(c))) continue;
+    if (ps.length === 2) seg(P[ps[0]], P[ps[1]], '#222');
+    else poly(pts(tok), null, '#222', 1.5);
+  }
+  // 点の名前・長さ・ア イ
+  const names = Object.keys(P).filter(visible), cen = names.reduce((a, c) => add(a, P[c], 1/names.length), [0, 0]);
+  for (const c of names) {
+    const d = sub(P[c], cen), l = Math.hypot(d[0], d[1]) || 1;
+    text(c, X(P[c][0]) + d[0]/l*14, Y(P[c][1]) - d[1]/l*14, '#222', 15);
+  }
+  for (const [a, b, tx] of F.marks) {
+    const m = lerp(P[a], P[b], 0.5), dd = unit(sub(P[b], P[a])), nrm = [dd[1], -dd[0]];
+    const side = (m[0]-cen[0])*nrm[0] + (m[1]-cen[1])*nrm[1] >= 0 ? 1 : -1;
+    text(tx, X(m[0]) + nrm[0]*side*16, Y(m[1]) - nrm[1]*side*16, '#555', 13);
+  }
+  for (const [tx, pl] of F.labels) {
+    const c = pts(pl).reduce((a, p) => add(a, p, 1/pl.length), [0, 0]);
+    text(tx, X(c[0]), Y(c[1]), '#222', 16);
+  }
+  if (st) caption(`${ci + 1}/${N}　${st.cap}`);
+  else caption(mode === 'pred' ? '予想を入れて「答えを決めて動かす」' : '');
+  $('bd').innerHTML = done ? steps.slice(0, ci + 1).map((x, i) => `<div class="${i === ci ? 'cur' : ''}">${i + 1}. ${x.cap}</div>`).join('') : '予想を入れると動かせる';
+  $('scrub').value = N ? s/N : 0;
+}
+function setControls() {
+  const on = mode === 'free' || revealed;
+  ['bStart', 'bRev', 'bPause', 'bPlay', 'bEnd', 'scrub'].forEach(id => $(id).disabled = !on);
+}
+
+// 予想モード
+function parseNum(v) {
+  v = v.replace(/[０-９．／]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).trim();
+  let m;
+  if ((m = v.match(/^(\d+)(?:と|\s+)(\d+)\/(\d+)$/))) return +m[1] + m[2]/m[3];
+  if ((m = v.match(/^(\d+)\/(\d+)$/))) return m[1]/m[2];
+  if (/^\d+(\.\d+)?$/.test(v)) return +v;
+  return null;
+}
+function getAns(q, i) {
+  if (q.t === 'ratio') { const a = $(`q${i}a`).value, b = $(`q${i}b`).value; return a === '' || b === '' || +a <= 0 || +b <= 0 ? null : [+a, +b]; }
+  return parseNum($(`q${i}`).value);
+}
+function checkFilled() { $('go').disabled = revealed || cur.qs.some((q, i) => getAns(q, i) === null); }
+function renderPred() {
+  $('qText').innerHTML = `<div class="small">${cur.mat} ${cur.no}</div>${cur.text}`;
+  $('qs').innerHTML = cur.qs.map((q, i) => `<div class="q"><b>${i+1}.</b> ${q.text} ` +
+    (q.t === 'ratio' ? `<input id="q${i}a" type="number" min="1"> : <input id="q${i}b" type="number" min="1">`
+                     : `<input id="q${i}" type="text"> ${q.unit}`) + '</div>').join('');
+  $('qs').querySelectorAll('input').forEach(e => e.oninput = checkFilled);
+  $('result').innerHTML = ''; checkFilled();
+}
+function loadPreset(i) {
+  pIdx = i; s = 0; dir = 0; revealed = false; shown = false;
+  load(tab.presets[i]); renderPred(); setControls(); draw();
+}
+function showResult() {
+  shown = true;
+  const rows = cur.qs.map((q, i) => {
+    const p = getAns(q, i), a = q.v(g);
+    if (q.t === 'ratio') {
+      const [x, y] = ratio(a[0], a[1]);
+      return {q:q.text, pred:p.join(':'), act:`${x}:${y}`, ok:Math.abs(p[0]/p[1] - a[0]/a[1]) < 1e-6*a[0]/a[1]};
+    }
+    return {q:q.text, pred:fmtNum(p) + q.unit, act:fmtNum(a) + q.unit, ok:Math.abs(p - a) < 1e-6*Math.max(1, a)};
+  });
+  $('result').innerHTML = '<table><tr><th></th><th>予想</th><th>実際</th><th></th></tr>' +
+    rows.map((r, i) => `<tr><td>${i+1}</td><td>${r.pred}</td><td>${r.act}</td><td>${r.ok ? '<span class="ok">○</span>' : '<span class="ng">×</span>'}</td></tr>`).join('') +
+    '</table><div style="margin-top:4px">ずれたところは ◀ で戻して見直そう</div>';
+  logPush(rows);
+}
+$('go').onclick = () => {
+  revealed = true; $('go').disabled = true;
+  $('qs').querySelectorAll('input').forEach(e => e.disabled = true);
+  setControls(); s = 0; dir = 1;
+};
+$('next').onclick = () => loadPreset((pIdx + 1) % tab.presets.length);
+
+// フリーモード
+let fcfg = {};
+function loadFree() { load(tab.free.make(fcfg[tabKey])); s = Math.min(s, steps.length); draw(); }
+function renderFree() {
+  const c = fcfg[tabKey];
+  $('fc').innerHTML = tab.free.specs.map(sp => sp.type === 'select'
+    ? `<label>${sp.label} <select id="f_${sp.id}">${sp.options.map(([v, l]) => `<option value="${v}" ${c[sp.id] == v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>`
+    : `<label>${sp.label} <span class="mono">${c[sp.id]}</span><input id="f_${sp.id}" type="range" min="${sp.min}" max="${sp.max}" step="${sp.step}" value="${c[sp.id]}"></label>`).join('') +
+    `<div class="small" id="ftext"></div>`;
+  for (const sp of tab.free.specs) {
+    const el = $('f_' + sp.id);
+    el.oninput = () => {
+      c[sp.id] = sp.type === 'range' ? +el.value : el.value;
+      if (sp.type === 'range') el.previousElementSibling.textContent = c[sp.id];
+      loadFree(); $('ftext').textContent = cur.text;
+    };
+  }
+  $('ftext').textContent = cur.text;
+}
+function toFree() {
+  mode = 'free'; dir = 0;
+  $('tFree').classList.add('on'); $('tPred').classList.remove('on'); $('pred').hidden = true; $('free').hidden = false;
+  fcfg[tabKey] = fcfg[tabKey] || {...tab.free.cfg};
+  s = 0; loadFree(); renderFree(); setControls(); s = steps.length; draw();
+}
+function toPred() {
+  mode = 'pred';
+  $('tPred').classList.add('on'); $('tFree').classList.remove('on'); $('pred').hidden = false; $('free').hidden = true;
+  loadPreset(pIdx);
+}
+$('tFree').onclick = toFree;
+$('tPred').onclick = toPred;
+function selectTab(key, i = 0) {
+  document.querySelectorAll('[data-sim]').forEach(x => x.classList.toggle('on', x.dataset.sim === key));
+  tab = TABS[key]; tabKey = key; pIdx = i; s = 0; dir = 0;
+  if (mode === 'pred') loadPreset(i); else toFree();
+}
+document.querySelectorAll('[data-sim]').forEach(b => b.onclick = () => selectTab(b.dataset.sim));
+
+// 教材の問題へのショートカット（予想モードで開く）
+for (const key in TABS) TABS[key].presets.forEach((p, i) => {
+  const b = document.createElement('button');
+  b.textContent = `${p.mat === '確認テスト' ? '確認' : p.mat} ${p.no}`;
+  b.onclick = () => { if (mode === 'free') toPred(); selectTab(key, i); };
+  $('cuts').appendChild(b);
+});
+
+// 再生
+$('bStart').onclick = () => { dir = 0; s = 0; draw(); };
+$('bEnd').onclick = () => { dir = 0; s = steps.length; draw(); };
+$('bPlay').onclick = () => { if (s >= steps.length) s = 0; dir = 1; };
+$('bRev').onclick = () => { if (s <= 0) s = steps.length; dir = -1; };
+$('bPause').onclick = () => { dir = 0; };
+$('scrub').oninput = e => { dir = 0; s = +e.target.value * steps.length; draw(); };
+
+let last = performance.now();
+function tick(now) {
+  const dt = Math.min(0.05, (now - last)/1000); last = now;
+  if (dir) {
+    s += dir * +$('spd').value * 0.4 * dt;
+    if (s >= steps.length) { s = steps.length; dir = 0; if (mode === 'pred' && revealed && !shown && !VIEW) showResult(); }
+    if (s <= 0) { s = 0; dir = 0; }
+    draw();
+  }
+  requestAnimationFrame(tick);
+}
+
+// 記録（予想モードの答え。書き出した CSV を apps/sim/ingest.py が wiki/logs/シミュ詳細.csv へ取り込む）
+const LOGKEY = 'sim_5B08_log';
+const logGet = () => JSON.parse(localStorage.getItem(LOGKEY) || '[]');
+function logN() { $('logn').textContent = `たまっている記録 ${logGet().length} 件`; }
+function logPush(rows) {
+  const L = logGet(), now = new Date(), ts = new Date(now - now.getTimezoneOffset()*60000).toISOString().slice(0, 19);
+  for (const r of rows) L.push([ts, '5B08', tab.title, cur.mat, cur.no, cur.text, r.q, r.pred, r.act, r.ok ? '○' : '×']);
+  localStorage.setItem(LOGKEY, JSON.stringify(L)); logN();
+}
+$('exp').onclick = () => {
+  const q = v => '"' + String(v).replace(/"/g, '""') + '"';
+  const csv = '﻿' + [['日時', '単元', 'シミュレーター', '教材', '問題番号', '問題', '設問', '予想', '実際', '正誤'], ...logGet()].map(r => r.map(q).join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
+  a.download = `シミュ5B08_記録_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+};
+
+logN();
+loadPreset(0);
+// ?q= で開いたときは、予想なしで ▶ を押すだけで手順が見られる（スマホ用の見る専用）
+const VIEW = new URLSearchParams(location.search).has('q');
+if (VIEW) {
+  const q = new URLSearchParams(location.search).get('q');
+  for (const key in TABS) { const i = TABS[key].presets.findIndex(p => p.mat + '|' + p.no === q); if (i >= 0) { selectTab(key, i); break; } }
+  document.querySelectorAll('.tabs').forEach(e => e.hidden = true);
+  document.body.id = 'viewonly';
+  revealed = true; shown = true; setControls(); draw();
+}
+requestAnimationFrame(tick);
+</script>
+</body></html>

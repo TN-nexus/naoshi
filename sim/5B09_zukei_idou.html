@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>5B09 図形の移動</title>
+<style>
+body{font-family:-apple-system,"Hiragino Sans",sans-serif;margin:0;color:#222;background:#fff}
+.simtabs{padding:10px 12px 0}
+.simtabs button,.tabs button{font-size:15px;padding:6px 14px;border:1px solid #222;background:#fff;margin-right:4px}
+.simtabs button.on,.tabs button.on{background:#222;color:#fff}
+.wrap{display:flex;flex-wrap:wrap;gap:16px;padding:12px;align-items:flex-start}
+canvas{border:1px solid #ccc;max-width:100%;height:auto}
+.panel{width:360px;font-size:15px;line-height:1.5}
+.box{border:1px solid #ddd;padding:8px 10px;margin:8px 0}
+.q{margin-top:8px}
+label{display:block;margin:3px 0}
+input[type=number]{width:80px;font-size:15px}
+input[type=range]{width:100%}
+table{border-collapse:collapse;width:100%;margin-top:6px;font-size:14px}
+td,th{border:1px solid #ddd;padding:3px 6px;text-align:left}
+th{background:#f5f5f5}
+.ok{color:#06c;font-weight:bold}.ng{color:#c30;font-weight:bold}
+.ctl button{font-size:16px;padding:4px 10px;margin:2px}
+button:disabled,input:disabled{opacity:.35}
+.mono{font-variant-numeric:tabular-nums}
+.small{font-size:13px;color:#666}
+@media(max-width:600px){.ctl button,.tabs button,#cuts button,#go,#next{min-height:44px;min-width:44px}.panel{width:100%}.simtabs button{min-height:40px}}
+#viewonly #cuts,#viewonly .simtabs button,#viewonly #pred .small,#viewonly #exp,#viewonly #logn,#viewonly #qs,#viewonly #go,#viewonly #next,#viewonly #result{display:none}#viewonly .wrap{padding:8px;gap:8px}#viewonly .panel{width:100%}
+</style></head><body>
+<div class="simtabs">
+  <a href="index.html" style="font-size:13px;color:#06c">← 単元を選ぶ</a><br>
+  <button data-sim="circle" class="on">円の転がり</button>
+  <button data-sim="sector">おうぎ形の転がり</button>
+  <button data-sim="slide">平行移動</button>
+  <button data-sim="roll">三角形などの転がり</button>
+</div>
+<div class="simtabs" id="cuts"><span class="small">教材の問題へ:</span></div>
+<div class="wrap">
+<canvas id="cv" width="640" height="520"></canvas>
+<div class="panel">
+  <div class="tabs"><button id="tPred" class="on">予想モード</button><button id="tFree">フリーモード</button></div>
+  <div id="pred" class="box">
+    <div id="qText"></div>
+    <div id="qs"></div>
+    <div style="margin-top:10px"><button id="go" disabled>答えを決めて動かす</button> <button id="next">次の問題</button></div>
+    <div id="result"></div>
+  </div>
+  <div id="free" class="box" hidden><div id="fc"></div></div>
+  <div class="ctl box">
+    <button id="bStart" title="最初へ">⏮</button>
+    <button id="bRev" title="逆再生">◀</button>
+    <button id="bPause" title="止める">⏸</button>
+    <button id="bPlay" title="再生">▶</button>
+    <button id="bEnd" title="最後へ">⏭</button>
+    速さ <select id="spd"><option value="0.4">ゆっくり</option><option value="1" selected>ふつう</option><option value="2.4">はやい</option></select>
+    <input id="scrub" type="range" min="0" max="1" step="0.001" value="0">
+  </div>
+  <div id="bd" class="box mono"></div>
+  <div class="small"><button id="exp">記録を書き出す</button> <span id="logn"></span></div>
+</div></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const PI = 3.14, D = Math.PI/180;
+const cv = $('cv'), ctx = cv.getContext('2d');
+const COL = {line:'#1a5fd0', corner:'#d07a20', edge:'#7a3fb0'};
+
+// 画面への写し（y は上向き）
+const V = {sc:30, ox:0, oy:0};
+const X = x => V.ox + x*V.sc, Y = y => V.oy - y*V.sc;
+function fit([x0, y0, x1, y1]) {
+  V.sc = Math.min(cv.width/(x1-x0), cv.height/(y1-y0));
+  V.ox = (cv.width - (x1-x0)*V.sc)/2 - x0*V.sc;
+  V.oy = cv.height - (cv.height - (y1-y0)*V.sc)/2 + y0*V.sc;
+}
+const r2 = v => Math.round(v*100)/100;
+const add = (p, q, k = 1) => [p[0]+q[0]*k, p[1]+q[1]*k];
+const rot = (p, a) => [p[0]*Math.cos(a) - p[1]*Math.sin(a), p[0]*Math.sin(a) + p[1]*Math.cos(a)];
+function arcPts(c, R, a0, a1, n = 40) {
+  const o = [];
+  for (let i = 0; i <= n; i++) { const a = a0 + (a1-a0)*i/n; o.push([c[0]+R*Math.cos(a), c[1]+R*Math.sin(a)]); }
+  return o;
+}
+function pathPts(pts, close) {
+  ctx.beginPath();
+  pts.forEach((p, i) => i ? ctx.lineTo(X(p[0]), Y(p[1])) : ctx.moveTo(X(p[0]), Y(p[1])));
+  if (close) ctx.closePath();
+}
+function dot(p, rad, col) { ctx.beginPath(); ctx.arc(X(p[0]), Y(p[1]), rad, 0, 7); ctx.fillStyle = col; ctx.fill(); }
+function ring(p, rad, col) { ctx.beginPath(); ctx.arc(X(p[0]), Y(p[1]), rad, 0, 7); ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.stroke(); }
+function label(t, p, col = '#555', size = 14) {
+  ctx.fillStyle = col; ctx.font = size + 'px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(t, X(p[0]), Y(p[1]));
+}
+function seg(p, q, col, w = 1, dash) {
+  ctx.beginPath(); ctx.moveTo(X(p[0]), Y(p[1])); ctx.lineTo(X(q[0]), Y(q[1]));
+  ctx.strokeStyle = col; ctx.lineWidth = w; ctx.setLineDash(dash || []); ctx.stroke(); ctx.setLineDash([]);
+}
+function caption(t) {
+  ctx.fillStyle = '#222'; ctx.font = '15px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  ctx.fillText(t, 10, 10);
+}
+
+// ───────── 円の転がり ─────────
+const nL = e => { const dx = e.p1[0]-e.p0[0], dy = e.p1[1]-e.p0[1], l = Math.hypot(dx, dy); return [dy/l, -dx/l]; };
+const nS = e => e.type === 'line' ? nL(e) : [Math.cos(e.a0), Math.sin(e.a0)];
+const nE = e => e.type === 'line' ? nL(e) : [Math.cos(e.a1), Math.sin(e.a1)];
+
+const CircleSim = {
+  title:'円の転がり', base:2.5,
+  presets:[
+    {shape:'rect', a:6, b:4, r:1},
+    {shape:'tri3', a:9, b:6, c:5, r:1},
+    {shape:'sector', a:6, th:60, r:1},
+    {shape:'sector', a:5, th:90, r:1},
+    {shape:'L', a:6, b:6, r:1},
+    {shape:'sector', a:9, th:60, r:2, area:true, src:'予シリ 練習問題2'},
+  ],
+  name(c) {
+    return {rect:`長方形（横${c.a}cm・たて${c.b}cm）`, tri:`正三角形（1辺${c.a}cm）`,
+      tri3:`三角形（${c.a}cm・${c.b}cm・${c.c}cm）`, sector:`おうぎ形（半径${c.a}cm・中心角${c.th}°）`, L:'L字の形'}[c.shape];
+  },
+  text(c) { return `半径 <b>${c.r}cm</b> の円が、${this.name(c)}のまわりを、はなれずに<b>1周</b>します。`; },
+  questions(c) {
+    return [
+      {id:'q1', type:'radio', text:'図形の角を曲がるあいだ、円の中心はどんな線をえがく？',
+        options:[['straight','まっすぐ'], ['arcV','図形の<b>角</b>を中心にした弧'], ['arcC','円の中心を中心にした弧'], ['stop','動かない（その場でまわるだけ）']]},
+      {id:'q2', type:'num', unit:'°', text:`角を曲がる部分（半径${c.r}cmの弧）の角度をぜんぶ足すと？`},
+      {id:'q3', type:'num', unit:'cm', text:'円の中心が動いた長さは？（円周率 3.14）'},
+      ...(c.area ? [{id:'q4', type:'num', unit:'cm²', text:'円が動いたあとの図形の面積は？（円周率 3.14）'}] : []),
+    ];
+  },
+  answer(c) { const P = this.build(c); return {q1:'arcV', q2:P.cornerDeg, q3:P.lenPI, q4:r2(2*c.r*P.lenPI)}; },
+  free(c) {
+    return [
+      {id:'shape', label:'形', type:'select', options:[['rect','長方形'], ['tri','正三角形'], ['sector','おうぎ形'], ['L','L字']]},
+      {id:'a', label:c.shape === 'sector' ? 'おうぎ形の半径' : '辺 a', type:'range', min:2, max:10, step:1, unit:'cm'},
+      ...(c.shape === 'rect' || c.shape === 'L' ? [{id:'b', label:'辺 b', type:'range', min:2, max:10, step:1, unit:'cm'}] : []),
+      ...(c.shape === 'sector' ? [{id:'th', label:'中心角', type:'range', min:30, max:180, step:15, unit:'°'}] : []),
+      {id:'r', label:'円の半径', type:'range', min:0.5, max:3, step:0.5, unit:'cm'},
+      {id:'center', label:'中心の線', type:'check'},
+      {id:'fan', label:'角のおうぎ形', type:'check'},
+      {id:'swept', label:'円が通ったあと（面積）', type:'check'},
+    ];
+  },
+  normalize(c, free) {
+    if (free && c.shape === 'tri3') { c.shape = 'tri'; c.a = 6; }
+    if (c.b == null) c.b = c.a;
+    if (c.th == null) c.th = 60;
+    if (c.shape === 'L') c.r = Math.min(c.r, Math.min(c.a, c.b)/4);
+  },
+  edges(c) {
+    const L = (p0, p1) => ({type:'line', p0, p1});
+    const poly = pts => pts.map((p, i) => L(p, pts[(i+1) % pts.length]));
+    const {a, b} = c;
+    switch (c.shape) {
+      case 'rect': return poly([[0,0],[a,0],[a,b],[0,b]]);
+      case 'tri':  return poly([[0,0],[a,0],[a/2, a*Math.sqrt(3)/2]]);
+      case 'tri3': { const x = (a*a + b*b - c.c*c.c)/(2*a); return poly([[0,0],[a,0],[x, Math.sqrt(b*b - x*x)]]); }
+      case 'L':    return poly([[0,0],[a,0],[a,b/2],[a/2,b/2],[a/2,b],[0,b]]);
+      case 'sector': {
+        const R = a, t = c.th*D, B = [R*Math.cos(t), R*Math.sin(t)];
+        return [L([0,0],[R,0]), {type:'arc', c:[0,0], R, a0:0, a1:t, p0:[R,0], p1:B}, L(B,[0,0])];
+      }
+    }
+  },
+  // 中心の道すじ: 辺にそう直線、おうぎ形の弧にそう弧、出っぱった角を中心にした弧。へこんだ角では弧はできない
+  build(c) {
+    const E = this.edges(c), n = E.length, r = c.r, ins = [], outs = [], corners = [];
+    let reflex = false;
+    for (let i = 0; i < n; i++) {
+      const prev = E[(i-1+n) % n], e = E[i], p = e.p0, n1 = nE(prev), n2 = nS(e);
+      const cr = n1[0]*n2[1] - n1[1]*n2[0], dt = n1[0]*n2[0] + n1[1]*n2[1];
+      if (cr > 1e-9) {
+        ins[i] = add(p, n1, r); outs[i] = add(p, n2, r);
+        corners[i] = {kind:'corner', c:p, rad:r, a0:Math.atan2(n1[1], n1[0]), ang:Math.acos(Math.max(-1, Math.min(1, dt)))};
+      } else if (cr < -1e-9) {
+        reflex = true;
+        const u = [(n2[1]*r - n1[1]*r)/cr, (-n2[0]*r + n1[0]*r)/cr];
+        ins[i] = outs[i] = add(p, u);
+      } else ins[i] = outs[i] = add(p, n2, r);
+    }
+    const segs = [];
+    for (let i = 0; i < n; i++) {
+      const e = E[i], j = (i+1) % n;
+      if (e.type === 'line') {
+        const p0 = outs[i], p1 = ins[j];
+        segs.push({kind:'line', p0, p1, len:Math.hypot(p1[0]-p0[0], p1[1]-p0[1]), nrm:nL(e)});
+      } else segs.push({kind:'edge', c:e.c, rad:e.R + r, R:e.R, a0:e.a0, ang:e.a1 - e.a0, len:(e.R + r)*(e.a1 - e.a0)});
+      if (corners[j]) segs.push({...corners[j], len:r*corners[j].ang});
+    }
+    let lineLen = 0, cornerDeg = 0, edgeDeg = 0, edgeRad = 0;
+    for (const g of segs) {
+      if (g.kind === 'line') lineLen += g.len;
+      else if (g.kind === 'corner') cornerDeg += g.ang/D;
+      else { edgeDeg += g.ang/D; edgeRad = g.rad; }
+    }
+    cornerDeg = Math.round(cornerDeg); edgeDeg = Math.round(edgeDeg);
+    const lenPI = r2(lineLen + 2*PI*r*cornerDeg/360 + 2*PI*edgeRad*edgeDeg/360);
+    return {E, segs, total:segs.reduce((t, g) => t + g.len, 0), cornerDeg, lenPI, reflex};
+  },
+  at(t) {
+    const P = this.P, r = this.c.r;
+    let lineLen = 0, cornerAng = 0, edgeAng = 0;
+    t = Math.max(0, Math.min(t, P.total - 1e-9));
+    for (const g of P.segs) {
+      const u = Math.min(t, g.len);
+      if (g.kind === 'line') {
+        lineLen += u;
+        if (t <= g.len) {
+          const k = g.len ? u/g.len : 0, q = [g.p0[0] + (g.p1[0]-g.p0[0])*k, g.p0[1] + (g.p1[1]-g.p0[1])*k];
+          return {q, contact:add(q, g.nrm, -r), lineLen, cornerAng, edgeAng, g};
+        }
+      } else {
+        const da = u/g.rad;
+        if (g.kind === 'corner') cornerAng += da; else edgeAng += da;
+        if (t <= g.len) {
+          const a = g.a0 + da, q = [g.c[0] + g.rad*Math.cos(a), g.c[1] + g.rad*Math.sin(a)];
+          const contact = g.kind === 'corner' ? g.c : [g.c[0] + g.R*Math.cos(a), g.c[1] + g.R*Math.sin(a)];
+          return {q, contact, lineLen, cornerAng, edgeAng, g};
+        }
+      }
+      t -= g.len;
+    }
+  },
+  bbox() {
+    const pts = this.P.E.flatMap(e => e.type === 'line' ? [e.p0] : arcPts(e.c, e.R, e.a0, e.a1, 12));
+    const m = 2*this.c.r + 1, xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+    return [Math.min(...xs)-m, Math.min(...ys)-m, Math.max(...xs)+m, Math.max(...ys)+m];
+  },
+  draw(s, done, sh) {
+    const c = this.c, P = this.P, r = c.r, cur = this.at(s);
+    if (sh.swept && done) {
+      ctx.fillStyle = '#dcdcdc';
+      for (let t = 0; t <= s; t += 0.04) { const q = this.at(t).q; ctx.beginPath(); ctx.arc(X(q[0]), Y(q[1]), r*V.sc, 0, 7); ctx.fill(); }
+    }
+    // 図形
+    ctx.beginPath(); let first = true;
+    for (const e of P.E) {
+      for (const p of (e.type === 'line' ? [e.p0, e.p1] : arcPts(e.c, e.R, e.a0, e.a1))) {
+        first ? ctx.moveTo(X(p[0]), Y(p[1])) : ctx.lineTo(X(p[0]), Y(p[1])); first = false;
+      }
+    }
+    ctx.closePath(); ctx.fillStyle = '#f3f3f3'; ctx.fill(); ctx.strokeStyle = '#222'; ctx.lineWidth = 2; ctx.stroke();
+    const vs = P.E.map(e => e.p0), cx = vs.reduce((t, v) => t + v[0], 0)/vs.length, cy = vs.reduce((t, v) => t + v[1], 0)/vs.length;
+    for (const e of P.E) {
+      if (e.type !== 'line') continue;
+      const mx = (e.p0[0]+e.p1[0])/2, my = (e.p0[1]+e.p1[1])/2, k = 0.6/Math.hypot(cx-mx, cy-my);
+      label(+Math.hypot(e.p1[0]-e.p0[0], e.p1[1]-e.p0[1]).toFixed(2) + 'cm', [mx + (cx-mx)*k, my + (cy-my)*k]);
+    }
+    if (c.shape === 'sector' && c.th < 180) label(c.th + '°', [0.22*c.a*Math.cos(c.th*D/2), 0.22*c.a*Math.sin(c.th*D/2)]);
+    if (done) {
+      // 角のおうぎ形（角が中心）
+      if (sh.fan) {
+        let t = s;
+        for (const g of P.segs) {
+          if (t <= 0) break;
+          if (g.kind === 'corner') {
+            const u = Math.min(t, g.len)/g.rad;
+            ctx.beginPath(); ctx.moveTo(X(g.c[0]), Y(g.c[1]));
+            ctx.arc(X(g.c[0]), Y(g.c[1]), g.rad*V.sc, -g.a0, -(g.a0 + u), true);
+            ctx.closePath(); ctx.fillStyle = 'rgba(240,150,50,.28)'; ctx.fill(); ctx.strokeStyle = COL.corner; ctx.lineWidth = 1; ctx.stroke();
+            if (t >= g.len) {
+              const am = g.a0 + g.ang/2;
+              label(Math.round(g.ang/D) + '°', [g.c[0] + 0.55*r*Math.cos(am), g.c[1] + 0.55*r*Math.sin(am)], '#a85a10', 13);
+            }
+          }
+          t -= g.len;
+        }
+      }
+      // 中心の線（直線・角の弧・おうぎ形の弧で色を分ける）
+      if (sh.center) {
+        let t = s;
+        for (const g of P.segs) {
+          if (t <= 0) break;
+          const u = Math.min(t, g.len);
+          ctx.beginPath();
+          if (g.kind === 'line') {
+            const k = g.len ? u/g.len : 0;
+            ctx.moveTo(X(g.p0[0]), Y(g.p0[1])); ctx.lineTo(X(g.p0[0] + (g.p1[0]-g.p0[0])*k), Y(g.p0[1] + (g.p1[1]-g.p0[1])*k));
+          } else ctx.arc(X(g.c[0]), Y(g.c[1]), g.rad*V.sc, -g.a0, -(g.a0 + u/g.rad), true);
+          ctx.strokeStyle = COL[g.kind]; ctx.lineWidth = 3; ctx.stroke();
+          t -= g.len;
+        }
+      }
+      if (cur.g.kind === 'edge') seg(cur.g.c, cur.q, COL.edge, 1, [4, 4]);
+    }
+    // 円（半径の線で回転が見える）
+    const a = s/r;
+    ctx.beginPath(); ctx.arc(X(cur.q[0]), Y(cur.q[1]), r*V.sc, 0, 7); ctx.strokeStyle = '#222'; ctx.lineWidth = 1.5; ctx.stroke();
+    seg(cur.q, [cur.q[0] + r*Math.cos(a), cur.q[1] + r*Math.sin(a)], '#888', 1.5);
+    dot(cur.q, 3.5, COL.line);
+    dot(cur.contact, 3, '#c30');
+  },
+  breakdown(s) {
+    const c = this.c, r = c.r, cur = this.at(s), cd = Math.round(cur.cornerAng/D), ed = Math.round(cur.edgeAng/D);
+    const vl = cur.lineLen, vc = 2*PI*r*cd/360, ve = 2*PI*(c.a + r)*ed/360;
+    let h = `<span style="color:${COL.line}">まっすぐ: ${vl.toFixed(2)} cm</span><br>
+      <span style="color:${COL.corner}">角を曲がる（半径${r}）: ${cd}° → 2×3.14×${r}×${cd}/360 = ${vc.toFixed(2)} cm</span><br>`;
+    if (c.shape === 'sector')
+      h += `<span style="color:${COL.edge}">おうぎ形の弧にそう（半径${c.a}+${r}）: ${ed}° → 2×3.14×${c.a + r}×${ed}/360 = ${ve.toFixed(2)} cm</span><br>`;
+    const L = vl + vc + (c.shape === 'sector' ? ve : 0);
+    h += `<b>合計: ${L.toFixed(2)} cm</b>`;
+    if (this.show.swept)
+      h += this.P.reflex ? '<br>通ったあとの面積: へこんだ角があるので、直径×中心の線 はそのまま使えない'
+                         : `<br>通ったあとの面積 = 直径 ${2*r} × 中心の線 ${L.toFixed(2)} = ${(2*r*L).toFixed(2)} cm²`;
+    return h;
+  },
+};
+
+// ───────── おうぎ形の転がり ─────────
+const SectorSim = {
+  title:'おうぎ形の転がり', base:40,
+  presets:[
+    {R:8, th:45, start:'flat', end:'OB'},
+    {R:3, th:180, start:'up', end:'B'},
+    {R:6, th:30, start:'flat', end:'OB'},
+    {R:4, th:90, start:'flat', end:'cycle'},
+  ],
+  name(c) { return c.th === 180 ? `半円OAB（直径${2*c.R}cm）` : `おうぎ形OAB（半径${c.R}cm・中心角${c.th}°）`; },
+  text(c) {
+    const st = c.start === 'up' ? '直線に垂直に立てた形（Aが下）から' : 'OAを直線にのせた形から';
+    const en = {B:'点Bがはじめて直線に重なる', OB:'OBがはじめて直線に重なる', cycle:'ふたたび同じ向きになる'}[c.end];
+    return `${this.name(c)}を、${st}、右へすべらないように転がし、${en}ところで止めます。`;
+  },
+  questions(c) {
+    const q = [
+      {id:'q1', type:'radio', text:'弧が直線にふれているあいだ、点Oはどう動く？',
+        options:[['flat','直線と平行にまっすぐ'], ['arc','弧をえがく'], ['stop','動かない']]},
+      {id:'q2', type:'num', unit:'cm', text:'点Oが動いたあとの線の長さは？（円周率 3.14）'},
+    ];
+    if (c.end === 'cycle') q.push({id:'q3', type:'radio', text:'とちゅうで、点Oが動かないときはある？', options:[['yes','ある'], ['no','ない']]});
+    return q;
+  },
+  answer(c) { return {q1:'flat', q2:this.build(c).lenPI, q3:'yes'}; },
+  free(c) {
+    return [
+      {id:'R', label:'半径', type:'range', min:2, max:10, step:1, unit:'cm'},
+      {id:'th', label:'中心角', type:'range', min:30, max:180, step:15, unit:'°'},
+      {id:'start', label:'はじめの形', type:'select', options:[['flat','OAを直線にのせる'], ['up','直線に垂直に立てる']]},
+      {id:'end', label:'止めるところ', type:'select', options:[['B','Bがはじめて直線に重なる'], ['OB','OBがはじめて直線に重なる'], ['cycle','ふたたび同じ向き']]},
+      {id:'trace', label:'点Oの線', type:'check'},
+      {id:'ghost', label:'はじめの位置', type:'check'},
+    ];
+  },
+  normalize() {},
+  build(c) {
+    const t = c.th, f0 = c.start === 'up' ? 90 : 0, f1 = {B:90+t, OB:180+t, cycle:360}[c.end];
+    const all = [{a:0, b:90, kind:'A'}, {a:90, b:90+t, kind:'roll'}, {a:90+t, b:180+t, kind:'B'}, {a:180+t, b:360, kind:'O'}];
+    const stages = all.map(g => ({...g, a:Math.max(g.a, f0), b:Math.min(g.b, f1)})).filter(g => g.b > g.a + 1e-9);
+    const deg = stages.filter(g => g.kind !== 'O').reduce((t, g) => t + g.b - g.a, 0);
+    return {f0, f1, stages, deg, lenPI:r2(2*PI*c.R*deg/360), total:f1 - f0};
+  },
+  // φ（回った角度）からおうぎ形の位置を出す。A を中心に回る → 弧がころがる → B を中心に回る → O を中心に回る
+  pose(phi) {
+    const {R, th} = this.c, a = -phi*D;
+    let piv, body;
+    if (phi <= 90) { piv = [R, 0]; body = [R, 0]; }
+    else if (phi <= 90 + th) return {a, T:[R + R*(phi-90)*D, R]};
+    else if (phi <= 180 + th) { piv = [R + R*th*D, 0]; body = [R*Math.cos(th*D), R*Math.sin(th*D)]; }
+    else return {a, T:[2*R + R*th*D, 0]};
+    const rb = rot(body, a);
+    return {a, T:[piv[0]-rb[0], piv[1]-rb[1]]};
+  },
+  world(ps, p) { return add(rot(p, ps.a), ps.T); },
+  shapePts(n = 48) { const {R, th} = this.c; return [[0,0], ...arcPts([0,0], R, 0, th*D, n)]; },
+  bbox() {
+    const P = this.P, pts = [[0,0]];
+    for (let f = P.f0; f <= P.f1; f += 5) { const ps = this.pose(f); this.shapePts(8).forEach(p => pts.push(this.world(ps, p))); }
+    const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+    return [Math.min(...xs)-1, Math.min(...ys)-1, Math.max(...xs)+1, Math.max(...ys)+1.2];
+  },
+  stageAt(phi) { return this.P.stages.find(g => phi >= g.a && phi <= g.b) || this.P.stages[this.P.stages.length-1]; },
+  draw(s, done, sh) {
+    const c = this.c, P = this.P, phi = P.f0 + s, ps = this.pose(phi), O = ps.T, bb = this.bb;
+    seg([bb[0], 0], [bb[2], 0], '#222', 2);
+    label('ℓ', [bb[0] + 0.4, 0.4]);
+    if (sh.ghost) {
+      const p0 = this.pose(P.f0);
+      pathPts(this.shapePts().map(p => this.world(p0, p)), true);
+      ctx.setLineDash([5, 4]); ctx.strokeStyle = '#999'; ctx.lineWidth = 1; ctx.stroke(); ctx.setLineDash([]);
+    }
+    pathPts(this.shapePts().map(p => this.world(ps, p)), true);
+    ctx.fillStyle = 'rgba(0,0,0,.07)'; ctx.fill(); ctx.strokeStyle = '#222'; ctx.lineWidth = 2; ctx.stroke();
+    if (done && sh.trace) {
+      for (const g of P.stages) {
+        if (phi <= g.a) break;
+        const pts = [];
+        for (let f = g.a; f < Math.min(g.b, phi); f += 0.5) pts.push(this.pose(f).T);
+        pts.push(this.pose(Math.min(g.b, phi)).T);
+        pathPts(pts, false); ctx.strokeStyle = g.kind === 'roll' ? COL.line : COL.corner; ctx.lineWidth = 3; ctx.stroke();
+      }
+    }
+    const A = this.world(ps, [c.R, 0]), B = this.world(ps, [c.R*Math.cos(c.th*D), c.R*Math.sin(c.th*D)]);
+    const mid = this.world(ps, [c.R*0.45*Math.cos(c.th*D/2), c.R*0.45*Math.sin(c.th*D/2)]);
+    for (const [t, p] of [['O', O], ['A', A], ['B', B]]) {
+      const dx = p[0]-mid[0], dy = p[1]-mid[1], l = Math.hypot(dx, dy) || 1;
+      label(t, [p[0] + dx/l*0.45, p[1] + dy/l*0.45], '#222', 15);
+    }
+    if (done) {
+      const g = this.stageAt(phi);
+      const cap = {A:`Aを中心に回る（Oは半径${c.R}cmの弧）`, roll:'弧が直線にふれてころがる（Oは直線と平行にまっすぐ）',
+        B:`Bを中心に回る（Oは半径${c.R}cmの弧）`, O:'Oを中心に回る（Oは動かない）'}[g.kind];
+      caption(cap);
+      if (g.kind === 'A') ring(A, 7, '#c30');
+      if (g.kind === 'B') ring(B, 7, '#c30');
+      if (g.kind === 'O') ring(O, 7, '#c30');
+      if (g.kind === 'roll') { seg(O, [O[0], 0], '#c30', 1, [4, 4]); dot([O[0], 0], 3.5, '#c30'); }
+    }
+    dot(O, 4, COL.line);
+  },
+  breakdown(s) {
+    const c = this.c, P = this.P, phi = P.f0 + s;
+    let sum = 0, degs = [];
+    const rows = P.stages.filter(g => phi > g.a).map(g => {
+      const d = Math.round(Math.min(phi, g.b) - g.a);
+      if (g.kind === 'O') return `Oを中心に回る ${d}°: Oは動かない → 0 cm`;
+      const v = 2*PI*c.R*d/360; sum += v; degs.push(d);
+      const nm = g.kind === 'roll' ? `弧がころがる ${d}°ぶん: まっすぐ（弧と同じ長さ）` : `${g.kind}を中心に回る ${d}°`;
+      return `<span style="color:${g.kind === 'roll' ? COL.line : COL.corner}">${nm}: 2×3.14×${c.R}×${d}/360 = ${v.toFixed(2)} cm</span>`;
+    });
+    if (!rows.length) return 'まだ動いていない';
+    const tot = degs.reduce((t, d) => t + d, 0);
+    return rows.join('<br>') + `<br><b>合計: ${sum.toFixed(2)} cm</b><br>まとめると 2×3.14×${c.R}×(${degs.join('+')})/360 = 2×3.14×${c.R}×${tot}/360`;
+  },
+};
+
+// ───────── 平行移動 ─────────
+const SlideSim = {
+  title:'平行移動', base:1.5,
+  presets:[
+    {shape:'rect', w:2, h:3, d:6, dir:'right'},
+    {shape:'rtri', w:3, h:4, d:5, dir:'right'},
+    {shape:'seg', w:2, h:3, d:7, dir:'right'},
+    {shape:'rect', w:4, h:2, d:3, dir:'up'},
+    {shape:'qarc', w:2, h:6, d:5, dir:'right'},
+    {shape:'qdisc', w:2, h:4, d:3, dir:'right'},
+    {shape:'qarc', w:2, h:11, d:7, dir:'right', src:'予シリ 練習問題1'},
+    {shape:'seg', w:2, h:4, d:5, dir:'right', src:'演問 トレーニング2(1)'},
+    {shape:'rect', w:2, h:4, d:5, dir:'right', src:'演問 トレーニング2(2)'},
+    {shape:'rtri', w:2, h:4, d:5, dir:'right', src:'演問 トレーニング2(3)'},
+  ],
+  name(c) {
+    return {rect:`長方形（たて${c.h}cm・横${c.w}cm）`, rtri:`直角三角形（たて${c.h}cm・横${c.w}cm）`, seg:`たての線（長さ${c.h}cm）`,
+      qarc:`四分円OABの弧AB（半径${c.h}cm）`, qdisc:`四分円OAB（半径${c.h}cm）`}[c.shape];
+  },
+  text(c) {
+    return `${this.name(c)}を、<b>${c.dir === 'right' ? '右' : '上'}へ ${c.d}cm</b> すべらせるように動かします。` +
+      (c.shape === 'qarc' ? '<b>弧ABだけ</b>が動いたあとの図形を考えます。' : '');
+  },
+  questions() {
+    return [
+      {id:'q1', type:'num', unit:'cm', text:'動いたあとの面積 ＝ もとの形の面積 ＋ □ × 動いた長さ。□は何cm？'},
+      {id:'q2', type:'num', unit:'cm²', text:'動いたあとの図形の面積は？（円周率 3.14）'},
+    ];
+  },
+  geo(c) {
+    const {w, h} = c;
+    switch (c.shape) {
+      case 'rect':  return {pts:[[0,0],[w,0],[w,h],[0,h]], closed:true, A:w*h};
+      case 'rtri':  return {pts:[[0,0],[w,0],[0,h]], closed:true, A:w*h/2};
+      case 'seg':   return {pts:[[0,0],[0,h]], closed:false, A:0};
+      case 'qarc':  return {pts:arcPts([0,0], h, 0, Math.PI/2, 48), closed:false, A:0, q:true};
+      case 'qdisc': return {pts:[[0,0], ...arcPts([0,0], h, 0, Math.PI/2, 48)], closed:true, A:r2(PI*h*h/4), q:true};
+    }
+  },
+  // 動く向きに直角な長さ
+  W(c, g) { const k = c.dir === 'right' ? 1 : 0, vs = g.pts.map(p => p[k]); return r2(Math.max(...vs) - Math.min(...vs)); },
+  answer(c) { const g = this.geo(c), W = this.W(c, g); return {q1:W, q2:r2(g.A + W*c.d)}; },
+  free(c) {
+    return [
+      {id:'shape', label:'形', type:'select', options:[['rect','長方形'], ['rtri','直角三角形'], ['seg','たての線'], ['qarc','四分円の弧だけ'], ['qdisc','四分円']]},
+      ...(c.shape === 'rect' || c.shape === 'rtri' ? [{id:'w', label:'横', type:'range', min:1, max:8, step:1, unit:'cm'}] : []),
+      {id:'h', label:c.shape === 'qarc' || c.shape === 'qdisc' ? '半径' : 'たて', type:'range', min:1, max:8, step:1, unit:'cm'},
+      {id:'d', label:'動かす長さ', type:'range', min:1, max:10, step:1, unit:'cm'},
+      {id:'dir', label:'動かす向き', type:'select', options:[['right','右へ'], ['up','上へ']]},
+      {id:'swept', label:'動いたあとの図形', type:'check'},
+    ];
+  },
+  normalize() {},
+  build(c) { const g = this.geo(c); return {g, W:this.W(c, g), total:c.d}; },
+  bbox() {
+    const c = this.c, xs = this.P.g.pts.map(p => p[0]), ys = this.P.g.pts.map(p => p[1]);
+    return [-1.8, -1.8, Math.max(...xs) + (c.dir === 'right' ? c.d : 0) + 1.5, Math.max(...ys) + (c.dir === 'up' ? c.d : 0) + 1.5];
+  },
+  draw(s, done, sh) {
+    const c = this.c, {g} = this.P, v = c.dir === 'right' ? [1, 0] : [0, 1], bb = this.bb;
+    seg([bb[0], 0], [bb[2], 0], '#222', 1.5);
+    if (done && sh.swept) {
+      for (let t = 0; t <= s; t += 0.03) {
+        pathPts(g.pts.map(p => add(p, v, t)), g.closed);
+        if (g.closed) { ctx.fillStyle = '#f6c99a'; ctx.fill(); } else { ctx.strokeStyle = '#f6c99a'; ctx.lineWidth = 3; ctx.stroke(); }
+      }
+    }
+    pathPts(g.pts, g.closed); ctx.setLineDash([5, 4]); ctx.strokeStyle = '#888'; ctx.lineWidth = 1.5; ctx.stroke(); ctx.setLineDash([]);
+    if (g.q) {
+      seg([0, 0], [c.h, 0], '#aaa', 1, [3, 3]); seg([0, 0], [0, c.h], '#aaa', 1, [3, 3]);
+      label('O', [-0.4, -0.4]); label('A', [c.h + 0.2, -0.45]); label('B', [-0.45, c.h + 0.2]);
+    }
+    const cur = g.pts.map(p => add(p, v, s));
+    pathPts(cur, g.closed);
+    if (g.closed) { ctx.fillStyle = 'rgba(0,0,0,.08)'; ctx.fill(); }
+    ctx.strokeStyle = '#222'; ctx.lineWidth = g.closed ? 2 : 3; ctx.stroke();
+    if (!g.q) {
+      label(c.h + 'cm', [-0.7, c.h/2]);
+      if (c.shape !== 'seg') label(c.w + 'cm', [c.w/2, -0.5]);
+    }
+    if (s > 0) {
+      const p0 = c.dir === 'right' ? [0, -1.2] : [-1.4, 0], p1 = add(p0, v, s);
+      seg(p0, p1, '#c30', 2);
+      label(s.toFixed(1) + 'cm', c.dir === 'right' ? [s/2, -1.55] : [-1.4, s + 0.4], '#c30');
+    }
+  },
+  breakdown(s) {
+    const {g, W} = this.P;
+    return `もとの形: ${g.A} cm²${g.A ? '' : '（線なので 0）'}<br>
+      動く向きに直角な長さ □ = ${W} cm<br>
+      □ × 動いた長さ = ${W} × ${s.toFixed(1)} = ${(W*s).toFixed(2)} cm²<br>
+      <b>合計: ${(g.A + W*s).toFixed(2)} cm²</b>`;
+  },
+};
+
+// ───────── 三角形などの転がり（頂点を中心に回る・弧がころがる をつなぐ） ─────────
+const RollSim = {
+  title:'三角形などの転がり', base:40,
+  presets:[
+    {shape:'rtri', a:6, th:60, P:'B', turns:2, src:'演問 実戦演習1'},
+    {shape:'big', R:4, th:270, P:'O', turns:0, src:'演問 実戦演習2'},
+    {shape:'rtri', a:4, th:45, P:'A', turns:3},
+  ],
+  name(c) {
+    return c.shape === 'rtri' ? `直角三角形ABC（BC ${c.a}cm・角B ${c.th}°・角C 90°）` : `おうぎ形OAB（半径${c.R}cm・中心角${c.th}°）`;
+  },
+  text(c) {
+    if (c.shape === 'big') return `${this.name(c)}を、AとBを直線にのせた形から、右へすべらないように転がし、ふたたび同じ向きになるところで止めます。`;
+    const en = c.turns === 3 ? 'ふたたび同じ向きになる' : `${c.turns}回回った`;
+    return `${this.name(c)}を、BCを直線にのせた形から、右へすべらないように転がし、${en}ところで止めます。`;
+  },
+  questions(c) {
+    return [
+      {id:'q1', type:'radio', text:'はじめに、どの点を中心にして回る？', options:(c.shape === 'rtri' ? ['A', 'B', 'C'] : ['O', 'A', 'B']).map(v => [v, '点' + v])},
+      {id:'q2', type:'num', unit:'cm', text:`点${c.P}が動いたあとの線の長さは？（円周率 3.14）`},
+    ];
+  },
+  answer(c) { const P = this.build(c); return {q1:P.stages.find(g => g.kind === 'pivot').name, q2:P.lenPI}; },
+  free(c) {
+    return [
+      {id:'shape', label:'形', type:'select', options:[['rtri','直角三角形'], ['big','大きいおうぎ形']]},
+      ...(c.shape === 'rtri' ? [
+        {id:'a', label:'BC', type:'range', min:2, max:8, step:1, unit:'cm'},
+        {id:'th', label:'角B', type:'select', options:[['30','30°'], ['45','45°'], ['60','60°']]},
+        {id:'P', label:'線をかく点', type:'select', options:[['A','A'], ['B','B'], ['C','C']]},
+        {id:'turns', label:'回る回数', type:'select', options:[['1','1回'], ['2','2回'], ['3','3回（同じ向き）']]},
+      ] : [
+        {id:'R', label:'半径', type:'range', min:2, max:6, step:1, unit:'cm'},
+        {id:'th', label:'中心角', type:'range', min:210, max:330, step:30, unit:'°'},
+      ]),
+      {id:'trace', label:'点の線', type:'check'},
+      {id:'ghost', label:'はじめの位置', type:'check'},
+    ];
+  },
+  normalize(c) {
+    c.th = +c.th; c.turns = +c.turns;
+    if (c.shape === 'rtri') { c.a = c.a || 6; if (![30, 45, 60].includes(c.th)) c.th = 60; if (!c.turns) c.turns = 2; if (c.P === 'O') c.P = 'B'; }
+    else { c.R = c.R || 4; if (c.th < 210) c.th = 270; c.P = 'O'; c.turns = 0; }
+  },
+  // 形（直線にのった向き）。pts は描く形、pieces は直線にふれる外まわり（左回り）
+  geo(c) {
+    const S = (p0, p1) => ({type:'seg', p0, p1});
+    if (c.shape === 'rtri') {
+      const B = [0, 0], C = [c.a, 0], A = [c.a, c.a*Math.tan(c.th*D)];
+      return {pts:[B, C, A], named:{A, B, C}, pieces:[S(B, C), S(C, A), S(A, B)]};
+    }
+    const R = c.R, h = (360 - c.th)/2, aB = (-90 + h)*D, aA = aB + c.th*D, dy = -R*Math.sin(aB);
+    const O = [0, dy], A = [R*Math.cos(aA), R*Math.sin(aA) + dy], B = [R*Math.cos(aB), R*Math.sin(aB) + dy];
+    return {pts:[O, ...arcPts(O, R, aB, aA, 72)], named:{O, A, B},
+      pieces:[S(A, B), {type:'arc', c:O, R, a0:aB, a1:aA, p0:B, p1:A}]};
+  },
+  build(c) {
+    const G = this.geo(c), n = G.pieces.length;
+    const dirS = g => g.type === 'seg' ? Math.atan2(g.p1[1]-g.p0[1], g.p1[0]-g.p0[0]) : g.a0 + Math.PI/2;
+    const dirE = g => g.type === 'seg' ? dirS(g) : g.a1 + Math.PI/2;
+    const nameOf = p => Object.keys(G.named).find(k => Math.hypot(G.named[k][0]-p[0], G.named[k][1]-p[1]) < 1e-6);
+    const raw = [];
+    for (let i = 0; i < n; i++) {
+      const g = G.pieces[i], h = G.pieces[(i+1) % n];
+      if (g.type === 'arc') raw.push({kind:'roll', c:g.c, R:g.R, deg:Math.round((g.a1 - g.a0)/D)});
+      let ext = (dirS(h) - dirE(g))/D; ext = ((ext % 360) + 360) % 360;
+      if (ext > 1e-6) raw.push({kind:'pivot', V:g.p1, name:nameOf(g.p1), deg:Math.round(ext)});
+    }
+    // 回る回数で切る（大きいおうぎ形は1周）
+    const stages = [];
+    let pv = 0, f = 0;
+    for (const g of raw) {
+      if (c.turns && g.kind === 'pivot' && ++pv > c.turns) break;
+      stages.push({...g, a:f, b:f + g.deg}); f += g.deg;
+    }
+    // 各段のはじめの位置（a: 回った角度、T: ずれ）
+    let st = {a:0, T:[0, 0]};
+    const P = G.named[c.P];
+    let lenPI = 0;
+    for (const g of stages) {
+      g.st = st;
+      g.r = g.kind === 'pivot' ? r2(Math.hypot(P[0]-g.V[0], P[1]-g.V[1])) : g.R;
+      lenPI += 2*PI*g.r*g.deg/360;
+      st = this.poseIn(g, g.deg);
+    }
+    return {G, stages, lenPI:r2(lenPI), total:f};
+  },
+  poseIn(g, u) {
+    const a = g.st.a - u*D, w = p => add(rot(p, g.st.a), g.st.T);
+    if (g.kind === 'pivot') { const W = w(g.V), rv = rot(g.V, a); return {a, T:[W[0]-rv[0], W[1]-rv[1]]}; }
+    const C = add(w(g.c), [g.R*u*D, 0]), rc = rot(g.c, a);
+    return {a, T:[C[0]-rc[0], C[1]-rc[1]]};
+  },
+  stageAt(phi) { return this.P.stages.find(g => phi >= g.a && phi <= g.b) || this.P.stages[this.P.stages.length-1]; },
+  pose(phi) { const g = this.stageAt(phi); return this.poseIn(g, Math.min(Math.max(phi - g.a, 0), g.deg)); },
+  world(ps, p) { return add(rot(p, ps.a), ps.T); },
+  bbox() {
+    const P = this.P, pts = [];
+    for (let f = 0; f <= P.total; f += 5) { const ps = this.pose(f); P.G.pts.forEach(p => pts.push(this.world(ps, p))); }
+    const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+    return [Math.min(...xs)-1, Math.min(...ys)-1, Math.max(...xs)+1, Math.max(...ys)+1.2];
+  },
+  draw(s, done, sh) {
+    const c = this.c, P = this.P, G = P.G, ps = this.pose(s), bb = this.bb, Pt = G.named[c.P];
+    seg([bb[0], 0], [bb[2], 0], '#222', 2);
+    label('ℓ', [bb[0] + 0.4, 0.4]);
+    if (sh.ghost) {
+      pathPts(G.pts, true);
+      ctx.setLineDash([5, 4]); ctx.strokeStyle = '#999'; ctx.lineWidth = 1; ctx.stroke(); ctx.setLineDash([]);
+    }
+    pathPts(G.pts.map(p => this.world(ps, p)), true);
+    ctx.fillStyle = 'rgba(0,0,0,.07)'; ctx.fill(); ctx.strokeStyle = '#222'; ctx.lineWidth = 2; ctx.stroke();
+    if (done && sh.trace) {
+      for (const g of P.stages) {
+        if (s <= g.a) break;
+        const pts = [];
+        for (let f = g.a; f < Math.min(g.b, s); f += 0.5) pts.push(this.world(this.poseIn(g, f - g.a), Pt));
+        pts.push(this.world(this.poseIn(g, Math.min(g.b, s) - g.a), Pt));
+        pathPts(pts, false); ctx.strokeStyle = g.kind === 'roll' ? COL.line : COL.corner; ctx.lineWidth = 3; ctx.stroke();
+      }
+    }
+    const nm = Object.keys(G.named), cen = nm.reduce((t, k) => [t[0] + G.named[k][0]/nm.length, t[1] + G.named[k][1]/nm.length], [0, 0]);
+    const cw = this.world(ps, cen);
+    for (const k of nm) {
+      const p = this.world(ps, G.named[k]), dx = p[0]-cw[0], dy = p[1]-cw[1], l = Math.hypot(dx, dy) || 1;
+      label(k, [p[0] + dx/l*0.45, p[1] + dy/l*0.45], '#222', 15);
+    }
+    const Pw = this.world(ps, Pt);
+    if (done) {
+      const g = this.stageAt(s);
+      if (g.kind === 'pivot') {
+        const V = this.world(ps, g.V);
+        caption(g.name === c.P ? `${g.name}を中心に回る（${c.P}は動かない）` : `${g.name}を中心に回る（${c.P}は半径${g.r}cmの弧）`);
+        ring(V, 7, '#c30');
+        if (g.name !== c.P) seg(V, Pw, '#c30', 1, [4, 4]);
+      } else {
+        caption(`弧が直線にふれてころがる（${c.P}は直線と平行にまっすぐ）`);
+        seg(Pw, [Pw[0], 0], '#c30', 1, [4, 4]); dot([Pw[0], 0], 3.5, '#c30');
+      }
+    }
+    dot(Pw, 4, COL.line);
+  },
+  breakdown(s) {
+    const c = this.c, P = this.P;
+    let sum = 0;
+    const rows = P.stages.filter(g => s > g.a).map(g => {
+      const d = Math.round(Math.min(s, g.b) - g.a);
+      if (g.kind === 'pivot' && g.r === 0) return `${g.name}を中心に回る ${d}°: ${c.P}は動かない → 0 cm`;
+      const v = 2*PI*g.r*d/360; sum += v;
+      const nm = g.kind === 'roll' ? `弧がころがる ${d}°ぶん: まっすぐ（弧と同じ長さ）` : `${g.name}を中心に回る ${d}°（半径 ${g.name}${c.P}）`;
+      return `<span style="color:${g.kind === 'roll' ? COL.line : COL.corner}">${nm}: 2×3.14×${g.r}×${d}/360 = ${v.toFixed(2)} cm</span>`;
+    });
+    if (!rows.length) return 'まだ動いていない';
+    return rows.join('<br>') + `<br><b>合計: ${sum.toFixed(2)} cm</b>`;
+  },
+};
+
+// ───────── 画面のしくみ ─────────
+const SIMS = {circle:CircleSim, sector:SectorSim, slide:SlideSim, roll:RollSim};
+const PRED_SHOW = {center:true, fan:true, swept:true, trace:true, ghost:true};
+let sim = CircleSim, cfg, s = 0, dir = 0, mode = 'pred', revealed = false, pIdx = 0, shown = false;
+for (const k in SIMS) SIMS[k].show = {center:true, fan:true, swept:k === 'slide', trace:true, ghost:true};
+
+function setup(c) {
+  cfg = c; sim.c = c; sim.P = sim.build(c); sim.bb = sim.bbox(); fit(sim.bb);
+  s = Math.min(s, sim.P.total); draw();
+}
+function draw() {
+  const done = mode === 'free' || revealed;
+  const sh = mode === 'free' ? sim.show : {...PRED_SHOW, swept:sim === SlideSim};
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  sim.draw(s, done, sh);
+  $('bd').innerHTML = done ? sim.breakdown(s) : '予想を入れると動かせる';
+  $('scrub').value = sim.P.total ? s/sim.P.total : 0;
+}
+function setControls() {
+  const on = mode === 'free' || revealed;
+  ['bStart', 'bRev', 'bPause', 'bPlay', 'bEnd', 'scrub'].forEach(id => $(id).disabled = !on);
+}
+
+// 予想モード
+const qsNow = () => sim.questions(cfg);
+function getAns(q) {
+  if (q.type === 'radio') { const e = document.querySelector(`input[name=${q.id}]:checked`); return e ? e.value : null; }
+  const v = $(q.id).value; return v === '' ? null : +v;
+}
+function checkFilled() { $('go').disabled = revealed || qsNow().some(q => getAns(q) === null); }
+function renderPred() {
+  $('qText').innerHTML = (cfg.src ? `<div class="small">${cfg.src}</div>` : '') + sim.text(cfg);
+  $('qs').innerHTML = qsNow().map((q, i) => `<div class="q"><b>${i+1}.</b> ${q.text}` +
+    (q.type === 'radio'
+      ? q.options.map(([v, l]) => `<label><input type="radio" name="${q.id}" value="${v}"> ${l}</label>`).join('')
+      : ` <input id="${q.id}" type="number" step="any"> ${q.unit}`) + '</div>').join('');
+  $('qs').querySelectorAll('input').forEach(e => e.oninput = e.onchange = checkFilled);
+  $('result').innerHTML = ''; checkFilled();
+}
+function loadPreset(i) {
+  pIdx = i; s = 0; dir = 0; revealed = false; shown = false;
+  const c = {...sim.presets[i]}; sim.normalize(c, false);
+  setup(c); renderPred(); setControls(); draw();
+}
+const plain = h => h.replace(/<[^>]+>/g, '');
+function showResult() {
+  shown = true;
+  const A = sim.answer(cfg), rows = [];
+  for (const q of qsNow()) {
+    const p = getAns(q), a = A[q.id];
+    const ok = q.type === 'radio' ? p === a : Math.abs(p - a) < (q.unit === '°' ? 0.5 : 0.06);
+    const lab = v => q.type === 'radio' ? q.options.find(o => o[0] === v)[1] : v + q.unit;
+    rows.push({q:q.text, pred:lab(p), act:lab(a), ok});
+  }
+  $('result').innerHTML = '<table><tr><th></th><th>予想</th><th>実際</th><th></th></tr>' +
+    rows.map((r, i) => `<tr><td>${i+1}</td><td>${r.pred}</td><td>${r.act}</td><td>${r.ok ? '<span class="ok">○</span>' : '<span class="ng">×</span>'}</td></tr>`).join('') +
+    '</table><div style="margin-top:4px">ずれたところは ◀ で戻して見直そう</div>';
+  logPush(rows);
+}
+$('go').onclick = () => {
+  revealed = true; $('go').disabled = true;
+  $('qs').querySelectorAll('input').forEach(e => e.disabled = true);
+  setControls(); s = 0; dir = 1;
+};
+$('next').onclick = () => loadPreset((pIdx + 1) % sim.presets.length);
+
+// フリーモード
+function renderFree() {
+  const specs = sim.free(cfg);
+  $('fc').innerHTML = specs.map(sp => {
+    if (sp.type === 'select')
+      return `<label>${sp.label} <select id="f_${sp.id}">${sp.options.map(([v, l]) => `<option value="${v}" ${cfg[sp.id] == v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>`;
+    if (sp.type === 'range')
+      return `<label>${sp.label} <span class="mono">${cfg[sp.id]}</span>${sp.unit}<input id="f_${sp.id}" type="range" min="${sp.min}" max="${sp.max}" step="${sp.step}" value="${cfg[sp.id]}"></label>`;
+    return `<label><input type="checkbox" id="f_${sp.id}" ${sim.show[sp.id] ? 'checked' : ''}> ${sp.label}</label>`;
+  }).join('');
+  for (const sp of specs) {
+    const el = $('f_' + sp.id);
+    el.oninput = () => {
+      if (sp.type === 'check') { sim.show[sp.id] = el.checked; draw(); return; }
+      cfg[sp.id] = sp.type === 'range' ? +el.value : el.value;
+      sim.normalize(cfg, true); setup(cfg);
+      if (sp.type === 'select') renderFree(); else el.previousElementSibling.textContent = cfg[sp.id];
+    };
+  }
+}
+function toFree() {
+  mode = 'free'; dir = 0;
+  $('tFree').classList.add('on'); $('tPred').classList.remove('on'); $('pred').hidden = true; $('free').hidden = false;
+  const c = {...cfg}; sim.normalize(c, true); setup(c); renderFree(); setControls(); draw();
+}
+function toPred() {
+  mode = 'pred';
+  $('tPred').classList.add('on'); $('tFree').classList.remove('on'); $('pred').hidden = false; $('free').hidden = true;
+  loadPreset(pIdx);
+}
+$('tFree').onclick = toFree;
+$('tPred').onclick = toPred;
+function selectSim(key, i = 0) {
+  document.querySelectorAll('[data-sim]').forEach(x => x.classList.toggle('on', x.dataset.sim === key));
+  sim = SIMS[key]; pIdx = i; s = 0; dir = 0;
+  if (mode === 'pred') loadPreset(i);
+  else { const c = {...sim.presets[i]}; sim.normalize(c, true); setup(c); renderFree(); setControls(); draw(); }
+}
+document.querySelectorAll('[data-sim]').forEach(b => b.onclick = () => selectSim(b.dataset.sim));
+
+// 教材の問題へのショートカット（src のついたプリセット。予想モードで開く）
+const CUTS = [['予シリ 練習問題1', '練習1'], ['予シリ 練習問題2', '練習2'], ['演問 トレーニング2(1)', 'トレ2(1)'], ['演問 トレーニング2(2)', 'トレ2(2)'],
+  ['演問 トレーニング2(3)', 'トレ2(3)'], ['演問 実戦演習1', '実戦1'], ['演問 実戦演習2', '実戦2']];
+for (const [src, lab] of CUTS) {
+  const key = Object.keys(SIMS).find(k => SIMS[k].presets.some(p => p.src === src));
+  const b = document.createElement('button');
+  b.textContent = lab; b.title = src;
+  b.onclick = () => { if (mode === 'free') toPred(); selectSim(key, SIMS[key].presets.findIndex(p => p.src === src)); };
+  $('cuts').appendChild(b);
+}
+
+// 再生
+$('bStart').onclick = () => { dir = 0; s = 0; draw(); };
+$('bEnd').onclick = () => { dir = 0; s = sim.P.total; draw(); };
+$('bPlay').onclick = () => { if (s >= sim.P.total) s = 0; dir = 1; };
+$('bRev').onclick = () => { if (s <= 0) s = sim.P.total; dir = -1; };
+$('bPause').onclick = () => { dir = 0; };
+$('scrub').oninput = e => { dir = 0; s = +e.target.value * sim.P.total; draw(); };
+
+let last = performance.now();
+function tick(now) {
+  const dt = Math.min(0.05, (now - last)/1000); last = now;
+  if (dir) {
+    s += dir * +$('spd').value * sim.base * dt;
+    if (s >= sim.P.total) { s = sim.P.total; dir = 0; if (mode === 'pred' && revealed && !shown && !VIEW) showResult(); }
+    if (s <= 0) { s = 0; dir = 0; }
+    draw();
+  }
+  requestAnimationFrame(tick);
+}
+
+// 記録（予想モードの答え。書き出した CSV を Claude が正本へ取り込む）
+const LOGKEY = 'sim_5B09_log';
+const logGet = () => JSON.parse(localStorage.getItem(LOGKEY) || '[]');
+function logN() { $('logn').textContent = `たまっている記録 ${logGet().length} 件`; }
+function logPush(rows) {
+  const L = logGet(), now = new Date(), ts = new Date(now - now.getTimezoneOffset()*60000).toISOString().slice(0, 19);
+  for (const r of rows) L.push([ts, sim.title, (cfg.src ? `[${cfg.src}] ` : '') + plain(sim.text(cfg)), plain(r.q), plain(r.pred), plain(r.act), r.ok ? '○' : '×']);
+  localStorage.setItem(LOGKEY, JSON.stringify(L)); logN();
+}
+$('exp').onclick = () => {
+  const q = v => '"' + String(v).replace(/"/g, '""') + '"';
+  const csv = '﻿' + [['日時', 'シミュレーター', '問題', '設問', '予想', '実際', '正誤'], ...logGet()].map(r => r.map(q).join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
+  a.download = `シミュ5B09_記録_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+};
+
+logN();
+loadPreset(0);
+// ?q=<src> で開いたときは、予想なしで ▶ を押すだけで手順が見られる（スマホ用の見る専用）
+const VIEW = new URLSearchParams(location.search).has('q');
+if (VIEW) {
+  const q = new URLSearchParams(location.search).get('q');
+  const key = Object.keys(SIMS).find(k => SIMS[k].presets.some(p => p.src === q));
+  if (key) selectSim(key, SIMS[key].presets.findIndex(p => p.src === q));
+  document.querySelectorAll('.tabs').forEach(e => e.hidden = true);
+  document.body.id = 'viewonly';
+  revealed = true; shown = true; setControls(); draw();
+}
+requestAnimationFrame(tick);
+</script>
+</body></html>
