@@ -26,7 +26,7 @@ button:disabled,input:disabled{opacity:.35}
 #viewonly .simtabs:not(#cuts) button,#viewonly .tabs,#viewonly #pred .small,#viewonly #exp,#viewonly #logn,#viewonly #qs,#viewonly #go,#viewonly #next,#viewonly #result{display:none}#viewonly .wrap{padding:8px;gap:8px}#viewonly .panel{width:100%}#viewonly #cuts{display:flex;flex-wrap:wrap;gap:6px}#viewonly #cuts .small{display:none}#viewonly #cuts button{min-height:44px;min-width:44px;font-size:14px}#viewonly #cuts button.cur{background:#222;color:#fff}
 </style></head><body>
 <div class="simtabs">
-  <a href="index.html" onclick="this.href='index.html'+location.search" style="font-size:13px;color:#06c">← 単元を選ぶ</a><br>
+  <a href="../top/" onclick="var u=new URLSearchParams(location.search),o=new URLSearchParams();['d','openExternalBrowser'].forEach(function(k){if(u.get(k))o.set(k,u.get(k))});this.href='../top/'+(o.toString()?'?'+o:'')" style="display:inline-block;border:1px solid #888;border-radius:8px;padding:6px 14px;font-size:15px;color:#222;text-decoration:none;margin:0 10px 6px 0">ホーム</a><a href="index.html" onclick="this.href='index.html'+location.search" style="font-size:13px;color:#06c">← 問題の一覧</a><br>
   <button data-sim="circle" class="on">円の転がり</button>
   <button data-sim="sector">おうぎ形の転がり</button>
   <button data-sim="slide">平行移動</button>
