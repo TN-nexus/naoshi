@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>シミュレーター</title>
+<title>算数シミュレーション</title>
 <style>
 body{font-family:-apple-system,"Hiragino Sans",sans-serif;margin:0;padding:14px;color:#222}
 h1{font-size:20px;margin:0 0 6px}h2{font-size:16px;margin:20px 0 4px}
@@ -9,17 +9,36 @@ a.u:active{background:#222;color:#fff}
 .small{font-size:13px;color:#666}
 </style></head><body>
 <a class="u" id="home" href="../top/">ホーム</a>
-<h1>シミュレーター</h1>
+<h1>算数シミュレーション<br><span class="small">上から順に。▶を押すと解き方が動く</span></h1>
 <script>document.getElementById("home").href="../top/"+location.search;</script>
 <div class="small">押して ▶ を押すと、解き方が順に動く。</div>
-<h2>理科</h2>
-<a class="u" href="rika_junkan.html">血液の循環（▶で血が流れる）</a>
-<h2>×だった問（5B10 → 5B08 → 5B09）</h2>
-<a class="u" href="5B10_kumiwake7_overlap.html">5B10 組分け対策 7(1)　平行移動の重なり</a><a class="u" href="5B08_heimen_hi.html?q=%E6%BC%94%E5%95%8F|%E5%8F%8D%E5%BE%A9%E5%9F%BA%E6%9C%AC1%282%29%E2%91%A0">5B08 演問 反復基本1(2)①　面積の比（アとイ）</a><a class="u" href="5B08_heimen_hi.html?q=%E6%BC%94%E5%95%8F|%E5%8F%8D%E5%BE%A9%E5%9F%BA%E6%9C%AC1%283%29">5B08 演問 反復基本1(3)　長方形の線の比と面積</a><a class="u" href="5B08_heimen_hi.html?q=%E6%BC%94%E5%95%8F|%E5%8F%8D%E5%BE%A9%E7%B7%B4%E7%BF%921">5B08 演問 反復練習1　台形の線の比と面積</a><a class="u" href="5B08_heimen_hi.html?q=%E6%BC%94%E5%95%8F|%E5%8F%8D%E5%BE%A9%E7%B7%B4%E7%BF%923">5B08 演問 反復練習3　長方形の線の比と面積</a><a class="u" href="5B08_heimen_hi.html?q=%E6%BC%94%E5%95%8F|%E3%83%88%E3%83%AC3%281%29">5B08 演問 トレ3(1)　ベンツ切り</a><a class="u" href="5B08_heimen_hi.html?q=%E6%BC%94%E5%95%8F|%E3%83%88%E3%83%AC3%282%29">5B08 演問 トレ3(2)　ベンツ切り</a><a class="u" href="5B08_heimen_hi.html?q=%E6%BC%94%E5%95%8F|%E3%83%88%E3%83%AC4%282%29">5B08 演問 トレ4(2)　対角線の比</a><a class="u" href="5B08_heimen_hi.html?q=%E6%BC%94%E5%95%8F|%E5%8F%8D%E5%BE%A9%E5%9F%BA%E6%9C%AC4">5B08 演問 反復基本4　ベンツ切り</a><a class="u" href="5B08_heimen_hi.html?q=%E6%BC%94%E5%95%8F|%E5%8F%8D%E5%BE%A9%E7%B7%B4%E7%BF%924">5B08 演問 反復練習4　ベンツ切り</a><a class="u" href="5B08_heimen_hi.html?q=%E6%BC%94%E5%95%8F|%E5%AE%9F%E6%88%A61">5B08 演問 実戦1　平行四辺形の面積</a><a class="u" href="5B08_heimen_hi.html?q=%E6%BC%94%E5%95%8F|%E5%AE%9F%E6%88%A62">5B08 演問 実戦2　ベンツ切り</a><a class="u" href="5B08_heimen_hi.html?q=%E4%BA%88%E3%82%B7%E3%83%AA|%E5%9F%BA%E6%9C%AC1%282%29%E2%91%A2">5B08 予シリ 基本1(2)③　面積の比（アとイ）</a><a class="u" href="5B08_heimen_hi.html?q=%E4%BA%88%E3%82%B7%E3%83%AA|%E5%9F%BA%E6%9C%AC1%283%29">5B08 予シリ 基本1(3)　長方形の線の比と面積</a><a class="u" href="5B08_heimen_hi.html?q=%E4%BA%88%E3%82%B7%E3%83%AA|%E5%9F%BA%E6%9C%AC4">5B08 予シリ 基本4　ベンツ切り</a><a class="u" href="5B08_heimen_hi.html?q=%E4%BA%88%E3%82%B7%E3%83%AA|%E7%B7%B4%E7%BF%923">5B08 予シリ 練習3　長方形の線の比と面積</a><a class="u" href="5B08_heimen_hi.html?q=%E4%BA%88%E3%82%B7%E3%83%AA|%E7%B7%B4%E7%BF%924">5B08 予シリ 練習4　ベンツ切り</a><a class="u" href="5B08_heimen_hi.html?q=%E4%BA%88%E3%82%B7%E3%83%AA|%E7%B7%B4%E7%BF%926">5B08 予シリ 練習6　正六角形の面積</a><a class="u" href="5B09_zukei_idou.html?q=%E4%BA%88%E3%82%B7%E3%83%AA%20%E7%B7%B4%E7%BF%92%E5%95%8F%E9%A1%8C1">5B09 予シリ 練習1　円の転がり</a><a class="u" href="5B09_zukei_idou.html?q=%E4%BA%88%E3%82%B7%E3%83%AA%20%E7%B7%B4%E7%BF%92%E5%95%8F%E9%A1%8C2">5B09 予シリ 練習2　おうぎ形の転がり</a><a class="u" href="5B09_zukei_idou.html?q=%E6%BC%94%E5%95%8F%20%E3%83%88%E3%83%AC%E3%83%BC%E3%83%8B%E3%83%B3%E3%82%B02%282%29">5B09 演問 トレ2(2)　平行移動</a><a class="u" href="5B09_zukei_idou.html?q=%E6%BC%94%E5%95%8F%20%E3%83%88%E3%83%AC%E3%83%BC%E3%83%8B%E3%83%B3%E3%82%B02%283%29">5B09 演問 トレ2(3)　平行移動</a>
-<h2>ベンツ切り（△OAB:△OBC:△OCA の面積比→辺の比）</h2>
-<a class="u" href="5B08_heimen_hi.html?q=%E6%BC%94%E5%95%8F|%E3%83%88%E3%83%AC3%281%29">5B08 演問 トレ3(1)　△OAB:△OBC:△OCA の面積比</a><a class="u" href="5B08_heimen_hi.html?q=%E6%BC%94%E5%95%8F|%E3%83%88%E3%83%AC3%282%29">5B08 演問 トレ3(2)　辺の比と面積</a><a class="u" href="5B08_heimen_hi.html?q=%E6%BC%94%E5%95%8F|%E5%8F%8D%E5%BE%A9%E5%9F%BA%E6%9C%AC4">5B08 演問 反復基本4　△OAB:△OBC:△OCA の面積比</a><a class="u" href="5B08_heimen_hi.html?q=%E4%BA%88%E3%82%B7%E3%83%AA|%E5%9F%BA%E6%9C%AC4">5B08 予シリ 基本4　△OAB:△OBC:△OCA の面積比</a><a class="u" href="5B08_heimen_hi.html?q=%E6%BC%94%E5%95%8F|%E5%8F%8D%E5%BE%A9%E7%B7%B4%E7%BF%924">5B08 演問 反復練習4　辺の比と面積</a><a class="u" href="5B08_heimen_hi.html?q=%E6%BC%94%E5%95%8F|%E5%AE%9F%E6%88%A62">5B08 演問 実戦2　辺の比と面積</a><a class="u" href="5B08_heimen_hi.html?q=%E4%BA%88%E3%82%B7%E3%83%AA|%E7%B7%B4%E7%BF%924">5B08 予シリ 練習4　辺の比と面積</a><a class="u" href="5B08_heimen_hi.html?q=%E7%A2%BA%E8%AA%8D%E3%83%86%E3%82%B9%E3%83%88|3">5B08 確認テスト 3　辺の比と面積</a>
-<h2>ぜんぶ</h2>
-<a class="u" href="5B10_kumiwake7_overlap.html">5B10 組分け対策 7(1) 平行移動の重なり</a><a class="u" href="5B09_zukei_idou.html">5B09 図形の移動（円・おうぎ形・平行移動）</a><a class="u" href="5B08_heimen_hi.html">5B08 平面図形と比</a>
+<h2>① 組分け対策で×（去年の組分けの問）</h2>
+<a class="u" href="5B10_kumiwake7_overlap.html">5B10 組分け対策 7(1)　平行移動の重なり（▶で□が出る）</a>
+<h2>② ベンツ切り（×だったもの）</h2>
+<a class="u" href="5B08_heimen_hi.html?q=%E6%BC%94%E5%95%8F|%E3%83%88%E3%83%AC3(1)">5B08 演問 トレ3(1)　ベンツ切り</a>
+<a class="u" href="5B08_heimen_hi.html?q=%E6%BC%94%E5%95%8F|%E3%83%88%E3%83%AC3(2)">5B08 演問 トレ3(2)　ベンツ切り</a>
+<a class="u" href="5B08_heimen_hi.html?q=%E6%BC%94%E5%95%8F|%E5%8F%8D%E5%BE%A9%E5%9F%BA%E6%9C%AC4">5B08 演問 反復基本4　ベンツ切り</a>
+<a class="u" href="5B08_heimen_hi.html?q=%E4%BA%88%E3%82%B7%E3%83%AA|%E5%9F%BA%E6%9C%AC4">5B08 予シリ 基本4　ベンツ切り</a>
+<a class="u" href="5B08_heimen_hi.html?q=%E6%BC%94%E5%95%8F|%E5%8F%8D%E5%BE%A9%E7%B7%B4%E7%BF%924">5B08 演問 反復練習4　ベンツ切り</a>
+<a class="u" href="5B08_heimen_hi.html?q=%E4%BA%88%E3%82%B7%E3%83%AA|%E7%B7%B4%E7%BF%924">5B08 予シリ 練習4　ベンツ切り</a>
+<a class="u" href="5B08_heimen_hi.html?q=%E6%BC%94%E5%95%8F|%E5%AE%9F%E6%88%A62">5B08 演問 実戦2　ベンツ切り</a>
+<a class="u" href="5B08_heimen_hi.html?q=%E7%A2%BA%E8%AA%8D%E3%83%86%E3%82%B9%E3%83%88|3">5B08 確認テスト 3　ベンツ切り</a>
+<h2>③ 相似・面積の比（×だったもの）</h2>
+<a class="u" href="5B08_heimen_hi.html?q=%E6%BC%94%E5%95%8F|%E5%8F%8D%E5%BE%A9%E5%9F%BA%E6%9C%AC1(2)%E2%91%A0">5B08 演問 反復基本1(2)①　面積の比（アとイ）</a>
+<a class="u" href="5B08_heimen_hi.html?q=%E4%BA%88%E3%82%B7%E3%83%AA|%E5%9F%BA%E6%9C%AC1(2)%E2%91%A2">5B08 予シリ 基本1(2)③　面積の比（アとイ）</a>
+<a class="u" href="5B08_heimen_hi.html?q=%E6%BC%94%E5%95%8F|%E5%8F%8D%E5%BE%A9%E5%9F%BA%E6%9C%AC1(3)">5B08 演問 反復基本1(3)　長方形の線の比と面積</a>
+<a class="u" href="5B08_heimen_hi.html?q=%E4%BA%88%E3%82%B7%E3%83%AA|%E5%9F%BA%E6%9C%AC1(3)">5B08 予シリ 基本1(3)　長方形の線の比と面積</a>
+<a class="u" href="5B08_heimen_hi.html?q=%E6%BC%94%E5%95%8F|%E5%8F%8D%E5%BE%A9%E7%B7%B4%E7%BF%921">5B08 演問 反復練習1　台形の線の比と面積</a>
+<a class="u" href="5B08_heimen_hi.html?q=%E6%BC%94%E5%95%8F|%E5%8F%8D%E5%BE%A9%E7%B7%B4%E7%BF%923">5B08 演問 反復練習3　長方形の線の比と面積</a>
+<a class="u" href="5B08_heimen_hi.html?q=%E4%BA%88%E3%82%B7%E3%83%AA|%E7%B7%B4%E7%BF%923">5B08 予シリ 練習3　長方形の線の比と面積</a>
+<a class="u" href="5B08_heimen_hi.html?q=%E6%BC%94%E5%95%8F|%E3%83%88%E3%83%AC4(2)">5B08 演問 トレ4(2)　対角線の比</a>
+<a class="u" href="5B08_heimen_hi.html?q=%E6%BC%94%E5%95%8F|%E5%AE%9F%E6%88%A61">5B08 演問 実戦1　平行四辺形の面積</a>
+<a class="u" href="5B08_heimen_hi.html?q=%E4%BA%88%E3%82%B7%E3%83%AA|%E7%B7%B4%E7%BF%926">5B08 予シリ 練習6　正六角形の面積</a>
+<h2>④ 図形の移動（×だったもの）</h2>
+<a class="u" href="5B09_zukei_idou.html?q=%E4%BA%88%E3%82%B7%E3%83%AA%20%E7%B7%B4%E7%BF%92%E5%95%8F%E9%A1%8C1">5B09 予シリ 練習問題1　円の転がり</a>
+<a class="u" href="5B09_zukei_idou.html?q=%E4%BA%88%E3%82%B7%E3%83%AA%20%E7%B7%B4%E7%BF%92%E5%95%8F%E9%A1%8C2">5B09 予シリ 練習問題2　おうぎ形の転がり</a>
+<a class="u" href="5B09_zukei_idou.html?q=%E6%BC%94%E5%95%8F%20%E3%83%88%E3%83%AC%E3%83%BC%E3%83%8B%E3%83%B3%E3%82%B02%282%29">5B09 演問 トレーニング2(2)　平行移動</a>
+<a class="u" href="5B09_zukei_idou.html?q=%E6%BC%94%E5%95%8F%20%E3%83%88%E3%83%AC%E3%83%BC%E3%83%8B%E3%83%B3%E3%82%B02%283%29">5B09 演問 トレーニング2(3)　平行移動</a>
 <p class="small">紙で解いたあとに見る（動かすと答えが出る）。</p>
 <script>/* cachebust: Safari が古い版を出さないよう、各リンクに毎回ちがう印 */
 (function(){const u=new URLSearchParams(location.search),d=u.get("d")?"d="+encodeURIComponent(u.get("d"))+"&":"",v=d+"v="+Date.now();document.querySelectorAll("a[href]").forEach(a=>{const h=a.getAttribute("href");if(!h||h.startsWith("http")||h.startsWith("#"))return;a.setAttribute("href",h+(h.includes("?")?"&":"?")+v);});})();</script></body></html>
