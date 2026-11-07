@@ -17,7 +17,8 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:"Hiragino Sans",
 button{font:inherit;color:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
 #norec{position:fixed;top:1px;right:6px;font-size:10px;line-height:1.2;color:var(--sub);z-index:50}
 .small{font-size:14px;color:var(--sub)}
-.bar{display:grid;grid-template-columns:4.5em 1fr 4.5em;align-items:center;gap:6px;padding:2px 2px 8px;border-bottom:1px solid var(--line);margin-bottom:14px;min-height:40px}
+.bar{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:6px;padding:2px 2px 8px;border-bottom:1px solid var(--line);margin-bottom:14px;min-height:40px}
+.home{display:inline-block;border:1px solid var(--line);background:#fff;border-radius:8px;padding:3px 9px;font-size:14px;text-decoration:none;color:inherit;margin-right:6px;white-space:nowrap}
 .tag{justify-self:start;font-size:13px;line-height:1.5;padding:1px 8px;border-radius:6px;white-space:nowrap}
 .tag.社会{background:#fbe6d2;color:#8a4a12} .tag.理科{background:#dcefdc;color:#2c6a32} .tag.国語{background:#e8e0f4;color:#5b3d8a}
 .dots{text-align:center;font-size:15px;letter-spacing:.12em;color:var(--sub);white-space:nowrap}
@@ -187,10 +188,15 @@ function render() {
   if (S.over || !S.set) return drawEnd();
   drawQ();
 }
+function homeHref() {   // トップへ。d と openExternalBrowser だけ持って戻る（v は捨てる）
+  const u = new URLSearchParams(location.search), o = new URLSearchParams();
+  for (const k of ["d", "openExternalBrowser", "try"]) if (u.get(k)) o.set(k, u.get(k));
+  const q = o.toString(); return "../top/" + (q ? "?" + q : "");
+}
 function barHtml() {
   const set = S.set;
   const dots = set.q.map((e, j) => j < set.i || (j === set.i && set.ans[j]) ? "●" : j === set.i ? "◎" : "○").join("");
-  return `<div class="bar"><span class="tag ${esc(set.s)}">${esc(set.s)}</span><span class="dots">${dots}</span><button class="menu" id="mb">…</button></div>` +
+  return `<div class="bar"><span><a class="home" href="${homeHref()}">ホーム</a><span class="tag ${esc(set.s)}">${esc(set.s)}</span></span><span class="dots">${dots}</span><button class="menu" id="mb">…</button></div>` +
     (menuOpen ? `<div class="mn">${menuOpen === 1 ? `<button id="m1">最初から</button>` : `<button class="danger" id="m2">ほんとうに最初から</button>`}<button id="m0">やめる</button></div>` : "");
 }
 function drawQ() {
@@ -240,7 +246,7 @@ function advance() {
   if (all) fireworks(render); else render();
 }
 function drawEnd() {
-  $app.innerHTML = `<div class="end">おわり。もう一周する？</div><button class="next" id="again">もう一周</button>`;
+  $app.innerHTML = `<div class="end">おわり。もう一周する？</div><button class="next" id="again">もう一周</button><a class="next" style="text-align:center;text-decoration:none" href="${homeHref()}">ホーム</a>`;
   document.getElementById("again").onclick = () => { newLap(S); save(); render(); };
 }
 function bindMenu() {
