@@ -15,6 +15,8 @@ button:disabled{opacity:.4;cursor:default}
 #ask .msg{margin-top:6px;font-size:15px}
 .ok{color:#080}.ng{color:#c00}
 .small{font-size:12px;color:#666}
+#ask,label:has(#free),.ctl.small{display:none!important}
+button{min-height:44px}
 </style></head><body>
 <h1>組分け対策（昨年度 第10回組分け）7(1)　平行移動の重なり</h1>
 <div class="q">直線ℓ上に1辺16cmの正方形アと、大きな長方形から小さな長方形を切り取った図形イがある。アを毎秒2cmで右へ動かす。グラフは、重なり始めてからの時間と、重なっている部分の面積。<b>図の□にあてはまる数は？</b></div>
@@ -23,8 +25,8 @@ button:disabled{opacity:.4;cursor:default}
 <div class="ctl">
   <button id="play">▶ 動かす</button>
   <span id="tlabel" style="font-size:16px;min-width:230px"></span>
-  <label><input type="checkbox" id="free"> 自由に動かす（止まらない）</label>
-  <input type="range" id="slider" min="0" max="18" step="0.1" value="0" style="width:260px" disabled>
+  <label><input type="checkbox" id="free" checked> 自由に動かす（止まらない）</label>
+  <input type="range" id="slider" min="0" max="18" step="0.1" value="0" style="width:260px;max-width:100%">
   <button id="reset">はじめから</button>
 </div>
 <div id="ask"><div class="t" id="askq"></div><div id="askin"></div><div class="msg" id="askmsg"></div></div>
