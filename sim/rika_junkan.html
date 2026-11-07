@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>理科 血液の循環</title>
+<style>
+body{font-family:-apple-system,"Hiragino Sans",sans-serif;margin:16px;max-width:900px;color:#222}
+h1{font-size:18px;margin:0 0 6px}
+.small{font-size:12px;color:#666}
+canvas{border:1px solid #ccc;display:block;margin:8px 0;max-width:100%;height:auto}
+button{font-size:15px;padding:6px 14px;border-radius:6px;border:1px solid #888;background:#fff;cursor:pointer;min-height:44px}
+button:disabled{opacity:.4;cursor:default}
+#sub{font-size:17px;font-weight:bold;min-height:2.6em;padding:2px 4px;color:#c00;line-height:1.4}
+</style></head><body>
+<a href="../top/" onclick="var u=new URLSearchParams(location.search),o=new URLSearchParams();['d','openExternalBrowser'].forEach(function(k){if(u.get(k))o.set(k,u.get(k))});this.href='../top/'+(o.toString()?'?'+o:'')" style="display:inline-block;border:1px solid #888;border-radius:8px;padding:6px 14px;font-size:15px;color:#222;text-decoration:none;margin:0 10px 6px 0">ホーム</a><a href="index.html" class="small" style="font-size:13px;color:#06c" onclick="this.href='index.html'+location.search">← 問題の一覧</a>
+<h1>理科　血液の循環</h1>
+<button id="play">▶ 流す</button>
+<canvas id="c" style="width:380px"></canvas>
+<div id="sub"></div>
+<script>
+const W=380,H=640,dpr=window.devicePixelRatio||1;
+const cv=document.getElementById('c'),ctx=cv.getContext('2d');
+cv.width=W*dpr;cv.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);
+const sub=document.getElementById('sub'),btn=document.getElementById('play');
+const RED='#d22',BLUE='#2459d6',GRAY='#bbb';
+
+// 部屋（画面の左が右心房・右心室）
+const rooms={
+ '右心房':[110,220,80,60],'左心房':[190,220,80,60],
+ '右心室':[110,280,80,70],'左心室':[190,280,80,70]};
+const lung=[110,20,160,60], body=[60,470,270,150];
+const organs={'小腸':[75,562,60,36],'肝臓':[165,562,60,36],'腎臓':[255,562,60,36]};
+// 血管（線）
+const vessels={
+ '肺動脈':[[110,315],[35,315],[35,50],[110,50]],
+ '肺静脈':[[270,50],[305,50],[305,250],[270,250]],
+ '大動脈':[[270,315],[345,315],[345,500],[330,500]],
+ '大静脈':[[90,470],[90,250],[110,250]]};
+const vlabel={ // 名前の位置・揃え・小さい注記
+ '肺動脈':[42,150,'left','（静脈血）'],'肺静脈':[298,150,'right','（動脈血）'],
+ '大動脈':[340,420,'right',''],'大静脈':[97,420,'left','']};
+// 粒の通り道（ev＝そこを通ったら名前が出る）
+const path=[
+ {x:150,y:250,ev:'右心房'},{x:150,y:315,ev:'右心室'},{x:110,y:315},{x:35,y:315},{x:35,y:180,ev:'肺動脈'},{x:35,y:50},{x:110,y:50},
+ {x:190,y:50,ev:'肺',col:'r'},{x:270,y:50},{x:305,y:50},{x:305,y:150,ev:'肺静脈'},{x:305,y:250},{x:270,y:250},
+ {x:230,y:250,ev:'左心房'},{x:230,y:315,ev:'左心室'},{x:270,y:315},{x:345,y:315},{x:345,y:420,ev:'大動脈'},{x:345,y:500},{x:330,y:500},
+ {x:200,y:500,ev:'全身',col:'b'},{x:90,y:500},{x:90,y:470},{x:90,y:380,ev:'大静脈'},{x:90,y:250},{x:110,y:250},{x:150,y:250,ev:'end'}];
+let acc=0;path.forEach((p,i)=>{if(i)acc+=Math.hypot(p.x-path[i-1].x,p.y-path[i-1].y);p.d=acc;});
+const L=acc, dLung=path.find(p=>p.ev==='肺').d, dBody=path.find(p=>p.ev==='全身').d;
+const subs={
+ '右心房':'全身から帰ってきた血（青＝酸素が少ない）が 右心房 へ',
+ '右心室':'右心房 → 右心室',
+ '肺動脈':'右心室から 肺動脈 で肺へ。中は静脈血',
+ '肺':'肺で酸素をもらって 青 → 赤',
+ '肺静脈':'肺静脈 で心臓へ。中は動脈血（赤）',
+ '左心房':'肺静脈 → 左心房',
+ '左心室':'左心房 → 左心室',
+ '大動脈':'左心室から 大動脈 で全身へ',
+ '全身':'全身に酸素をわたして 赤 → 青',
+ '大静脈':'大静脈 で 右心房 へもどる。これで一周'};
+const FLOW=18000, T3=4500, T4=4500, T5=4500;
+let shown=new Set(), t0=0, run=false, phase='idle', lastEv=-1;
+
+function posAt(d){
+ if(d<=0)return path[0];if(d>=L)return path[path.length-1];
+ for(let i=1;i<path.length;i++)if(path[i].d>=d){const a=path[i-1],b=path[i],f=(d-a.d)/(b.d-a.d);return{x:a.x+(b.x-a.x)*f,y:a.y+(b.y-a.y)*f};}
+}
+function colAt(d){return (d>dLung&&d<=dBody)?RED:BLUE;}
+function poly(pts,color,w){ctx.strokeStyle=color;ctx.lineWidth=w;ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.stroke();}
+function head(a,b,color){const ang=Math.atan2(b[1]-a[1],b[0]-a[0]);ctx.fillStyle=color;ctx.beginPath();ctx.moveTo(b[0],b[1]);ctx.lineTo(b[0]-9*Math.cos(ang-.45),b[1]-9*Math.sin(ang-.45));ctx.lineTo(b[0]-9*Math.cos(ang+.45),b[1]-9*Math.sin(ang+.45));ctx.fill();}
+function txt(s,x,y,size,color,align){ctx.font=`bold ${size}px -apple-system,"Hiragino Sans",sans-serif`;ctx.fillStyle=color;ctx.textAlign=align||'center';ctx.textBaseline='middle';ctx.fillText(s,x,y);}
+function glow(){return .5+.5*Math.sin(performance.now()/180);}
+
+function draw(now){
+ ctx.clearRect(0,0,W,H);ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);
+ // 血管
+ for(const k in vessels){const v=vessels[k];
+  if(k==='大静脈'){poly(v,'#fff',8);} // 交差を見やすく
+  poly(v,shown.has(k)?'#888':GRAY,3);head(v[v.length-2],v[v.length-1],shown.has(k)?'#888':GRAY);}
+ // 肺
+ ctx.lineWidth=2;ctx.strokeStyle='#666';ctx.strokeRect(...lung);
+ if(shown.has('肺'))txt('肺',190,50,20,'#222');
+ // 全身
+ ctx.strokeRect(...body);txt('全身（からだ）',195,535,15,'#222');
+ for(const k in organs){const o=organs[k];ctx.lineWidth=1.5;ctx.strokeStyle='#666';ctx.strokeRect(...o);txt(k,o[0]+o[2]/2,o[1]+o[3]/2,13,'#222');}
+ // 門脈（小腸→肝臓）・腎静脈（腎臓から出る）
+ const gm=phase==='monmyaku', gj=phase==='jin';
+ const mc=gm?`rgba(230,120,0,${.5+.5*glow()})`:'#888', jc=gj?`rgba(230,120,0,${.5+.5*glow()})`:'#888';
+ poly([[135,580],[163,580]],mc,gm?6:1.5);head([135,580],[165,580],mc);
+ poly([[285,562],[285,522]],jc,gj?6:1.5);head([285,562],[285,520],jc);
+ if(gm)txt('門脈',150,622-10,13,'#c60');
+ if(gj)txt('腎静脈',318,535,13,'#c60','left');
+ // 心臓
+ for(const k in rooms){const r=rooms[k];
+  ctx.lineWidth=k==='左心室'?6:2;ctx.strokeStyle='#444';
+  if(k==='左心室'&&phase==='sinshitsu'){ctx.strokeStyle=`rgba(220,0,0,${.4+.6*glow()})`;ctx.lineWidth=8;}
+  ctx.strokeRect(...r);
+  if(shown.has(k))txt(k,r[0]+r[2]/2,r[1]+(k.endsWith('房')?14:r[3]-14),14,'#222');}
+ // 血管の名前
+ for(const k in vlabel)if(shown.has(k)){const[x,y,al,n]=vlabel[k];txt(k,x,y,14,'#222',al);if(n)txt(n,x,y+17,11,k==='肺動脈'?BLUE:RED,al);}
+ // 粒
+ if(phase==='flow'||phase==='sinshitsu'||phase==='monmyaku'||phase==='jin'||phase==='done'){
+  const d=phase==='flow'?(now-t0)/FLOW*L:L;
+  if(phase==='flow'){
+   for(let i=11;i>=0;i--){const di=d-i*18;if(di<0)continue;const p=posAt(di);ctx.fillStyle=colAt(di);ctx.beginPath();ctx.arc(p.x,p.y,i?5:8,0,7);ctx.fill();}
+  }
+ }
+}
+
+function loop(now){
+ const e=now-t0;
+ if(phase==='flow'){
+  const d=e/FLOW*L;
+  for(let i=lastEv+1;i<path.length;i++){if(path[i].d<=d){lastEv=i;const ev=path[i].ev;if(ev&&ev!=='end'){if(ev!=='全身')shown.add(ev);sub.textContent=subs[ev];}}else break;}
+  if(e>=FLOW){phase='sinshitsu';t0=now;sub.textContent='左心室＝全身へ送り出す。かべがいちばん厚い';}
+ }else if(phase==='sinshitsu'&&e>=T3){phase='monmyaku';t0=now;sub.textContent='門脈＝養分がいちばん多い（小腸 → 肝臓）';}
+ else if(phase==='monmyaku'&&e>=T4){phase='jin';t0=now;sub.textContent='腎静脈＝尿素がいちばん少ない（腎臓から出る）';}
+ else if(phase==='jin'&&e>=T5){phase='done';btn.disabled=false;btn.textContent='▶ もう一度';}
+ draw(now);
+ if(phase!=='done')requestAnimationFrame(loop);
+}
+btn.onclick=()=>{shown=new Set();lastEv=-1;phase='flow';t0=performance.now();btn.disabled=true;sub.textContent='';requestAnimationFrame(loop);};
+draw(0);
+sub.textContent='▶ を押すと血が流れる（赤＝酸素が多い血、青＝酸素が少ない血）';
+</script>
+</body></html>
