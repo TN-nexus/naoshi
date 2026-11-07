@@ -18,6 +18,7 @@ button:disabled{opacity:.4;cursor:default}
 #ask,label:has(#free),.ctl.small{display:none!important}
 button{min-height:44px}
 </style></head><body>
+<a href="index.html" class="small" style="font-size:13px;color:#06c" onclick="this.href='index.html'+location.search">← 単元を選ぶ</a>
 <h1>組分け対策（昨年度 第10回組分け）7(1)　平行移動の重なり</h1>
 <div class="q">直線ℓ上に1辺16cmの正方形アと、大きな長方形から小さな長方形を切り取った図形イがある。アを毎秒2cmで右へ動かす。グラフは、重なり始めてからの時間と、重なっている部分の面積。<b>図の□にあてはまる数は？</b></div>
 
@@ -236,7 +237,7 @@ $('play').onclick = () => {
 };
 $('free').onchange = () => { $('slider').disabled = !$('free').checked && stopIdx < STOPS.length; };
 $('slider').oninput = e => { t = +e.target.value; playing = false; $('play').textContent = '▶ 動かす'; draw(); };
-$('reset').onclick = () => { t = 0; playing = false; stopIdx = 0; qIdx = 0; asking = false; shown.clear(); $('ask').style.display = 'none'; $('play').disabled = false; $('play').textContent = '▶ 動かす'; $('slider').disabled = !$('free').checked; draw(); };
+$('reset').onclick = () => { t = 0; playing = false; stopIdx = 0; qIdx = 0; asking = false; shown.clear(); $('ask').style.display = 'none'; $('play').disabled = false; $('play').textContent = '▶ 動かす'; $('slider').disabled = false; draw(); };
 
 logN(); draw(); requestAnimationFrame(tick);
 </script>
