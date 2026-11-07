@@ -27,7 +27,7 @@ button:disabled,input:disabled{opacity:.35}
 #bd div{margin:2px 0}#bd .cur{font-weight:bold}
 a{color:#06c}
 @media(max-width:600px){.ctl button,.tabs button,#cuts button,#go,#next{min-height:44px;min-width:44px}.panel{width:100%}.simtabs button{min-height:40px}}
-#viewonly #cuts,#viewonly .simtabs button,#viewonly #pred .small,#viewonly #exp,#viewonly #logn,#viewonly #qs,#viewonly #go,#viewonly #next,#viewonly #result{display:none}#viewonly .wrap{padding:8px;gap:8px}#viewonly .panel{width:100%}
+#viewonly .simtabs:not(#cuts) button,#viewonly .tabs,#viewonly #pred .small,#viewonly #exp,#viewonly #logn,#viewonly #qs,#viewonly #go,#viewonly #next,#viewonly #result{display:none}#viewonly .wrap{padding:8px;gap:8px}#viewonly .panel{width:100%}#viewonly #cuts{display:flex;flex-wrap:wrap;gap:6px}#viewonly #cuts .small{display:none}#viewonly #cuts button{min-height:44px;min-width:44px;font-size:14px}#viewonly #cuts button.cur{background:#222;color:#fff}
 </style></head><body>
 <div class="simtabs">
   <a href="index.html" class="small">← 単元を選ぶ</a><br>
@@ -814,14 +814,19 @@ $('exp').onclick = () => {
 
 logN();
 loadPreset(0);
-// ?q= で開いたときは、予想なしで ▶ を押すだけで手順が見られる（スマホ用の見る専用）
-const VIEW = new URLSearchParams(location.search).has('q');
-if (VIEW) {
+// 見る専用: 予想入力なし。どの問題も ▶ を押すだけ。?q= があればその問題から始める
+const VIEW = true;
+document.body.id = 'viewonly';
+{
+  const _lp = loadPreset;
+  loadPreset = function(i) { _lp(i); revealed = true; shown = true; setControls(); draw(); };
   const q = new URLSearchParams(location.search).get('q');
+  if (q) {
   for (const key in TABS) { const i = TABS[key].presets.findIndex(p => p.mat + '|' + p.no === q); if (i >= 0) { selectTab(key, i); break; } }
-  document.querySelectorAll('.tabs').forEach(e => e.hidden = true);
-  document.body.id = 'viewonly';
-  revealed = true; shown = true; setControls(); draw();
+  }
+  const mark = () => { const bs = [...$('cuts').querySelectorAll('button')]; let n = 0; for (const key in TABS) { TABS[key].presets.forEach((p, k) => { bs[n++].classList.toggle('cur', key === tabKey && k === pIdx); }); } };
+  $('cuts').addEventListener('click', () => setTimeout(mark, 0));
+  loadPreset(pIdx); mark();
 }
 requestAnimationFrame(tick);
 </script>
