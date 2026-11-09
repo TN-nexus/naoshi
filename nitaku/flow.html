@@ -6,17 +6,18 @@
 <title>見方→問題</title>
 <link rel="icon" href="data:,">
 <style>
-/* にたく（page.html）と同じ色・字。1画面1つ、スクロールさせない */
-:root{ --bg:#f6f5f1; --card:#fff; --ink:#1f2328; --sub:#6b6f76; --line:#d9d6cf; --ok:#1f7a4d; --ng:#b3261e; --sel:#2b5cb8; --selbg:#e6eefc; }
+/* にたく（page.html）と同じ色・字。問題は出題と返りを1画面で（11/9 16時 パパ） */
+:root{ --bg:#f6f5f1; --card:#fff; --ink:#1f2328; --sub:#6b6f76; --line:#d9d6cf; --ok:#1f7a4d; --okbg:#e3f3ea; --ng:#b3261e; --ngbg:#fbe9e7; --sel:#2b5cb8; --selbg:#e6eefc; }
 *{box-sizing:border-box}
 html,body{height:100%}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;font-size:18px;line-height:1.6;-webkit-tap-highlight-color:transparent}
-#app{max-width:560px;margin:0 auto;padding:10px 14px 14px;min-height:calc(100dvh - var(--top,0px));display:flex;flex-direction:column}
+#app{max-width:560px;margin:0 auto;padding:8px 14px 14px;min-height:calc(100dvh - var(--top,0px));display:flex;flex-direction:column}
 button{font:inherit;color:inherit;cursor:pointer}
-.bar{display:flex;align-items:center;gap:8px;min-height:34px;border-bottom:1px solid var(--line);margin-bottom:12px;padding-bottom:6px}
+.bar{display:flex;align-items:center;gap:8px;min-height:34px;border-bottom:1px solid var(--line);margin-bottom:10px;padding-bottom:6px}
 .tag{font-size:13px;line-height:1.5;padding:1px 8px;border-radius:6px;white-space:nowrap;background:#eceae4}
 .tag.社会{background:#fbe6d2;color:#8a4a12} .tag.理科{background:#dcefdc;color:#2c6a32}
-.step{font-size:13px;color:var(--sub)}
+.step{font-size:15px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
+.step small{font-weight:400;color:var(--sub);font-size:13px}
 .sp{flex:1}
 .menu{border:1px solid var(--line);background:#fff;border-radius:8px;padding:0 12px;font-size:16px}
 .mn{position:absolute;right:14px;top:50px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px;z-index:30;display:flex;flex-direction:column;gap:6px;box-shadow:0 4px 14px rgba(0,0,0,.08)}
@@ -26,22 +27,36 @@ button{font:inherit;color:inherit;cursor:pointer}
 .say{font-size:24px;font-weight:800;line-height:1.45;margin:6px 0 4px}
 .lbl{font-size:13px;color:var(--sub);margin-top:10px}
 .txt{font-size:17px;line-height:1.55}
-.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:10px}
-.q{font-size:17px;line-height:1.6;white-space:pre-wrap;margin-bottom:8px}
+.q{font-size:17px;line-height:1.55;white-space:pre-wrap;margin-bottom:6px}
 .fig{display:block;max-width:100%;max-height:22vh;margin:0 auto 6px;object-fit:contain}
-.ask{font-size:19px;font-weight:800;margin:6px 0 8px}
-.ch{display:flex;flex-direction:column;gap:10px}
-.c{min-height:56px;font-size:19px;line-height:1.35;padding:8px 12px;border:2px solid var(--line);border-radius:14px;background:#fff;text-align:center}
+.ask{font-size:14px;color:var(--sub);margin:6px 0 4px}
+.ch{display:flex;flex-direction:column;gap:8px}
+.wr{display:flex;gap:8px}
+.wr .c{flex:1;min-height:44px;font-size:17px}
+.c{min-height:50px;font-size:18px;line-height:1.35;padding:7px 12px;border:2px solid var(--line);border-radius:14px;background:#fff;text-align:center}
 .c:disabled{cursor:default;color:inherit;opacity:1}
-.fb{font-size:17px;line-height:1.55;margin:10px 2px 0}
-.next{display:block;width:100%;margin-top:auto;font-size:19px;font-weight:700;padding:13px;border-radius:10px;border:2px solid var(--ink);background:#fff}
-.row{display:flex;align-items:baseline;gap:10px;font-size:18px;margin:6px 0}
-.row b{font-size:30px;width:34px;text-align:center}
+.c.wait{opacity:.45}
+.c.right{border-color:var(--ok);background:var(--okbg)}
+.c.wrong{border-color:var(--ng);background:var(--ngbg)}
+.c.mine{box-shadow:0 0 0 2px var(--ink) inset}
+.c .mk{font-size:13px;color:var(--sub);margin-left:6px}
+.res{margin-top:10px}
+.row{display:flex;align-items:baseline;gap:10px;font-size:18px;margin:2px 0}
+.row b{font-size:28px;width:30px;text-align:center}
+.fb{font-size:16px;line-height:1.5;margin:4px 2px 0;color:var(--sub)}
+.next{display:block;width:100%;margin-top:12px;font-size:19px;font-weight:700;padding:13px;border-radius:10px;border:2px solid var(--ink);background:#fff}
+.push{margin-top:auto}
 .ok{color:var(--ok)} .ng{color:var(--ng)}
-.end{font-size:20px;text-align:center;margin:28vh 0 16px}
-.dan{margin-top:8vh}
 .head{font-size:13px;color:var(--sub);margin:-4px 0 4px}
+.dan{margin-top:6vh}
 .iff{font-size:15px;line-height:1.5;color:var(--sub);margin-top:14px;padding-top:8px;border-top:1px dashed var(--line)}
+.top{margin-top:16vh;text-align:center}
+.top h1{font-size:26px;margin:0 0 18px}
+.top .big{font-size:40px;font-weight:800;font-variant-numeric:tabular-nums}
+.saijo{margin-top:8vh}
+.saijo .lbl{font-size:14px}
+.saijo .say{font-size:26px;margin:4px 0 14px}
+.end{font-size:22px;text-align:center;margin:26vh 0 16px}
 #err{position:fixed;left:0;right:0;bottom:0;background:#fff3f2;color:var(--ng);font-size:12px;white-space:pre-wrap;padding:4px 8px;z-index:60;display:none}
 #norec{position:fixed;top:1px;right:6px;font-size:10px;line-height:1.2;color:var(--sub);z-index:50}
 </style>
@@ -55,55 +70,82 @@ window.onerror = (m, s, l, c) => { const e = document.getElementById("err"); e.s
 <script src="flow_data.js"></script>
 <script>
 // CORE-BEGIN 流れの規則（純粋関数。node で単体: apps/nitaku/README.md）
-// 論点＝上段ごとのブロック（flow_build.py が作る F.blocks＝[{j, ks}]、理社はブロック単位で交互）。
-// 1回＝ブロックをまるごと取って 10問に達したら終わり（ブロックは割らない）。段は その回で初めて出る上段で1画面、2度目と1問だけの上段は見出し1行
-const SESS_N = 10;
+// 1本の列 steps: 「T|教科」最上段（その教科が初めて出る直前に1回）→「D|上段ID」段 →「Q|問」その上段の問を全部 → 次のブロック（理社交互）。
+// 列が尽きたら、×だった問を1回ずつ「R|問」で再出（段なし）→ おわり。区切り（10問）は無い
 function shuffle(a, rnd = Math.random) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
-const blockKey = b => b.j + "|" + b.ks[0];
-function newState(F) { return { v: 2, order: F.blocks.map(blockKey), next: 0, sess: null, done: [] }; }
-function qEntry(it, re, dan, rnd) {
-  const when = it.wc.length >= 2;
-  return { k: it.k, re, dan: !!dan, opts: shuffle(it.choices, rnd), wopts: when ? shuffle(it.wc, rnd) : [],
-           phase: dan ? "dan" : (when ? "when" : "ans"), w: null, a: null };
-}
-// 1回（ブロック単位で 10問まで）を始める。尽きていれば null
-function startSession(S, F, day, rnd = Math.random) {
-  const by = Object.fromEntries(F.items.map(i => [i.k, i])), bk = Object.fromEntries(F.blocks.map(b => [blockKey(b), b]));
-  const q = [], shown = new Set();
-  while (S.next < S.order.length && q.length < SESS_N) {
-    const b = bk[S.order[S.next++]]; if (!b) continue;
-    const ks = b.ks.filter(k => by[k]); if (!ks.length) continue;
-    const full = !!(F.J[b.j] && F.J[b.j].full) && !shown.has(b.j);
-    shown.add(b.j);
-    ks.forEach((k, i) => q.push(qEntry(by[k], 0, full && i === 0, rnd)));
+function buildSteps(F) {
+  const st = [], seen = {}, by = Object.fromEntries(F.items.map(i => [i.k, i]));
+  for (const b of F.blocks) {
+    const ks = b.ks.filter(k => by[k]); if (!ks.length || !F.J[b.j]) continue;
+    const s = F.J[b.j].s;
+    if (!seen[s]) { seen[s] = 1; if (F.T && F.T[s] && F.T[s].length) st.push("T|" + s); }
+    st.push("D|" + b.j);
+    ks.forEach(k => st.push("Q|" + k));
   }
-  if (!q.length) { S.sess = null; return null; }
-  S.sess = { day, i: 0, n: 0, q };
-  return S.sess;
+  return st;
 }
-// 段を見た → 問へ
-function passDan(e) { e.phase = e.wopts.length ? "when" : "ans"; }
-// 1問の返りまで済んだら次へ。答え×で初回なら、その回の最後に1回だけ回す（段なし）
-function finishItem(S, F, rnd = Math.random) {
-  const ss = S.sess, e = ss.q[ss.i], it = F.items.find(i => i.k === e.k);
-  const ok = e.a === it.a;
-  if (e.re === 0) { ss.n++; if (!S.done.includes(e.k)) S.done.push(e.k); }
-  if (!ok && e.re === 0) ss.q.push(qEntry(it, 1, false, rnd));
-  ss.i++;
-  return ss.i >= ss.q.length;
+function newState(F) { return { v: 3, steps: buildSteps(F), pos: 0, done: [], wrong: [], rpos: 0, cur: null }; }
+// データが差し替わったら: 消えた問・上段は飛ばし、新しい問はその段ごと後ろに足す
+function syncState(S, F) {
+  const by = Object.fromEntries(F.items.map(i => [i.k, i])), ok = st => st[0] === "Q" ? !!by[st.slice(2)] : st[0] === "D" ? !!F.J[st.slice(2)] : true;
+  const before = S.steps.slice(0, S.pos).filter(ok).length;
+  S.steps = S.steps.filter(ok); S.pos = before;
+  const have = new Set(S.steps.filter(x => x[0] === "Q").map(x => x.slice(2)));
+  const jOf = x => !x ? "" : x[0] === "D" ? x.slice(2) : x[0] === "Q" ? by[x.slice(2)].jodan : "";
+  for (const st of buildSteps(F)) {
+    if (st[0] !== "Q" || have.has(st.slice(2))) continue;
+    const j = by[st.slice(2)].jodan;
+    if (jOf(S.steps[S.steps.length - 1]) !== j) S.steps.push("D|" + j);
+    S.steps.push(st);
+  }
+  S.wrong = S.wrong.filter(k => by[k]); S.done = S.done.filter(k => by[k]);
+  if (S.cur && !by[S.cur.k]) S.cur = null;
+  return S;
 }
-function remaining(S) { return S.order.length - S.next; }
-if (typeof module !== "undefined") module.exports = { SESS_N, shuffle, blockKey, newState, qEntry, startSession, passDan, finishItem, remaining };
+// いまの画面: T|教科・D|上段・Q|問・R|問・END
+function step(S) { return S.pos < S.steps.length ? S.steps[S.pos] : S.rpos < S.wrong.length ? "R|" + S.wrong[S.rpos] : "END"; }
+// 問の画面の中身（並びは1回だけ決めて保存）
+function curEntry(S, F, rnd = Math.random) {
+  const st = step(S); if (!/^[QR]\|/.test(st)) return null;
+  const k = st.slice(2);
+  if (!S.cur || S.cur.k !== k) {
+    const it = F.items.find(i => i.k === k);
+    S.cur = { k, re: st[0] === "R" ? 1 : 0, opts: shuffle(it.choices, rnd), wopts: it.wc.length >= 2 ? shuffle(it.wc, rnd) : [], w: null, a: null };
+  }
+  return S.cur;
+}
+// 押した（いつ→答えの順。答えは いつ のあと）。返り値は記録する行の種類
+function pickWhen(S, v) { const e = S.cur; if (!e || e.w != null || !e.wopts.length) return false; e.w = v; return true; }
+function pickAns(S, v) { const e = S.cur; if (!e || e.a != null || (e.wopts.length && e.w == null)) return false; e.a = v; return true; }
+// 次へ: T・D は進むだけ。Q は済に数え、×なら再出に積む。R は再出を1つ進める
+function advance(S, F) {
+  const st = step(S);
+  if (st === "END") return st;
+  if (st[0] === "T" || st[0] === "D") { S.pos++; return step(S); }
+  const e = S.cur, it = F.items.find(i => i.k === st.slice(2));
+  if (!e || e.a == null) return st;
+  if (st[0] === "Q") {
+    if (!S.done.includes(it.k)) S.done.push(it.k);
+    if (e.a !== it.a && !S.wrong.includes(it.k)) S.wrong.push(it.k);
+    S.pos++;
+  } else S.rpos++;
+  S.cur = null;
+  return step(S);
+}
+// 何問目（Q は列の中の番号、R は再出の中の番号）
+function qNum(S) { const st = step(S); return st[0] === "R" ? S.rpos + 1 : S.steps.slice(0, S.pos + 1).filter(x => x[0] === "Q").length; }
+function total(S) { return S.steps.filter(x => x[0] === "Q").length; }
+if (typeof module !== "undefined") module.exports = { shuffle, buildSteps, newState, syncState, step, curEntry, pickWhen, pickAns, advance, qNum, total };
 // CORE-END
 </script>
 <script>
-const F = (typeof FLOW !== "undefined" && FLOW) || { items: [], blocks: [], J: {} };
+const F = (typeof FLOW !== "undefined" && FLOW) || { items: [], blocks: [], J: {}, T: {} };
 const J = F.J, BY = Object.fromEntries(F.items.map(i => [i.k, i]));
 const params = new URLSearchParams(location.search);
 const DEPLOY = params.get("d") || "";
 const API = DEPLOY ? `https://script.google.com/macros/s/${encodeURIComponent(DEPLOY)}/exec` : "";
 const TRY = params.get("try") === "1";
-const SKEY = TRY ? "nitaku.flow.try" : "nitaku.flow.v2", QKEY = TRY ? "nitaku.flowq.try" : "nitaku.flowq.v1", DKEY = "nendai.dev";
+const SKEY = TRY ? "nitaku.flow.try3" : "nitaku.flow.v3", QKEY = TRY ? "nitaku.flowq.try" : "nitaku.flowq.v1", DKEY = "nendai.dev";
 const MODE = TRY ? "nitaku_flow_try" : "nitaku_flow";
 const $app = document.getElementById("app");
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -115,7 +157,6 @@ function ts() {
   const d = new Date(), p = n => String(n).padStart(2, "0"), o = -d.getTimezoneOffset();
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}${o >= 0 ? "+" : "-"}${p(Math.floor(Math.abs(o) / 60))}:${p(Math.abs(o) % 60)}`;
 }
-const today = () => ts().slice(0, 10);
 let flushing = false;
 function log(args) {
   if (!API) return;
@@ -139,15 +180,12 @@ window.addEventListener("online", flush);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) flush(); });
 
 let S = ls.get(SKEY, null);
-if (!S || S.v !== 2) S = newState(F);
-// データが差し替わったら: 新しいブロックを order の後ろに足す・消えた問は飛ばす
-for (const k of F.blocks.map(blockKey)) if (!S.order.includes(k)) S.order.push(k);
-if (S.sess) S.sess.q = S.sess.q.filter(e => BY[e.k]);
+if (!S || S.v !== 3) S = newState(F); else syncState(S, F);
 const save = () => ls.set(SKEY, S);
-let menuOpen = 0, t0 = Date.now();
+let menuOpen = 0, t0 = Date.now(), onTop = true;
 
 function bar(tag, step) {
-  return `<div class="bar">${tag ? `<span class="tag ${esc(tag)}">${esc(tag)}</span>` : ""}<span class="step">${esc(step || "")}</span><span class="sp"></span><button class="menu" id="mb">…</button></div>` +
+  return `<div class="bar">${tag ? `<span class="tag ${esc(tag)}">${esc(tag)}</span>` : ""}<span class="step">${step || ""}</span><span class="sp"></span><button class="menu" id="mb">…</button></div>` +
     (menuOpen ? `<div class="mn">${menuOpen === 1 ? `<button id="m1">最初から</button>` : `<button class="danger" id="m2">ほんとうに最初から</button>`}<button id="m0">やめる</button></div>` : "");
 }
 function bindMenu() {
@@ -155,75 +193,95 @@ function bindMenu() {
   on("mb", () => { menuOpen = menuOpen ? 0 : 1; render(); });
   on("m0", () => { menuOpen = 0; render(); });
   on("m1", () => { menuOpen = 2; render(); });
-  on("m2", () => { menuOpen = 0; S = newState(F); save(); render(); });
+  on("m2", () => { menuOpen = 0; S = newState(F); onTop = true; save(); render(); });
 }
-function nextBtn(label, id = "nx") { return `<button class="next" id="${id}">${esc(label)}</button>`; }
+const nextBtn = (label, cls = "push", id = "nx") => `<button class="next ${cls}" id="${id}">${esc(label)}</button>`;
 function bindNext(f, id = "nx") { const el = document.getElementById(id); if (el) el.onclick = f; }
-const say = id => (J[id] && J[id].say) || "";
+const go = () => { advance(S, F); t0 = Date.now(); render(); scrollTo(0, 0); };
 
 function render() {
   save();
-  if (!S.sess || (S.sess.i >= S.sess.q.length && S.sess.day !== today())) {
-    if (!S.sess || S.sess.i >= S.sess.q.length) { if (!startSession(S, F, today())) return drawEnd(); save(); }
-  }
-  if (S.sess.i >= S.sess.q.length) return drawEnd();
-  const e = S.sess.q[S.sess.i];
-  if (e.phase === "dan") return drawDan(e);
+  if (onTop) return drawTop();
+  const st = step(S);
+  if (st === "END") return drawEnd();
+  if (st[0] === "T") return drawSaijo(st.slice(2));
+  if (st[0] === "D") return drawDan(st.slice(2));
   drawItem();
 }
 
-// 段: 言い方（大きく1行）・もし→なら（2行まで）・もしもの1行（読むだけ）。ボタンは「問題へ」1つ
-function drawDan(e) {
-  const it = BY[e.k], j = J[it.jodan];
-  $app.innerHTML = bar(it.s, "") + `<div class="dan"><div class="say">${esc(j.say)}</div>` +
-    `<div class="lbl">もし</div><div class="txt">${esc(j.moshi)}</div><div class="lbl">なら</div><div class="txt">${esc(j.nara)}</div>` +
-    (j.iff ? `<div class="iff">${esc(j.iff)}</div>` : "") + `</div>` + nextBtn("問題へ");
+// トップ: 題・全体の進み n／47・ボタン1つ
+function drawTop() {
+  const n = S.done.length, N = total(S), end = step(S) === "END";
+  const fresh = S.pos === 0 && !S.cur;
+  $app.innerHTML = bar("", "") + `<div class="top"><h1>見方→問題 5B10</h1><div class="big">${n}<small class="lead">／${N}</small></div>` +
+    (end ? `<p class="lead">ぜんぶ終わった</p>` : "") + `</div>` +
+    (end ? "" : nextBtn(fresh ? "はじめる" : "つづきから"));
   bindMenu();
-  bindNext(() => { passDan(e); t0 = Date.now(); render(); });
+  bindNext(() => { onTop = false; t0 = Date.now(); render(); });
 }
 
+// 最上段: その教科が初めて出る直前に1回。読むだけ
+function drawSaijo(s) {
+  const ts_ = (F.T && F.T[s]) || [];
+  $app.innerHTML = bar(s, "") + `<div class="saijo"><div class="lbl">${esc(s)}でいつも聞くこと</div>` +
+    ts_.map(t => `<div class="say">${esc(t.say)}</div>`).join("") + `</div>` + nextBtn("次へ");
+  bindMenu(); bindNext(go);
+}
+
+// 段: 言い方（大きく1行）・もし→なら（2行）・もしもの1行（読むだけ）
+function drawDan(jid) {
+  const j = J[jid];
+  $app.innerHTML = bar(j.s, "") + `<div class="dan"><div class="say">${esc(j.say)}</div>` +
+    `<div class="lbl">もし</div><div class="txt">${esc(j.moshi)}</div><div class="lbl">なら</div><div class="txt">${esc(j.nara)}</div>` +
+    (j.iff ? `<div class="iff">${esc(j.iff)}</div>` : "") + `</div>` + nextBtn("問題へ");
+  bindMenu(); bindNext(go);
+}
+
+// 問: 出題と返りを1画面で。いつ（社会）→答え を押すと、その場で印と ○×・正解・上段の「なら」1行・「次へ」（見方は上に出ているので返りでは繰り返さない）
 function drawItem() {
-  const ss = S.sess, e = ss.q[ss.i], it = BY[e.k];
-  const stp = e.re ? "もう一度" : "";
-  const head = say(it.jodan) ? `<div class="head">見方: ${esc(say(it.jodan))}</div>` : "";
-  const qh = head + `<div class="q">${esc(it.q)}</div>` + (it.fig ? `<img class="fig" src="${esc(it.fig)}" alt="図">` : "");
-  const choose = (opts, cb) => { $app.querySelectorAll(".c[data-v]").forEach(el => el.onclick = () => cb(opts[+el.dataset.v])); };
-  const btns = opts => `<div class="ch">${opts.map((v, i) => `<button class="c" data-v="${i}">${esc(v)}</button>`).join("")}</div>`;
-  if (e.phase === "when") {
-    $app.innerHTML = bar(it.s, stp) + qh + `<div class="ask">いつの話？</div>` + btns(e.wopts); bindMenu();
-    return choose(e.wopts, v => {
-      e.w = v; e.phase = "ans"; t0 = Date.now();
-      log({ stage: it.s, bundle: `いつ|${it.n}`, year: String(e.re + 1), event: String(it.q).slice(0, 300), aEra: v, aYear: it.when, ok: v === it.when ? 1 : 0, sec: "" });
-      render();
-    });
+  const e = curEntry(S, F), it = BY[e.k], j = J[it.jodan] || {};
+  const N = e.re ? S.wrong.length : total(S);
+  const stp = (e.re ? `<small>もう一度</small> ` : "") + `${qNum(S)}／${N}`;
+  const answered = e.a != null, needW = e.wopts.length > 0;
+  const cls = (v, mine, right) => !answered ? "" : (v === right ? " right" : v === mine ? " wrong" : "") + (v === mine ? " mine" : "");
+  const btn = (v, i, kind, mine, right, wait) =>
+    `<button class="c${cls(v, mine, right)}${wait ? " wait" : ""}" data-k="${kind}" data-v="${i}"${answered || wait ? " disabled" : ""}>${esc(v)}</button>`;
+  let h = bar(it.s, stp) + (j.say ? `<div class="head">見方: ${esc(j.say)}</div>` : "") +
+    `<div class="q">${esc(it.q)}</div>` + (it.fig ? `<img class="fig" src="${esc(it.fig)}" alt="図">` : "");
+  if (needW) {
+    const wDone = e.w != null;
+    h += `<div class="ask">いつの話？</div><div class="wr">` + e.wopts.map((v, i) =>
+      `<button class="c${wDone ? (v === it.when ? " right" : v === e.w ? " wrong" : "") + (v === e.w ? " mine" : "") : ""}" data-k="w" data-v="${i}"${wDone ? " disabled" : ""}>${esc(v)}</button>`).join("") + `</div>`;
   }
-  if (e.phase === "ans") {
-    $app.innerHTML = bar(it.s, stp) + qh + `<div class="ask">答えは？</div>` + btns(e.opts); bindMenu();
-    return choose(e.opts, v => {
-      e.a = v; e.phase = "res";
-      const sec = Math.round((Date.now() - t0) / 100) / 10;
-      log({ stage: it.s, bundle: `${F.tag}|${it.n}`, year: String(e.re + 1), event: String(it.q).slice(0, 300), aEra: v, aYear: it.a, ok: v === it.a ? 1 : 0, sec });
-      render();
-    });
+  h += `<div class="ask">答えは？</div><div class="ch">` + e.opts.map((v, i) => btn(v, i, "a", e.a, it.a, needW && e.w == null)).join("") + `</div>`;
+  if (answered) {
+    const okA = e.a === it.a;
+    h += `<div class="res" id="res"><div class="row"><b class="${okA ? "ok" : "ng"}">${okA ? "○" : "×"}</b><span>${okA ? "" : `正解は「${esc(it.a)}」`}</span></div>` +
+      (needW && e.w !== it.when ? `<div class="fb">いつ: ${esc(it.when)}</div>` : "") +
+      (j.nara ? `<div class="fb">なら ${esc(j.nara)}</div>` : "") +
+      (!okA && !e.re ? `<div class="fb">この問は最後にもう一度出る。</div>` : "") + `</div>` + nextBtn("次へ", "");
   }
-  // res: 正誤と正解・上段の言い方1行
-  const okA = e.a === it.a;
-  const row = (ok, txt) => `<div class="row"><b class="${ok ? "ok" : "ng"}">${ok ? "○" : "×"}</b><span>${txt}</span></div>`;
-  $app.innerHTML = bar(it.s, stp) + `<div class="q">${esc(it.q)}</div>` +
-    (e.w != null ? row(e.w === it.when, `いつ: ${esc(it.when)}`) : "") +
-    row(okA, `答え: ${esc(it.a)}${okA ? "" : `（えらんだ ${esc(e.a)}）`}`) +
-    (say(it.jodan) ? `<div class="fb">見方: ${esc(say(it.jodan))}</div>` : "") +
-    (!okA && e.re === 0 ? `<div class="fb lead">この問はこの回の最後にもう一度出る。</div>` : "") +
-    nextBtn("次へ");
+  $app.innerHTML = h;
   bindMenu();
-  bindNext(() => { finishItem(S, F); t0 = Date.now(); render(); });
+  $app.querySelectorAll(".c[data-k]").forEach(el => el.onclick = () => {
+    const v = (el.dataset.k === "w" ? e.wopts : e.opts)[+el.dataset.v];
+    if (el.dataset.k === "w") {
+      if (!pickWhen(S, v)) return;
+      log({ stage: it.s, bundle: `いつ|${it.n}`, year: String(e.re + 1), event: String(it.q).slice(0, 300), aEra: v, aYear: it.when, ok: v === it.when ? 1 : 0, sec: "" });
+      t0 = Date.now(); render(); return;
+    }
+    if (!pickAns(S, v)) return;
+    const sec = Math.round((Date.now() - t0) / 100) / 10;
+    log({ stage: it.s, bundle: `${F.tag}|${it.n}`, year: String(e.re + 1), event: String(it.q).slice(0, 300), aEra: v, aYear: it.a, ok: v === it.a ? 1 : 0, sec });
+    render();
+    const nx = document.getElementById("nx");
+    if (nx && nx.getBoundingClientRect().bottom > innerHeight) nx.scrollIntoView({ block: "end", behavior: "smooth" });
+  });
+  bindNext(go);
 }
 function drawEnd() {
-  const n = S.sess ? S.sess.n : 0, more = remaining(S) > 0;
-  $app.innerHTML = bar("", "") + `<div class="end">きょうの分はここまで。<br><span class="lead">${n} 問やった</span></div>` +
-    (more ? nextBtn("つづきをやる", "more") : "");
+  $app.innerHTML = bar("", "") + `<div class="end">おわり<br><span class="lead">${S.done.length} 問やった</span></div>`;
   bindMenu();
-  bindNext(() => { startSession(S, F, today()); render(); }, "more");
 }
 if (TRY) {
   document.body.insertAdjacentHTML("afterbegin", '<div style="position:fixed;top:0;left:0;right:0;z-index:55;background:var(--selbg);color:var(--sel);border-bottom:1px solid var(--line);font-size:13px;text-align:center;padding:1px 8px">試し（娘の記録に混ざらない）</div>');
