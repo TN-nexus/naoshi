@@ -309,7 +309,7 @@ function drawItem() {
     h += `<div class="res" id="res"><div class="row"><b class="${okA ? "ok" : "ng"}">${okA ? "○" : "×"}</b><span>${okA ? "" : `正解は「${esc(it.a)}」`}</span></div>` +
       (needW && e.w !== it.when ? `<div class="fb">いつ: ${esc(it.when)}</div>` : "") +
       (it.hint ? `<div class="fb">${esc(it.hint)}</div>` : j.nara ? `<div class="fb">なら ${esc(j.nara)}</div>` : "") +
-      (!okA && !e.re ? `<div class="fb">${it.jodan ? "この論点" : "おぼえる語"}の最後にもう一度出る。</div>` : "") + `</div>` + nextBtn("次へ", "");
+      `</div>` + nextBtn("次へ", "");
   }
   $app.innerHTML = h;
   bindMenu();
@@ -342,7 +342,7 @@ function drawItemB() {
   const body = `<div class="mid">` + (!it.jodan ? `<div class="head">${esc(F.oboe || "おぼえる語")}</div>` : !e.nf && j.say ? `<div class="head">見方: ${esc(j.say)}</div>` : "") +
     `<div class="q">${esc(it.q)}</div>` + (it.fig ? `<img class="fig" src="${esc(it.fig)}" alt="図">` : "") + `</div>`;
   // 下の固定欄: 札（上。押すと印に変わり残る）＋選択肢（下。札を押すまで薄く押せない）→ 答えたら 札＋○×・返し・「次へ」
-  const fudaBtn = !e.nf ? "" : !e.f ? `<button class="fuda" id="fuda"><span class="fm">${esc(j.kk ? `もし ${j.fm || j.say} →` : fudaSay)}</span>${j.kk ? `<span class="kk">${esc(j.kk)}、で考える</span>` : ""}<small>頭で答えてから押す</small></button>`
+  const fudaBtn = !e.nf ? "" : !e.f ? `<button class="fuda" id="fuda"><span class="fm">${esc(j.kk ? `もし ${j.fm || j.say} →` : fudaSay)}</span>${j.kk ? `<span class="kk">${esc(j.kk)}、で考える</span>` : ""}</button>`
     : `<button class="fuda on" disabled><span class="fm">${esc(j.kk ? `もし ${j.fm || j.say} →` : fudaSay)}</span>${j.kk ? `<span class="kk">${esc(j.kk)}、で考える</span>` : ""}</button>`;
   const lock = e.nf && !e.f;
   let dock;
@@ -355,7 +355,7 @@ function drawItemB() {
     dock = fudaBtn + `<div class="res" id="res"><div class="row"><b class="${okA ? "ok" : "ng"}">${okA ? "○" : "×"}</b><span>${okA ? esc(it.a) : `正解は「${esc(it.a)}」<small class="lead">（えらんだ ${esc(e.a)}）</small>`}</span></div>` +
       (e.wopts.length && e.w !== it.when ? `<div class="fb">いつ: ${esc(it.when)}</div>` : "") +
       (it.hint ? `<div class="fb">${esc(it.hint)}</div>` : j.nara ? `<div class="fb">なら ${esc(j.nara)}</div>` : "") +
-      (!okA && !e.re ? `<div class="fb">${it.jodan ? "この論点" : "おぼえる語"}の最後にもう一度出る。</div>` : "") + `</div>` + nextBtn("次へ", "");
+      `</div>` + nextBtn("次へ", "");
   }
   $app.innerHTML = lay(bar(it.s, stp, mid), body, dock);
   document.getElementById("pane").classList.add("ctr");
