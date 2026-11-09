@@ -190,7 +190,9 @@ function render() {
   let body = "";
   if (TAB === "kyou") {
     const tp = (D.links || {}).today_page;   // 組分け前日の今日専用ページ（家の Wi-Fi の中だけ開く）
+    const core = (D.links || {}).core;   // きょうのコア確認（家の Wi-Fi の中だけ開く。11/9 夜）
     body = (tp ? `<section class="card"><a class="dads-button" data-type="solid-fill" data-size="lg" style="display:block;text-align:center" href="${esc(tp)}">今日はここだけ見る</a></section>` : "")
+         + (core ? `<section class="card"><a class="dads-button" data-type="solid-fill" data-size="lg" style="display:block;text-align:center" href="${esc(core)}">きょうのコア確認</a><p class="small" style="margin:6px 0 0;text-align:center">家の Wi-Fi で、MacBook から</p></section>` : "")
          + `<section class="card"><h2>きょう</h2>${planHtml()}</section>`
          + `<section class="card"><h2>つづき</h2>${todoHtml()}</section>`
          + `<section class="card"><h2>きょうの進み</h2>${progHtml()}</section>`;
