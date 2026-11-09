@@ -98,12 +98,13 @@ document.write(`<script src="${SET ? "flow_data_" + SET + ".js" : "flow_data.js"
 // 1本の列 steps: 「T|教科」最上段（その教科が初めて出る直前に1回）→「D|上段ID」段 →「Q|問」その上段の問を全部 → 次のブロック（理社交互）。
 // ブロック（上段）の問で×だったら、そのブロックの末尾（次の段の前）に「R|問」を差し込み、その場で1回再出（段なし。また×でも先へ）。
 // 全体の最後のやり直しは無い（11/9 16:10 パパ「論点の区切りで、流れないように」）。区切り（10問）は無い
+// plain（ui.plain。帰りのバス 11/9 19時）: ブロックは j="" で教科ごとに chunk 問（build が作る）→「H|教科」の区切りだけ（画面なし）。最上段・段・札は無い
 function shuffle(a, rnd = Math.random) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 function buildSteps(F) {
   const st = [], seen = {}, by = Object.fromEntries(F.items.map(i => [i.k, i]));
   for (const b of F.blocks) {
     const ks = b.ks.filter(k => by[k]); if (!ks.length || (b.j && !F.J[b.j])) continue;
-    if (!b.j) { st.push("H|おぼえる語"); ks.forEach(k => st.push("Q|" + k)); continue; }   // 上段に乗らない語: 段なしの見出しブロック
+    if (!b.j) { st.push("H|" + (b.h || "おぼえる語")); ks.forEach(k => st.push("Q|" + k)); continue; }   // 上段に乗らない語・plain のブロック: 段なしの区切り
     const s = F.J[b.j].s;
     if (!seen[s]) { seen[s] = 1; if (F.T && F.T[s] && F.T[s].length) st.push("T|" + s); }
     st.push("D|" + b.j);
@@ -111,7 +112,9 @@ function buildSteps(F) {
   }
   return st;
 }
-function newState(F) { return { v: 4, steps: buildSteps(F), pos: 0, done: [], wrong: [], cur: null }; }
+function newState(F) { const S = { v: 4, steps: buildSteps(F), pos: 0, done: [], wrong: [], cur: null }; skipHead(S); return S; }
+// 先頭の区切り H は画面を出さないので飛ばす（plain は H から始まる）
+function skipHead(S) { while (S.pos < S.steps.length && S.steps[S.pos][0] === "H") S.pos++; return S; }
 // データが差し替わったら: 消えた問・上段は飛ばし、新しい問はその段ごと後ろに足す
 function syncState(S, F) {
   const by = Object.fromEntries(F.items.map(i => [i.k, i])), ok = st => st[0] === "Q" || st[0] === "R" ? !!by[st.slice(2)] : st[0] === "D" ? !!F.J[st.slice(2)] : true;
@@ -122,12 +125,12 @@ function syncState(S, F) {
   for (const st of buildSteps(F)) {
     if (st[0] !== "Q" || have.has(st.slice(2))) continue;
     const j = by[st.slice(2)].jodan;
-    if (jOf(S.steps[S.steps.length - 1]) !== j) S.steps.push("D|" + j);
+    if (j && jOf(S.steps[S.steps.length - 1]) !== j) S.steps.push("D|" + j);
     S.steps.push(st);
   }
   S.wrong = S.wrong.filter(k => by[k]); S.done = S.done.filter(k => by[k]);
   if (S.cur && !by[S.cur.k]) S.cur = null;
-  return S;
+  return skipHead(S);
 }
 // いまの画面: T|教科・D|上段・Q|問・R|問（ブロック内の再出）・END
 function step(S) { return S.pos < S.steps.length ? S.steps[S.pos] : "END"; }
@@ -175,7 +178,7 @@ function blockPos(S, at = S.pos) {
   return { n: seg.filter(x => x[0] === "Q").length, i: seg.slice(0, off).filter(x => x[0] === "Q").length,
            rn: seg.filter(x => x[0] === "R").length, ri: seg.slice(0, off).filter(x => x[0] === "R").length };
 }
-if (typeof module !== "undefined") module.exports = { shuffle, buildSteps, newState, syncState, step, curEntry, openFuda, pickWhen, pickAns, advance, qNum, total, blockPos };
+if (typeof module !== "undefined") module.exports = { shuffle, buildSteps, newState, skipHead, syncState, step, curEntry, openFuda, pickWhen, pickAns, advance, qNum, total, blockPos };
 // CORE-END
 </script>
 <script>
@@ -187,7 +190,8 @@ const DEPLOY = params.get("d") || "";
 const API = DEPLOY ? `https://script.google.com/macros/s/${encodeURIComponent(DEPLOY)}/exec` : "";
 const TRY = params.get("try") === "1";
 const SUF = SET ? "." + SET : "";   // 進みは set ごとに分ける（5B10 は従来のキーのまま）
-const SKEY = (TRY ? "nitaku.flow.try4" : "nitaku.flow.v4") + SUF, QKEY = TRY ? "nitaku.flowq.try" : "nitaku.flowq.v1", DKEY = "nendai.dev";
+const PLAIN = !!(F.ui && F.ui.plain);   // 最上段・上段・札を出さない（帰りのバス 5B11。11/9 19時）
+const SKEY = (PLAIN ? (TRY ? "nitaku.flow.try5" : "nitaku.flow.v5") : (TRY ? "nitaku.flow.try4" : "nitaku.flow.v4")) + SUF, QKEY = TRY ? "nitaku.flowq.try" : "nitaku.flowq.v1", DKEY = "nendai.dev";
 const MODE = TRY ? "nitaku_flow_try" : "nitaku_flow";
 const $app = document.getElementById("app");
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -258,7 +262,7 @@ function render() {
 // トップ: 題・全体の進み n／47・ボタン1つ
 function drawTop() {
   const n = S.done.length, N = total(S), end = step(S) === "END";
-  const fresh = S.pos === 0 && !S.cur;
+  const fresh = S.steps.slice(0, S.pos).every(x => x[0] === "H") && !S.cur;   // 先頭の区切り H（plain）は飛ばした分も「まだ」
   $app.innerHTML = lay(bar("", ""), `<div class="top"><h1>${esc(F.title || "見方→問題 5B10")}</h1><div class="big">${n}<small class="lead">／${N}</small></div>` +
     (end ? `<p class="lead">ぜんぶ終わった</p>` : "") + `</div>`,
     (end ? "" : nextBtn(fresh ? "はじめる" : "つづきから")));
@@ -339,7 +343,7 @@ function drawItemB() {
     : `<span class="dots">${Array.from({ length: bp.n }, (_, i) => i < bp.i || (i === bp.i && e.a != null) ? "●" : i === bp.i ? "◎" : "○").join("")}</span>`;
   const fudaSay = it.jodan ? fudaText(j) : "";
   // 上の欄: 問題文（と図）を縦の真ん中に。おぼえる語は見出しを添える
-  const body = `<div class="mid">` + (!it.jodan ? `<div class="head">${esc(F.oboe || "おぼえる語")}</div>` : !e.nf && j.say ? `<div class="head">見方: ${esc(j.say)}</div>` : "") +
+  const body = `<div class="mid">` + (PLAIN ? "" : !it.jodan ? `<div class="head">${esc(F.oboe || "おぼえる語")}</div>` : !e.nf && j.say ? `<div class="head">見方: ${esc(j.say)}</div>` : "") +
     `<div class="q">${esc(it.q)}</div>` + (it.fig ? `<img class="fig" src="${esc(it.fig)}" alt="図">` : "") + `</div>`;
   // 下の固定欄: 札（上。押すと印に変わり残る）＋選択肢（下。札を押すまで薄く押せない）→ 答えたら 札＋○×・返し・「次へ」
   const fudaBtn = !e.nf ? "" : !e.f ? `<button class="fuda" id="fuda"><span class="fm">${esc(j.kk ? `もし ${j.fm || j.say} →` : fudaSay)}</span>${j.kk ? `<span class="kk">${esc(j.kk)}、で考える</span>` : ""}</button>`
