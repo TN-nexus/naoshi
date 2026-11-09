@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>ふりかえり</title>
+<link rel="icon" href="data:,">
+<!-- 塾から帰った夕食後10分の「ふりかえり」。設計 wiki/knowledge/振り返り_設計_2026-11-09.md §2・§3。
+     データ furikaeri_data.js（furikaeri_build.py が作る）。正誤・点数・時間・進み具合は出さない。本は閉じたまま。 -->
+<style>
+/* flow.html と同じ色・字。1画面1つ、スクロールさせない */
+:root{ --bg:#f6f5f1; --card:#fff; --ink:#1f2328; --sub:#6b6f76; --line:#d9d6cf; --sel:#2b5cb8; --selbg:#e6eefc; }
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;font-size:18px;line-height:1.6;-webkit-tap-highlight-color:transparent}
+#app{max-width:560px;margin:0 auto;padding:10px 14px 14px;min-height:calc(100dvh - var(--top,0px));display:flex;flex-direction:column}
+button{font:inherit;color:inherit;cursor:pointer}
+.bar{display:flex;align-items:center;gap:8px;min-height:30px;border-bottom:1px solid var(--line);margin-bottom:12px;padding-bottom:6px}
+.tag{font-size:13px;line-height:1.5;padding:1px 8px;border-radius:6px;white-space:nowrap;background:#eceae4}
+.tag.社会{background:#fbe6d2;color:#8a4a12} .tag.理科{background:#dcefdc;color:#2c6a32} .tag.算数{background:#dfe8f7;color:#284f8f} .tag.国語{background:#f3dfe6;color:#8a2c4a}
+.ttl{font-size:15px;color:var(--sub)}
+.lead{font-size:16px;color:var(--sub)}
+.top{font-size:21px;font-weight:800;border:2px solid var(--ink);border-radius:12px;padding:8px 12px;margin:4px 0 12px;background:#fff}
+.top small{display:block;font-size:13px;font-weight:400;color:var(--sub)}
+.ask{font-size:19px;font-weight:800;margin:4px 0 8px;line-height:1.5}
+.lbl{font-size:15px;font-weight:700;margin:8px 0 4px}
+input.in,textarea.in{display:block;width:100%;font:inherit;font-size:18px;line-height:1.5;padding:9px 11px;border:2px solid var(--line);border-radius:10px;background:#fff;color:var(--ink)}
+textarea.in{resize:none}
+input.in:focus,textarea.in:focus{outline:none;border-color:var(--sel)}
+.hon{font-size:13px;color:var(--sub);margin-bottom:2px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:10px}
+.say{font-size:22px;font-weight:800;line-height:1.45}
+.txt{font-size:17px;line-height:1.6}
+.soe{font-size:14px;color:var(--sub);margin-top:6px}
+.where{font-size:15px;color:var(--sub);margin-bottom:6px}
+.ch{display:flex;flex-direction:column;gap:8px;margin-bottom:8px}
+.c{min-height:48px;font-size:17px;line-height:1.35;padding:6px 12px;border:2px solid var(--line);border-radius:12px;background:#fff;text-align:center}
+.c.picked{border-color:var(--sel);background:var(--selbg);font-weight:700}
+.next{display:block;width:100%;margin-top:auto;font-size:19px;font-weight:700;padding:13px;border-radius:10px;border:2px solid var(--ink);background:#fff}
+.gap{height:10px}
+.end{font-size:22px;font-weight:700;text-align:center;margin:32vh 0 16px}
+.reset{display:block;margin:0 auto;font-size:13px;color:var(--sub);background:none;border:1px solid var(--line);border-radius:8px;padding:4px 10px}
+#err{position:fixed;left:0;right:0;bottom:0;background:#fff3f2;color:#b3261e;font-size:12px;white-space:pre-wrap;padding:4px 8px;z-index:60;display:none}
+#norec{position:fixed;top:1px;right:6px;font-size:10px;line-height:1.2;color:var(--sub);z-index:50}
+</style>
+</head>
+<body>
+<div id="app"><p class="lead">よみこみ中…</p></div>
+<div id="err"></div>
+<script>
+window.onerror = (m, s, l, c) => { const e = document.getElementById("err"); e.style.display = "block"; e.textContent += `${m} (${l}:${c})\n`; };
+</script>
+<script src="furikaeri_data.js"></script>
+<script>
+// CORE-BEGIN 画面の並びと記録の形（純粋関数。node で単体: apps/nitaku/README.md「ふりかえり」）
+// 入力の文: 改行は空白に、前後の空白は落とす
+function clean(s) { return String(s ?? "").replace(/\s*[\r\n]+\s*/g, " ").trim(); }
+// 1教科 = 1 上段（2欄→本にはこう→見ないでもう一回）→ 2 場所×n（1欄→本→もう一回）→ 3 ×（batsu があるときだけ）→ 4 宿題
+// D.core（11/9 今夜の形）: 全教科の 1〜3 → コア確認へ行って戻る1画面 → 全教科の宿題
+function screens(D) {
+  const out = [], sh = [];
+  (D.sets || []).forEach((st, si) => {
+    out.push({ t: "j1", si }, { t: "jhon", si }, { t: "jre", si });
+    (st.basho || []).forEach((b, bi) => out.push({ t: "b1", si, bi }, { t: "bhon", si, bi }, { t: "bre", si, bi }));
+    (st.batsu || []).forEach((x, xi) => out.push({ t: "x1", si, xi }, { t: "xhon", si, xi }, { t: "xre", si, xi }));
+    if (st.shukudai) (D.core ? sh : out).push({ t: "shu", si });
+  });
+  if (D.core) out.push({ t: "core" }, ...sh);
+  out.push({ t: "end" });
+  return out;
+}
+// データの同一性（変われば進みを消す）
+function dataKey(D) { return (D.core ? "core;" : "") + (D.sets || []).map(s => `${s.tag}:${s.date}:${(s.basho || []).length}`).join(","); }
+// 束（GAS の bundle）。| は区切りなので名前から落とす
+const nm = s => String(s ?? "").replace(/\|/g, "／");
+function bundles(sc, D) {
+  if (sc.t === "core" || sc.t === "end") return [];
+  const st = D.sets[sc.si];
+  if (sc.t === "j1") return [`上段|${st.jodan.id}|1`, `上段|${st.jodan.id}|2`];
+  if (sc.t === "jre") return [`上段|${st.jodan.id}|再`];
+  if (sc.t === "b1" || sc.t === "bre") { const b = st.basho[sc.bi]; return [`場所|${nm(b.page)}|${nm(b.name)}` + (sc.t === "bre" ? "|再" : "")]; }
+  if (sc.t === "x1") { const x = st.batsu[sc.xi]; return [`×|${nm(x.k)}|上段`, `×|${nm(x.k)}|1`]; }
+  if (sc.t === "xre") return [`×|${nm(st.batsu[sc.xi].k)}|再`];
+  if (sc.t === "shu") return ["宿題"];
+  return [];
+}
+// 1画面の入力 → log の args（stage=教科、bundle=束、year=回、event=問い、aEra=入力、aYear=本の文／上段の言い方。正誤は空）
+function logRows(sc, D, inp) {
+  if (sc.t === "core" || sc.t === "end") return [];
+  const st = D.sets[sc.si], bs = bundles(sc, D), J = st.jodan, row = (bundle, event, aEra, aYear, ok = "") =>
+    ({ stage: st.s, bundle, year: st.kai, event, aEra: clean(aEra), aYear, ok, sec: "" });
+  if (sc.t === "j1") return [row(bs[0], J.ask[0], inp[0], J.say), row(bs[1], J.ask[1], inp[1], J.say)];
+  if (sc.t === "jre") return [row(bs[0], st.top, inp[0], J.say)];
+  if (sc.t === "b1" || sc.t === "bre") { const b = st.basho[sc.bi]; return [row(bs[0], `p.${b.page}『${b.name}』`, inp[0], b.unit)]; }
+  if (sc.t === "x1") { const x = st.batsu[sc.xi]; return [row(bs[0], x.q, inp.pick || "", x.jodan, inp.pick ? (inp.pick === x.jodan ? 1 : 0) : ""), row(bs[1], x.q, inp[0], x.a)]; }
+  if (sc.t === "xre") { const x = st.batsu[sc.xi]; return [row(bs[0], x.q, inp[0], x.a)]; }
+  if (sc.t === "shu") return [row(bs[0], "きょう出た宿題", inp[0], "")];
+  return [];
+}
+function newState(D) { return { v: 1, key: dataKey(D), i: 0, inp: {} }; }
+if (typeof module !== "undefined") module.exports = { clean, screens, dataKey, bundles, logRows, newState };
+// CORE-END
+</script>
+<script>
+const D = (typeof FURI !== "undefined" && FURI) || { sets: [] };
+const params = new URLSearchParams(location.search);
+const DEPLOY = params.get("d") || "";
+const API = DEPLOY ? `https://script.google.com/macros/s/${encodeURIComponent(DEPLOY)}/exec` : "";
+const TRY = params.get("try") === "1";
+const SKEY = TRY ? "nitaku.furi.try" : "nitaku.furi.v1", QKEY = TRY ? "nitaku.furiq.try" : "nitaku.furiq.v1", DKEY = "nendai.dev";
+const MODE = TRY ? "nitaku_furikaeri_try" : "nitaku_furikaeri";
+const $app = document.getElementById("app");
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const ls = { get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+             set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} } };
+let DEV = TRY ? "テスト-パパ" : ls.get(DKEY, "");
+if (!DEV) { DEV = "n" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); ls.set(DKEY, DEV); }
+function ts() {
+  const d = new Date(), p = n => String(n).padStart(2, "0"), o = -d.getTimezoneOffset();
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}${o >= 0 ? "+" : "-"}${p(Math.floor(Math.abs(o) / 60))}:${p(Math.abs(o) % 60)}`;
+}
+let flushing = false;
+function log(args) {
+  if (!API) return;
+  const q = ls.get(QKEY, []); q.push(Object.assign({ dev: DEV, ts: ts(), mode: MODE }, args)); ls.set(QKEY, q); flush();
+}
+async function flush() {
+  if (!API || flushing) return;
+  flushing = true;
+  try {
+    for (;;) {
+      const q = ls.get(QKEY, []); if (!q.length) break;
+      const r = await fetch(API, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, credentials: "omit",
+                                   body: JSON.stringify({ app: "nendai", op: "log", args: q[0] }) });
+      if (!r.ok) break;
+      const q2 = ls.get(QKEY, []); q2.shift(); ls.set(QKEY, q2);
+    }
+  } catch (e) { /* 次の機会に */ }
+  flushing = false;
+}
+window.addEventListener("online", flush);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) flush(); });
+
+const SC = screens(D);
+let S = ls.get(SKEY, null);
+if (!S || S.v !== 1 || S.key !== dataKey(D)) S = newState(D);
+const save = () => ls.set(SKEY, S);
+
+function bar(st) { return `<div class="bar"><span class="tag ${esc(st.s)}">${esc(st.s)}</span><span class="ttl">${esc(st.title)}</span></div>`; }
+const inBox = (n, tall) => tall ? `<textarea class="in" data-n="${n}" rows="2" autocomplete="off"></textarea>` : `<input class="in" data-n="${n}" type="text" autocomplete="off" enterkeyhint="next">`;
+const hon = (lbl, body) => `<div class="hon">本にはこう</div><div class="card">${lbl}${body}</div>`;
+const nextBtn = (label = "次へ") => `<button class="next" id="nx">${esc(label)}</button>`;
+
+function render() {
+  save();
+  const sc = SC[Math.min(S.i, SC.length - 1)];
+  if (sc.t === "end") {
+    $app.innerHTML = `<div class="end">きょうはここまで</div>` + (TRY ? `<button class="reset" id="rs">（試し）最初から</button>` : "");
+    const rs = document.getElementById("rs"); if (rs) rs.onclick = () => { S = newState(D); render(); };
+    return;
+  }
+  if (sc.t === "core") {
+    const ss = [...new Set(D.sets.map(s => s.s))].join("→");
+    $app.innerHTML = `<div class="gap"></div><div class="ask">つぎは、パパの画面でコア確認（${esc(ss)}）。</div><div class="txt">終わったらここに戻って宿題。</div>` + nextBtn("もどってきた");
+    document.getElementById("nx").onclick = () => { S.i++; render(); scrollTo(0, 0); };
+    return;
+  }
+  const st = D.sets[sc.si], J = st.jodan, b = st.basho && st.basho[sc.bi], x = st.batsu && st.batsu[sc.xi];
+  const key = String(S.i), inp = S.inp[key] = S.inp[key] || {};
+  let h = bar(st), btn = "次へ";
+  if (sc.t === "j1") {
+    h += `<div class="lead">きょうの${esc(st.s)}「${esc(st.title)}」</div><div class="top"><small>いつも聞くこと</small>${esc(st.top)}</div>` +
+      `<div class="ask">きょうの話で</div>` + J.ask.map((a, n) => `<div class="lbl">${esc(a)}</div>` + inBox(n, false)).join("");
+  } else if (sc.t === "jhon") {
+    h += `<div class="gap"></div>` + hon("", `<div class="say">${esc(J.say)}</div>` + (J.iikata ? `<div class="soe">${esc(J.iikata)}</div>` : ""));
+    btn = "かくして、もう一回";
+  } else if (sc.t === "jre") {
+    h += `<div class="ask">見ないでもう一回</div><div class="lbl">${esc(st.top)}</div>` + inBox(0, true);
+  } else if (sc.t === "b1") {
+    h += `<div class="lead">本は閉じたまま</div><div class="ask">${esc(b.page)}ページの「${esc(b.name)}」の${esc(b.kind === "見出し" ? "ところ" : b.kind)}、何の話？</div>` + inBox(0, true);
+  } else if (sc.t === "bhon") {
+    h += `<div class="gap"></div>` + hon(`<div class="where">${esc(b.page)}ページ「${esc(b.name)}」</div>`, `<div class="txt">${esc(b.unit)}</div>`);
+    btn = "かくして、もう一回";
+  } else if (sc.t === "bre") {
+    h += `<div class="ask">見ないでもう一回</div><div class="lbl">${esc(b.page)}ページの「${esc(b.name)}」、何の話？</div>` + inBox(0, true);
+  } else if (sc.t === "x1") {
+    const opts = inp.o = inp.o || [x.jodan].concat((x.conf || []).slice(0, 2)).sort(() => Math.random() - .5);
+    h += `<div class="card"><div class="txt">${esc(x.q)}</div></div><div class="ask">本当はどう考える？</div><div class="ch">` +
+      opts.map(o => `<button class="c ${inp.pick === o ? "picked" : ""}" data-v="${esc(o)}">${esc((x.say && x.say[o]) || o)}</button>`).join("") + `</div>` + inBox(0, true);
+  } else if (sc.t === "xhon") {
+    h += `<div class="gap"></div>` + hon("", `<div class="say">${esc(x.a)}</div><div class="txt">${esc(x.moshi)}</div>`);
+    btn = "かくして、もう一回";
+  } else if (sc.t === "xre") {
+    h += `<div class="ask">見ないでもう一回</div><div class="lbl">本当はどう考える？</div>` + inBox(0, true);
+  } else if (sc.t === "shu") {
+    h += `<div class="ask">きょう出た宿題（そのまま）</div>` + inBox(0, true);
+  }
+  $app.innerHTML = h + nextBtn(btn);
+  $app.querySelectorAll(".in").forEach(el => {
+    el.value = inp[el.dataset.n] || "";
+    el.oninput = () => { inp[el.dataset.n] = el.value; save(); };
+  });
+  $app.querySelectorAll(".c[data-v]").forEach(el => el.onclick = () => { inp.pick = el.dataset.v; render(); });
+  document.getElementById("nx").onclick = () => {
+    for (const r of logRows(sc, D, inp)) log(r);
+    S.i++; render(); scrollTo(0, 0);
+  };
+}
+if (TRY) {
+  document.body.insertAdjacentHTML("afterbegin", '<div style="position:fixed;top:0;left:0;right:0;z-index:55;background:var(--selbg);color:var(--sel);border-bottom:1px solid var(--line);font-size:13px;text-align:center;padding:1px 8px">試し（娘の記録に混ざらない）</div>');
+  document.body.style.paddingTop = "22px"; document.documentElement.style.setProperty("--top", "22px");
+}
+if (!API) { const t = document.createElement("div"); t.id = "norec"; t.textContent = "きろくなし"; document.body.appendChild(t); }
+if (!(D.sets || []).length) $app.innerHTML = `<p class="lead">データがありません</p>`; else render();
+flush();
+</script>
+</body>
+</html>
