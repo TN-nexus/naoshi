@@ -69,6 +69,15 @@ button{font:inherit;color:inherit;cursor:pointer}
 .bt .res{margin-top:0}
 .fuda{display:block;width:100%;min-height:66px;font-size:19px;font-weight:800;line-height:1.4;border:2px solid var(--sel);background:var(--selbg);color:var(--sel);border-radius:14px;padding:10px 14px;text-align:left}
 .fuda small{display:block;font-size:13px;font-weight:400;color:var(--sub)}
+.fuda .fm,.fuda .kk{display:block}
+.fuda .kk{font-size:16px;font-weight:700}
+.fuda.on{border-color:var(--line);background:#fff;color:var(--ink);min-height:0;padding:6px 12px;font-size:15px}
+.fuda.on .kk{font-size:14px}
+.bt .dock .fuda + .ch{margin-top:8px}
+.bt .pane.ctr{display:flex;flex-direction:column}
+.bt .pane.ctr > .mid{margin:auto 0}
+.bt .dock .fuda + .res{margin-top:8px}
+.kkline{font-size:16px;font-weight:700;color:var(--sel);margin:2px 0 6px}
 #err{position:fixed;left:0;right:0;bottom:0;background:#fff3f2;color:var(--ng);font-size:12px;white-space:pre-wrap;padding:4px 8px;z-index:60;display:none}
 #norec{position:fixed;top:1px;right:6px;font-size:10px;line-height:1.2;color:var(--sub);z-index:50}
 </style>
@@ -129,7 +138,7 @@ function curEntry(S, F, rnd = Math.random) {
   if (!S.cur || S.cur.k !== k) {
     const it = F.items.find(i => i.k === k);
     S.cur = { k, re: st[0] === "R" ? 1 : 0, opts: shuffle(it.choices, rnd), wopts: it.wc.length >= 2 ? shuffle(it.wc, rnd) : [], w: null, a: null,
-              nf: !!(F.ui && F.ui.fuda), f: false };   // nf＝札が要る（set の ui.fuda）。f＝札を押した（押すまで選択肢を出さない）
+              nf: !!(F.ui && F.ui.fuda) && !!it.jodan, f: false };   // nf＝札が要る（set の ui.fuda。おぼえる語は札なし）。f＝札を押した（押すまで選択肢を出さない）
   }
   return S.cur;
 }
@@ -271,6 +280,7 @@ function drawDan(jid) {
   $app.innerHTML = lay(bar(j.s, ""), `<div class="dan"><div class="say">${esc(j.say)}</div>` +
     `<div class="lbl">もし</div><div class="txt">${esc(j.moshi)}</div><div class="lbl">なら</div><div class="txt">${esc(j.nara)}</div>` +
     (j.iff ? `<div class="iff">${esc(j.iff)}</div>` : "") + `<div class="cnt">この論点は ${blockPos(S, S.pos + 1).n}問</div></div>`, nextBtn("問題へ"));
+  if (j.kk) $app.querySelector(".dan .say").insertAdjacentHTML("afterend", `<div class="kkline">${esc(fudaText(j))}</div>`);
   bindMenu(); bindNext(go);
 }
 
@@ -319,30 +329,36 @@ function drawItem() {
   });
   bindNext(go);
 }
+// 札の文: 「もし ◯◯ → 考え方、で考える」（考え方が無ければ 言い方 →）
+const fudaText = j => j.kk ? `もし ${j.fm || j.say} → ${j.kk}、で考える` : `${j.say || ""} →`;
 // 問（ui.bottom）: 上の欄に問題文・図、下の固定欄に 札 →（押すと）選択肢 →（押すと）○×・正解・一言・「次へ」
 function drawItemB() {
   const e = curEntry(S, F), it = BY[e.k], j = J[it.jodan] || {};
   const stp = `${qNum(S)}／${total(S)}`, bp = blockPos(S);
   const mid = e.re ? `<span class="dots re">もう一度 ${bp.ri + 1}／${bp.rn}</span>`
     : `<span class="dots">${Array.from({ length: bp.n }, (_, i) => i < bp.i || (i === bp.i && e.a != null) ? "●" : i === bp.i ? "◎" : "○").join("")}</span>`;
-  const fudaSay = it.jodan ? (j.say || "") : "おぼえる語";
-  const body = (!e.nf && j.say ? `<div class="head">見方: ${esc(j.say)}</div>` : "") +
-    `<div class="q">${esc(it.q)}</div>` + (it.fig ? `<img class="fig" src="${esc(it.fig)}" alt="図">` : "");
+  const fudaSay = it.jodan ? fudaText(j) : "";
+  // 上の欄: 問題文（と図）を縦の真ん中に。おぼえる語は見出しを添える
+  const body = `<div class="mid">` + (!it.jodan ? `<div class="head">${esc(F.oboe || "おぼえる語")}</div>` : !e.nf && j.say ? `<div class="head">見方: ${esc(j.say)}</div>` : "") +
+    `<div class="q">${esc(it.q)}</div>` + (it.fig ? `<img class="fig" src="${esc(it.fig)}" alt="図">` : "") + `</div>`;
+  // 下の固定欄: 札（上。押すと印に変わり残る）＋選択肢（下。札を押すまで薄く押せない）→ 答えたら 札＋○×・返し・「次へ」
+  const fudaBtn = !e.nf ? "" : !e.f ? `<button class="fuda" id="fuda"><span class="fm">${esc(j.kk ? `もし ${j.fm || j.say} →` : fudaSay)}</span>${j.kk ? `<span class="kk">${esc(j.kk)}、で考える</span>` : ""}<small>頭で答えてから押す</small></button>`
+    : `<button class="fuda on" disabled><span class="fm">${esc(j.kk ? `もし ${j.fm || j.say} →` : fudaSay)}</span>${j.kk ? `<span class="kk">${esc(j.kk)}、で考える</span>` : ""}</button>`;
+  const lock = e.nf && !e.f;
   let dock;
-  if (e.nf && !e.f) {
-    dock = `<button class="fuda" id="fuda">${esc(fudaSay)} →<small>頭で答えてから押す</small></button>`;
-  } else if (e.a == null) {
-    dock = (e.wopts.length ? `<div class="ask">いつの話？</div><div class="wr">` + e.wopts.map((v, i) =>
+  if (e.a == null) {
+    dock = fudaBtn + (e.wopts.length ? `<div class="ask">いつの話？</div><div class="wr">` + e.wopts.map((v, i) =>
       `<button class="c${e.w != null ? (v === it.when ? " right" : v === e.w ? " wrong mine" : "") : ""}" data-k="w" data-v="${i}"${e.w != null ? " disabled" : ""}>${esc(v)}</button>`).join("") + `</div><div class="ask">答えは？</div>` : "") +
-      `<div class="ch">` + e.opts.map((v, i) => `<button class="c${e.wopts.length && e.w == null ? " wait" : ""}" data-k="a" data-v="${i}"${e.wopts.length && e.w == null ? " disabled" : ""}>${esc(v)}</button>`).join("") + `</div>`;
+      `<div class="ch">` + e.opts.map((v, i) => { const wt = lock || (e.wopts.length && e.w == null); return `<button class="c${wt ? " wait" : ""}" data-k="a" data-v="${i}"${wt ? " disabled" : ""}>${esc(v)}</button>`; }).join("") + `</div>`;
   } else {
     const okA = e.a === it.a;
-    dock = `<div class="res" id="res"><div class="row"><b class="${okA ? "ok" : "ng"}">${okA ? "○" : "×"}</b><span>${okA ? esc(it.a) : `正解は「${esc(it.a)}」<small class="lead">（えらんだ ${esc(e.a)}）</small>`}</span></div>` +
+    dock = fudaBtn + `<div class="res" id="res"><div class="row"><b class="${okA ? "ok" : "ng"}">${okA ? "○" : "×"}</b><span>${okA ? esc(it.a) : `正解は「${esc(it.a)}」<small class="lead">（えらんだ ${esc(e.a)}）</small>`}</span></div>` +
       (e.wopts.length && e.w !== it.when ? `<div class="fb">いつ: ${esc(it.when)}</div>` : "") +
       (it.hint ? `<div class="fb">${esc(it.hint)}</div>` : j.nara ? `<div class="fb">なら ${esc(j.nara)}</div>` : "") +
       (!okA && !e.re ? `<div class="fb">${it.jodan ? "この論点" : "おぼえる語"}の最後にもう一度出る。</div>` : "") + `</div>` + nextBtn("次へ", "");
   }
   $app.innerHTML = lay(bar(it.s, stp, mid), body, dock);
+  document.getElementById("pane").classList.add("ctr");
   bindMenu();
   const fb = document.getElementById("fuda");
   if (fb) fb.onclick = () => {
