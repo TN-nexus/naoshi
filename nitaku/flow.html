@@ -71,7 +71,8 @@ window.onerror = (m, s, l, c) => { const e = document.getElementById("err"); e.s
 <script>
 // CORE-BEGIN 流れの規則（純粋関数。node で単体: apps/nitaku/README.md）
 // 1本の列 steps: 「T|教科」最上段（その教科が初めて出る直前に1回）→「D|上段ID」段 →「Q|問」その上段の問を全部 → 次のブロック（理社交互）。
-// 列が尽きたら、×だった問を1回ずつ「R|問」で再出（段なし）→ おわり。区切り（10問）は無い
+// ブロック（上段）の問で×だったら、そのブロックの末尾（次の段の前）に「R|問」を差し込み、その場で1回再出（段なし。また×でも先へ）。
+// 全体の最後のやり直しは無い（11/9 16:10 パパ「論点の区切りで、流れないように」）。区切り（10問）は無い
 function shuffle(a, rnd = Math.random) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 function buildSteps(F) {
   const st = [], seen = {}, by = Object.fromEntries(F.items.map(i => [i.k, i]));
@@ -84,14 +85,14 @@ function buildSteps(F) {
   }
   return st;
 }
-function newState(F) { return { v: 3, steps: buildSteps(F), pos: 0, done: [], wrong: [], rpos: 0, cur: null }; }
+function newState(F) { return { v: 4, steps: buildSteps(F), pos: 0, done: [], wrong: [], cur: null }; }
 // データが差し替わったら: 消えた問・上段は飛ばし、新しい問はその段ごと後ろに足す
 function syncState(S, F) {
-  const by = Object.fromEntries(F.items.map(i => [i.k, i])), ok = st => st[0] === "Q" ? !!by[st.slice(2)] : st[0] === "D" ? !!F.J[st.slice(2)] : true;
+  const by = Object.fromEntries(F.items.map(i => [i.k, i])), ok = st => st[0] === "Q" || st[0] === "R" ? !!by[st.slice(2)] : st[0] === "D" ? !!F.J[st.slice(2)] : true;
   const before = S.steps.slice(0, S.pos).filter(ok).length;
   S.steps = S.steps.filter(ok); S.pos = before;
   const have = new Set(S.steps.filter(x => x[0] === "Q").map(x => x.slice(2)));
-  const jOf = x => !x ? "" : x[0] === "D" ? x.slice(2) : x[0] === "Q" ? by[x.slice(2)].jodan : "";
+  const jOf = x => !x ? "" : x[0] === "D" ? x.slice(2) : x[0] === "Q" || x[0] === "R" ? by[x.slice(2)].jodan : "";
   for (const st of buildSteps(F)) {
     if (st[0] !== "Q" || have.has(st.slice(2))) continue;
     const j = by[st.slice(2)].jodan;
@@ -102,8 +103,8 @@ function syncState(S, F) {
   if (S.cur && !by[S.cur.k]) S.cur = null;
   return S;
 }
-// いまの画面: T|教科・D|上段・Q|問・R|問・END
-function step(S) { return S.pos < S.steps.length ? S.steps[S.pos] : S.rpos < S.wrong.length ? "R|" + S.wrong[S.rpos] : "END"; }
+// いまの画面: T|教科・D|上段・Q|問・R|問（ブロック内の再出）・END
+function step(S) { return S.pos < S.steps.length ? S.steps[S.pos] : "END"; }
 // 問の画面の中身（並びは1回だけ決めて保存）
 function curEntry(S, F, rnd = Math.random) {
   const st = step(S); if (!/^[QR]\|/.test(st)) return null;
@@ -117,23 +118,24 @@ function curEntry(S, F, rnd = Math.random) {
 // 押した（いつ→答えの順。答えは いつ のあと）。返り値は記録する行の種類
 function pickWhen(S, v) { const e = S.cur; if (!e || e.w != null || !e.wopts.length) return false; e.w = v; return true; }
 function pickAns(S, v) { const e = S.cur; if (!e || e.a != null || (e.wopts.length && e.w == null)) return false; e.a = v; return true; }
-// 次へ: T・D は進むだけ。Q は済に数え、×なら再出に積む。R は再出を1つ進める
+// 次へ: T・D・R は進むだけ。Q は済に数え、×ならそのブロックの末尾（次の T・D の前）に R を差し込む
 function advance(S, F) {
   const st = step(S);
   if (st === "END") return st;
   if (st[0] === "T" || st[0] === "D") { S.pos++; return step(S); }
+  const at = i => { while (i < S.steps.length && !/^[TD]\|/.test(S.steps[i])) i++; return i; };
   const e = S.cur, it = F.items.find(i => i.k === st.slice(2));
   if (!e || e.a == null) return st;
   if (st[0] === "Q") {
     if (!S.done.includes(it.k)) S.done.push(it.k);
-    if (e.a !== it.a && !S.wrong.includes(it.k)) S.wrong.push(it.k);
-    S.pos++;
-  } else S.rpos++;
+    if (e.a !== it.a && !S.wrong.includes(it.k)) { S.wrong.push(it.k); S.steps.splice(at(S.pos + 1), 0, "R|" + it.k); }
+  }
+  S.pos++;
   S.cur = null;
   return step(S);
 }
-// 何問目（Q は列の中の番号、R は再出の中の番号）
-function qNum(S) { const st = step(S); return st[0] === "R" ? S.rpos + 1 : S.steps.slice(0, S.pos + 1).filter(x => x[0] === "Q").length; }
+// 何問目（Q の列の中の番号。R はいま済んでいる数）
+function qNum(S) { return S.steps.slice(0, S.pos + 1).filter(x => x[0] === "Q").length; }
 function total(S) { return S.steps.filter(x => x[0] === "Q").length; }
 if (typeof module !== "undefined") module.exports = { shuffle, buildSteps, newState, syncState, step, curEntry, pickWhen, pickAns, advance, qNum, total };
 // CORE-END
@@ -145,7 +147,7 @@ const params = new URLSearchParams(location.search);
 const DEPLOY = params.get("d") || "";
 const API = DEPLOY ? `https://script.google.com/macros/s/${encodeURIComponent(DEPLOY)}/exec` : "";
 const TRY = params.get("try") === "1";
-const SKEY = TRY ? "nitaku.flow.try3" : "nitaku.flow.v3", QKEY = TRY ? "nitaku.flowq.try" : "nitaku.flowq.v1", DKEY = "nendai.dev";
+const SKEY = TRY ? "nitaku.flow.try4" : "nitaku.flow.v4", QKEY = TRY ? "nitaku.flowq.try" : "nitaku.flowq.v1", DKEY = "nendai.dev";
 const MODE = TRY ? "nitaku_flow_try" : "nitaku_flow";
 const $app = document.getElementById("app");
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -180,7 +182,7 @@ window.addEventListener("online", flush);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) flush(); });
 
 let S = ls.get(SKEY, null);
-if (!S || S.v !== 3) S = newState(F); else syncState(S, F);
+if (!S || S.v !== 4) S = newState(F); else syncState(S, F);
 const save = () => ls.set(SKEY, S);
 let menuOpen = 0, t0 = Date.now(), onTop = true;
 
@@ -240,8 +242,7 @@ function drawDan(jid) {
 // 問: 出題と返りを1画面で。いつ（社会）→答え を押すと、その場で印と ○×・正解・上段の「なら」1行・「次へ」（見方は上に出ているので返りでは繰り返さない）
 function drawItem() {
   const e = curEntry(S, F), it = BY[e.k], j = J[it.jodan] || {};
-  const N = e.re ? S.wrong.length : total(S);
-  const stp = (e.re ? `<small>もう一度</small> ` : "") + `${qNum(S)}／${N}`;
+  const stp = e.re ? `もう一度 <small>${qNum(S)}／${total(S)}</small>` : `${qNum(S)}／${total(S)}`;
   const answered = e.a != null, needW = e.wopts.length > 0;
   const cls = (v, mine, right) => !answered ? "" : (v === right ? " right" : v === mine ? " wrong" : "") + (v === mine ? " mine" : "");
   const btn = (v, i, kind, mine, right, wait) =>
@@ -259,7 +260,7 @@ function drawItem() {
     h += `<div class="res" id="res"><div class="row"><b class="${okA ? "ok" : "ng"}">${okA ? "○" : "×"}</b><span>${okA ? "" : `正解は「${esc(it.a)}」`}</span></div>` +
       (needW && e.w !== it.when ? `<div class="fb">いつ: ${esc(it.when)}</div>` : "") +
       (j.nara ? `<div class="fb">なら ${esc(j.nara)}</div>` : "") +
-      (!okA && !e.re ? `<div class="fb">この問は最後にもう一度出る。</div>` : "") + `</div>` + nextBtn("次へ", "");
+      (!okA && !e.re ? `<div class="fb">この上段の最後にもう一度出る。</div>` : "") + `</div>` + nextBtn("次へ", "");
   }
   $app.innerHTML = h;
   bindMenu();
