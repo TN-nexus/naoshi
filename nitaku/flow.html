@@ -44,6 +44,9 @@ h1{font-size:22px;line-height:1.5;margin:18vh 0 10px;font-weight:800}
 .row b{font-size:30px;width:34px;text-align:center}
 .ok{color:var(--ok)} .ng{color:var(--ng)}
 .end{font-size:20px;text-align:center;margin:28vh 0 16px}
+.dan{margin-top:8vh}
+.head{font-size:13px;color:var(--sub);margin:-4px 0 4px}
+.iff{font-size:15px;line-height:1.5;color:var(--sub);margin-top:14px;padding-top:8px;border-top:1px dashed var(--line)}
 #err{position:fixed;left:0;right:0;bottom:0;background:#fff3f2;color:var(--ng);font-size:12px;white-space:pre-wrap;padding:4px 8px;z-index:60;display:none}
 #norec{position:fixed;top:1px;right:6px;font-size:10px;line-height:1.2;color:var(--sub);z-index:50}
 </style>
@@ -57,65 +60,55 @@ window.onerror = (m, s, l, c) => { const e = document.getElementById("err"); e.s
 <script src="flow_data.js"></script>
 <script>
 // CORE-BEGIN 流れの規則（純粋関数。node で単体: apps/nitaku/README.md）
+// 論点＝上段ごとのブロック（flow_build.py が作る F.blocks＝[{j, ks}]、理社はブロック単位で交互）。
+// 1回＝ブロックをまるごと取って 10問に達したら終わり（ブロックは割らない）。段は その回で初めて出る上段で1画面、2度目と1問だけの上段は見出し1行
 const SESS_N = 10;
 function shuffle(a, rnd = Math.random) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
-// なら を1文に（画面Bは2〜3行まで）
-function shortNara(s) {
-  s = String(s || "").replace(/^①/, "").split(/[。②]/)[0].replace(/[（(][^）)]*$/, "");
-  if (s.length <= 46) return s;
-  const cut = s.lastIndexOf("、", 46);
-  return s.slice(0, cut > 20 ? cut : 46) + "…";
+const blockKey = b => b.j + "|" + b.ks[0];
+function newState(F) { return { v: 2, order: F.blocks.map(blockKey), next: 0, sess: null, done: [] }; }
+function qEntry(it, re, dan, rnd) {
+  const when = it.wc.length >= 2;
+  return { k: it.k, re, dan: !!dan, opts: shuffle(it.choices, rnd), wopts: when ? shuffle(it.wc, rnd) : [],
+           phase: dan ? "dan" : (when ? "when" : "ans"), w: null, a: null };
 }
-// 説明〜もしも の画面の並び
-function introScreens(F) {
-  const out = [{ t: "title" }, { t: "top", s: "社会" }, { t: "top", s: "理科" }];
-  for (const f of F.feat) out.push({ t: "jodan", j: f.j });
-  out.push({ t: "lens", s: "社会" }, { t: "lens", s: "理科" });
-  for (const f of F.feat) out.push({ t: "quiz", j: f.j, w: f.w });
-  out.push({ t: "moshi", s: "社会" }, { t: "moshi", s: "理科" });
-  return out;
-}
-// 理科・社会を交互に（json の順を保つ）
-function interleave(items) {
-  const a = items.filter(i => i.s === "理科").map(i => i.k), b = items.filter(i => i.s === "社会").map(i => i.k), out = [];
-  for (let i = 0; i < Math.max(a.length, b.length); i++) { if (a[i]) out.push(a[i]); if (b[i]) out.push(b[i]); }
-  return out;
-}
-function newState(F) { return { v: 1, intro: 0, introDone: false, order: interleave(F.items), next: 0, sess: null, done: [] }; }
-function qEntry(it, re, rnd) {
-  return { k: it.k, re, opts: shuffle(it.choices, rnd), jopts: shuffle([it.jodan].concat(it.jw), rnd), phase: it.wc.length >= 2 ? "when" : "jodan",
-           wopts: it.wc.length >= 2 ? shuffle(it.wc, rnd) : [], w: null, j: null, a: null };
-}
-// 1セッション（最大10問）を始める。尽きていれば null
+// 1回（ブロック単位で 10問まで）を始める。尽きていれば null
 function startSession(S, F, day, rnd = Math.random) {
-  const by = Object.fromEntries(F.items.map(i => [i.k, i]));
-  const ks = [];
-  while (S.next < S.order.length && ks.length < SESS_N) { const k = S.order[S.next++]; if (by[k]) ks.push(k); }
-  if (!ks.length) { S.sess = null; return null; }
-  S.sess = { day, i: 0, n: 0, q: ks.map(k => qEntry(by[k], 0, rnd)) };
+  const by = Object.fromEntries(F.items.map(i => [i.k, i])), bk = Object.fromEntries(F.blocks.map(b => [blockKey(b), b]));
+  const q = [], shown = new Set();
+  while (S.next < S.order.length && q.length < SESS_N) {
+    const b = bk[S.order[S.next++]]; if (!b) continue;
+    const ks = b.ks.filter(k => by[k]); if (!ks.length) continue;
+    const full = !!(F.J[b.j] && F.J[b.j].full) && !shown.has(b.j);
+    shown.add(b.j);
+    ks.forEach((k, i) => q.push(qEntry(by[k], 0, full && i === 0, rnd)));
+  }
+  if (!q.length) { S.sess = null; return null; }
+  S.sess = { day, i: 0, n: 0, q };
   return S.sess;
 }
-// 1問の返りまで済んだら次へ。答え×で初回なら後ろに1回だけ回す
+// 段を見た → 問へ
+function passDan(e) { e.phase = e.wopts.length ? "when" : "ans"; }
+// 1問の返りまで済んだら次へ。答え×で初回なら、その回の最後に1回だけ回す（段なし）
 function finishItem(S, F, rnd = Math.random) {
   const ss = S.sess, e = ss.q[ss.i], it = F.items.find(i => i.k === e.k);
   const ok = e.a === it.a;
   if (e.re === 0) { ss.n++; if (!S.done.includes(e.k)) S.done.push(e.k); }
-  if (!ok && e.re === 0) ss.q.push(qEntry(it, 1, rnd));
+  if (!ok && e.re === 0) ss.q.push(qEntry(it, 1, false, rnd));
   ss.i++;
   return ss.i >= ss.q.length;
 }
 function remaining(S) { return S.order.length - S.next; }
-if (typeof module !== "undefined") module.exports = { SESS_N, shuffle, shortNara, introScreens, interleave, newState, qEntry, startSession, finishItem, remaining };
+if (typeof module !== "undefined") module.exports = { SESS_N, shuffle, blockKey, newState, qEntry, startSession, passDan, finishItem, remaining };
 // CORE-END
 </script>
 <script>
-const F = (typeof FLOW !== "undefined" && FLOW) || { items: [], feat: [], J: {}, top: {}, lens: {}, moshi: {} };
+const F = (typeof FLOW !== "undefined" && FLOW) || { items: [], blocks: [], J: {} };
 const J = F.J, BY = Object.fromEntries(F.items.map(i => [i.k, i]));
 const params = new URLSearchParams(location.search);
 const DEPLOY = params.get("d") || "";
 const API = DEPLOY ? `https://script.google.com/macros/s/${encodeURIComponent(DEPLOY)}/exec` : "";
 const TRY = params.get("try") === "1";
-const SKEY = TRY ? "nitaku.flow.try" : "nitaku.flow.v1", QKEY = TRY ? "nitaku.flowq.try" : "nitaku.flowq.v1", DKEY = "nendai.dev";
+const SKEY = TRY ? "nitaku.flow.try" : "nitaku.flow.v2", QKEY = TRY ? "nitaku.flowq.try" : "nitaku.flowq.v1", DKEY = "nendai.dev";
 const MODE = TRY ? "nitaku_flow_try" : "nitaku_flow";
 const $app = document.getElementById("app");
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -150,18 +143,17 @@ async function flush() {
 window.addEventListener("online", flush);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) flush(); });
 
-const INTRO = introScreens(F);
 let S = ls.get(SKEY, null);
-if (!S || S.v !== 1) S = newState(F);
-// データが差し替わったら: 新しい問を order の後ろに足す・消えた問は飛ばす
-for (const k of interleave(F.items)) if (!S.order.includes(k)) S.order.push(k);
+if (!S || S.v !== 2) S = newState(F);
+// データが差し替わったら: 新しいブロックを order の後ろに足す・消えた問は飛ばす
+for (const k of F.blocks.map(blockKey)) if (!S.order.includes(k)) S.order.push(k);
 if (S.sess) S.sess.q = S.sess.q.filter(e => BY[e.k]);
 const save = () => ls.set(SKEY, S);
-let menuOpen = 0, pickNow = null, t0 = Date.now();
+let menuOpen = 0, t0 = Date.now();
 
 function bar(tag, step) {
   return `<div class="bar">${tag ? `<span class="tag ${esc(tag)}">${esc(tag)}</span>` : ""}<span class="step">${esc(step || "")}</span><span class="sp"></span><button class="menu" id="mb">…</button></div>` +
-    (menuOpen ? `<div class="mn">${menuOpen === 1 ? `<button id="m3">説明をもう一度</button><button id="m1">最初から</button>` : `<button class="danger" id="m2">ほんとうに最初から</button>`}<button id="m0">やめる</button></div>` : "");
+    (menuOpen ? `<div class="mn">${menuOpen === 1 ? `<button id="m1">最初から</button>` : `<button class="danger" id="m2">ほんとうに最初から</button>`}<button id="m0">やめる</button></div>` : "");
 }
 function bindMenu() {
   const on = (id, f) => { const el = document.getElementById(id); if (el) el.onclick = f; };
@@ -169,107 +161,49 @@ function bindMenu() {
   on("m0", () => { menuOpen = 0; render(); });
   on("m1", () => { menuOpen = 2; render(); });
   on("m2", () => { menuOpen = 0; S = newState(F); save(); render(); });
-  on("m3", () => { menuOpen = 0; S.intro = 0; S.introDone = false; pickNow = null; save(); render(); });
 }
 function nextBtn(label, id = "nx") { return `<button class="next" id="${id}">${esc(label)}</button>`; }
 function bindNext(f, id = "nx") { const el = document.getElementById(id); if (el) el.onclick = f; }
-const say = id => (J[id] && J[id].say) || id;
-// 見分け: 正しい上段と押した上段の条件だけ（ID は見せない）
-function mwHtml(right, picked) {
-  const mw = (J[right] && J[right].mw) || {}, ids = [right].concat(picked && picked !== right ? [picked] : []).filter(x => mw[x]);
-  if (!ids.length) return "";
-  return `<div class="fb">こう見分ける<br>` + ids.map(x => `${x === right ? "○" : "・"} ${esc(mw[x])}なら「${esc(say(x))}」`).join("<br>") + `</div>`;
-}
+const say = id => (J[id] && J[id].say) || "";
 
 function render() {
   save();
-  if (!S.introDone) return drawIntro();
   if (!S.sess || (S.sess.i >= S.sess.q.length && S.sess.day !== today())) {
     if (!S.sess || S.sess.i >= S.sess.q.length) { if (!startSession(S, F, today())) return drawEnd(); save(); }
   }
   if (S.sess.i >= S.sess.q.length) return drawEnd();
+  const e = S.sess.q[S.sess.i];
+  if (e.phase === "dan") return drawDan(e);
   drawItem();
 }
-function introNext() { pickNow = null; S.intro++; if (S.intro >= INTRO.length) S.introDone = true; render(); }
 
-function drawIntro() {
-  const sc = INTRO[S.intro], stp = `見方 ${S.intro + 1}/${INTRO.length}`;
-  let h = "";
-  if (sc.t === "title") {
-    h = bar("", "") + `<h1>${esc((F.test || "").split(" ")[0] || "5B10")} のテストを解く前に、見方を2つ</h1><div class="lead">読む → 何の問題か決める → 手を動かす</div>` + nextBtn("次へ");
-  } else if (sc.t === "top") {
-    h = bar(sc.s, stp) + `<div class="lead">${sc.s}のいちばん上の見方</div><div class="gap"></div>` +
-      F.top[sc.s].map(t => `<div class="card"><div class="say">${esc(t.say)}</div><div class="txt">${esc(t.nara)}</div></div>`).join("") + nextBtn("次へ");
-  } else if (sc.t === "jodan") {
-    const j = J[sc.j];
-    h = bar(j.s, stp) + `<div class="lead">今回のテストに出る見方</div><div class="say">${esc(j.say)}</div>` +
-      `<div class="lbl">もし</div><div class="txt">${esc(j.moshi)}</div><div class="lbl">なら</div><div class="txt">${esc(shortNara(j.nara))}</div>` + nextBtn("次へ");
-  } else if (sc.t === "lens") {
-    const L = F.lens[sc.s], opts = [L.want, L.other];
-    const btn = id => `<button class="c ${pickNow === id ? "picked" : ""}" data-v="${esc(id)}" ${pickNow ? "disabled" : ""}>${esc(say(id))}</button>`;
-    h = bar(sc.s, stp) + `<div class="ask">${esc(L.q)}</div><div class="ch">${opts.map(btn).join("")}</div>` +
-      (pickNow ? `<div class="fb">${esc(pickNow === L.want ? L.ok : L.alt)}</div>` + nextBtn("次へ") : "");
-    $app.innerHTML = h; bindMenu();
-    $app.querySelectorAll(".c[data-v]").forEach(el => el.onclick = () => {
-      pickNow = el.dataset.v; log({ stage: sc.s, bundle: `レンズ|${sc.s}`, event: L.q, aEra: pickNow, aYear: "", ok: "", sec: "" }); drawIntro();
-    });
-    return bindNext(introNext);
-  } else if (sc.t === "quiz") {
-    const j = J[sc.j];
-    sc._o = sc._o || shuffle([sc.j].concat(sc.w));
-    const okp = pickNow === sc.j;
-    const btn = id => {
-      let c = "c"; if (pickNow) { if (id === sc.j) c += " right"; else if (id === pickNow) c += " picked-ng"; }
-      return `<button class="${c}" data-v="${esc(id)}" ${pickNow ? "disabled" : ""}>${esc(say(id))}</button>`;
-    };
-    h = bar(j.s, stp) + `<div class="lbl">もし</div><div class="txt">${esc(j.moshi)}</div><div class="ask">今回の上段は？</div><div class="ch">${sc._o.map(btn).join("")}</div>` +
-      (pickNow ? (okp ? `<div class="fb">そう。</div>` : (mwHtml(sc.j, pickNow) || `<div class="fb">なら: ${esc(shortNara(j.nara))}</div>`)) + nextBtn("次へ") : "");
-    $app.innerHTML = h; bindMenu();
-    $app.querySelectorAll(".c[data-v]").forEach(el => el.onclick = () => {
-      pickNow = el.dataset.v; log({ stage: j.s, bundle: `上段|導入_${sc.j}`, event: j.moshi, aEra: pickNow, aYear: sc.j, ok: pickNow === sc.j ? 1 : 0, sec: "" }); drawIntro();
-    });
-    return bindNext(introNext);
-  } else if (sc.t === "moshi") {
-    const M = F.moshi[sc.s], last = S.intro === INTRO.length - 1;
-    const btn = v => `<button class="c ${pickNow === v ? "picked" : ""}" data-v="${esc(v)}" ${pickNow ? "disabled" : ""}>${esc(v)}</button>`;
-    h = bar(sc.s, stp) + `<div class="lead">もしも〜だったら？（${esc(say(M.j))}）</div><div class="ask">${esc(M.q)}</div><div class="ch">${M.choices.map(btn).join("")}</div>` +
-      (pickNow ? `<div class="fb">そういう考え方もあるね。<br>こう考えるといいよ: ${esc(M.tip)}</div>` + nextBtn(last ? "ではでは、実際に問題を解いてみよう" : "次へ") : "");
-    $app.innerHTML = h; bindMenu();
-    $app.querySelectorAll(".c[data-v]").forEach(el => el.onclick = () => {
-      pickNow = el.dataset.v; log({ stage: sc.s, bundle: `もしも|${sc.s}`, event: M.q, aEra: pickNow, aYear: "", ok: "", sec: "" }); drawIntro();
-    });
-    return bindNext(introNext);
-  }
-  $app.innerHTML = h; bindMenu(); bindNext(introNext);
+// 段: 言い方（大きく1行）・もし→なら（2行まで）・もしもの1行（読むだけ）。ボタンは「問題へ」1つ
+function drawDan(e) {
+  const it = BY[e.k], j = J[it.jodan];
+  $app.innerHTML = bar(it.s, "") + `<div class="dan"><div class="say">${esc(j.say)}</div>` +
+    `<div class="lbl">もし</div><div class="txt">${esc(j.moshi)}</div><div class="lbl">なら</div><div class="txt">${esc(j.nara)}</div>` +
+    (j.iff ? `<div class="iff">${esc(j.iff)}</div>` : "") + `</div>` + nextBtn("問題へ");
+  bindMenu();
+  bindNext(() => { passDan(e); t0 = Date.now(); render(); });
 }
 
 function drawItem() {
   const ss = S.sess, e = ss.q[ss.i], it = BY[e.k];
-  const stp = `問題 ${Math.min(ss.n + 1, SESS_N)}` + (e.re ? "（もう一度）" : "");
-  const qh = `<div class="q">${esc(it.q)}</div>` + (it.fig ? `<img class="fig" src="${esc(it.fig)}" alt="図">` : "");
-  const choose = (opts, cb, label = v => v) => {
-    $app.querySelectorAll(".c[data-v]").forEach(el => el.onclick = () => cb(opts[+el.dataset.v]));
-  };
-  const btns = (opts, label = v => v) => `<div class="ch">${opts.map((v, i) => `<button class="c" data-v="${i}">${esc(label(v))}</button>`).join("")}</div>`;
+  const stp = e.re ? "もう一度" : "";
+  const head = say(it.jodan) ? `<div class="head">見方: ${esc(say(it.jodan))}</div>` : "";
+  const qh = head + `<div class="q">${esc(it.q)}</div>` + (it.fig ? `<img class="fig" src="${esc(it.fig)}" alt="図">` : "");
+  const choose = (opts, cb) => { $app.querySelectorAll(".c[data-v]").forEach(el => el.onclick = () => cb(opts[+el.dataset.v])); };
+  const btns = opts => `<div class="ch">${opts.map((v, i) => `<button class="c" data-v="${i}">${esc(v)}</button>`).join("")}</div>`;
   if (e.phase === "when") {
     $app.innerHTML = bar(it.s, stp) + qh + `<div class="ask">いつの話？</div>` + btns(e.wopts); bindMenu();
     return choose(e.wopts, v => {
-      e.w = v; e.phase = "jodan";
+      e.w = v; e.phase = "ans"; t0 = Date.now();
       log({ stage: it.s, bundle: `いつ|${it.n}`, year: String(e.re + 1), event: String(it.q).slice(0, 300), aEra: v, aYear: it.when, ok: v === it.when ? 1 : 0, sec: "" });
-      render();
-    });
-  }
-  if (e.phase === "jodan") {
-    $app.innerHTML = bar(it.s, stp) + qh + `<div class="ask">${it.s === "社会" ? "どの見方の話？" : "何の話？"}</div>` + btns(e.jopts, say); bindMenu();
-    return choose(e.jopts, v => {
-      e.j = v; e.phase = "ans"; t0 = Date.now();
-      log({ stage: it.s, bundle: `上段|${it.n}`, year: String(e.re + 1), event: String(it.q).slice(0, 300), aEra: v, aYear: it.jodan, ok: v === it.jodan ? 1 : 0, sec: "" });
       render();
     });
   }
   if (e.phase === "ans") {
     $app.innerHTML = bar(it.s, stp) + qh + `<div class="ask">答えは？</div>` + btns(e.opts); bindMenu();
-    t0 = t0 || Date.now();
     return choose(e.opts, v => {
       e.a = v; e.phase = "res";
       const sec = Math.round((Date.now() - t0) / 100) / 10;
@@ -277,18 +211,17 @@ function drawItem() {
       render();
     });
   }
-  // res
-  const okA = e.a === it.a, okJ = e.j === it.jodan;
+  // res: 正誤と正解・上段の言い方1行
+  const okA = e.a === it.a;
   const row = (ok, txt) => `<div class="row"><b class="${ok ? "ok" : "ng"}">${ok ? "○" : "×"}</b><span>${txt}</span></div>`;
-  $app.innerHTML = bar(it.s, stp) +
+  $app.innerHTML = bar(it.s, stp) + `<div class="q">${esc(it.q)}</div>` +
     (e.w != null ? row(e.w === it.when, `いつ: ${esc(it.when)}`) : "") +
-    row(okJ, `見方: ${esc(say(it.jodan))}`) +
     row(okA, `答え: ${esc(it.a)}${okA ? "" : `（えらんだ ${esc(e.a)}）`}`) +
-    (!okJ ? mwHtml(it.jodan, e.j) : "") +
-    (!okA && e.re === 0 ? `<div class="fb lead">この問はあとでもう一度出る。</div>` : "") +
+    (say(it.jodan) ? `<div class="fb">見方: ${esc(say(it.jodan))}</div>` : "") +
+    (!okA && e.re === 0 ? `<div class="fb lead">この問はこの回の最後にもう一度出る。</div>` : "") +
     nextBtn("次へ");
   bindMenu();
-  bindNext(() => { finishItem(S, F); render(); });
+  bindNext(() => { finishItem(S, F); t0 = Date.now(); render(); });
 }
 function drawEnd() {
   const n = S.sess ? S.sess.n : 0, more = remaining(S) > 0;
