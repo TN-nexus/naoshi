@@ -55,12 +55,12 @@ window.onerror = (m, s, l, c) => { const e = document.getElementById("err"); e.s
 // CORE-BEGIN 画面の並びと記録の形（純粋関数。node で単体: apps/nitaku/README.md「ふりかえり」）
 // 入力の文: 改行は空白に、前後の空白は落とす
 function clean(s) { return String(s ?? "").replace(/\s*[\r\n]+\s*/g, " ").trim(); }
-// 1教科 = 1 上段（2欄→本にはこう→見ないでもう一回）→ 2 場所×n（1欄→本→もう一回）→ 3 ×（batsu があるときだけ）→ 4 宿題
+// 1教科 = 1 上段（本にはこう→見ないでもう一回。2欄 j1 は 11/9 夜に外した）→ 2 場所×n（1欄→本→もう一回）→ 3 ×（batsu があるときだけ）→ 4 宿題
 // D.core（11/9 今夜の形）: 全教科の 1〜3 → コア確認へ行って戻る1画面 → 全教科の宿題
 function screens(D) {
   const out = [], sh = [];
   (D.sets || []).forEach((st, si) => {
-    out.push({ t: "j1", si }, { t: "jhon", si }, { t: "jre", si });
+    out.push({ t: "jhon", si }, { t: "jre", si });  // 11/9 夜 パパ: 最初の2欄（j1）は外す。本にはこう から入る
     (st.basho || []).forEach((b, bi) => out.push({ t: "b1", si, bi }, { t: "bhon", si, bi }, { t: "bre", si, bi }));
     (st.batsu || []).forEach((x, xi) => out.push({ t: "x1", si, xi }, { t: "xhon", si, xi }, { t: "xre", si, xi }));
     if (st.shukudai) (D.core ? sh : out).push({ t: "shu", si });
@@ -70,7 +70,7 @@ function screens(D) {
   return out;
 }
 // データの同一性（変われば進みを消す）
-function dataKey(D) { return (D.core ? "core;" : "") + (D.sets || []).map(s => `${s.tag}:${s.date}:${(s.basho || []).length}`).join(","); }
+function dataKey(D) { return "noj1;" + (D.core ? "core;" : "") + (D.sets || []).map(s => `${s.tag}:${s.date}:${(s.basho || []).length}`).join(","); }
 // 束（GAS の bundle）。| は区切りなので名前から落とす
 const nm = s => String(s ?? "").replace(/\|/g, "／");
 function bundles(sc, D) {
@@ -172,7 +172,7 @@ function render() {
     h += `<div class="lead">きょうの${esc(st.s)}「${esc(st.title)}」</div><div class="top"><small>いつも聞くこと</small>${esc(st.top)}</div>` +
       `<div class="ask">きょうの話で</div>` + J.ask.map((a, n) => `<div class="lbl">${esc(a)}</div>` + inBox(n, false)).join("");
   } else if (sc.t === "jhon") {
-    h += `<div class="gap"></div>` + hon("", `<div class="say">${esc(J.say)}</div>` + (J.iikata ? `<div class="soe">${esc(J.iikata)}</div>` : ""));
+    h += `<div class="lead">きょうの${esc(st.s)}「${esc(st.title)}」</div><div class="top"><small>いつも聞くこと</small>${esc(st.top)}</div>` + hon("", `<div class="say">${esc(J.say)}</div>` + (J.iikata ? `<div class="soe">${esc(J.iikata)}</div>` : ""));
     btn = "かくして、もう一回";
   } else if (sc.t === "jre") {
     h += `<div class="ask">見ないでもう一回</div><div class="lbl">${esc(st.top)}</div>` + inBox(0, true);
