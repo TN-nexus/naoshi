@@ -60,7 +60,7 @@ function clean(s) { return String(s ?? "").replace(/\s*[\r\n]+\s*/g, " ").trim()
 function screens(D) {
   const out = [], sh = [];
   (D.sets || []).forEach((st, si) => {
-    out.push({ t: "jhon", si }, { t: "jre", si });  // 11/9 夜 パパ: 最初の2欄（j1）は外す。本にはこう から入る
+    out.push({ t: "jhon", si });  // 11/9 夜 パパ: 最初の2欄（j1）と 見ないでもう一回（jre）は外す。本にはこう だけ
     (st.basho || []).forEach((b, bi) => out.push({ t: "b1", si, bi }, { t: "bhon", si, bi }, { t: "bre", si, bi }));
     (st.batsu || []).forEach((x, xi) => out.push({ t: "x1", si, xi }, { t: "xhon", si, xi }, { t: "xre", si, xi }));
     if (st.shukudai) (D.core ? sh : out).push({ t: "shu", si });
@@ -70,7 +70,7 @@ function screens(D) {
   return out;
 }
 // データの同一性（変われば進みを消す）
-function dataKey(D) { return "noj1;" + (D.core ? "core;" : "") + (D.sets || []).map(s => `${s.tag}:${s.date}:${(s.basho || []).length}`).join(","); }
+function dataKey(D) { return "noj1jre;" + (D.core ? "core;" : "") + (D.sets || []).map(s => `${s.tag}:${s.date}:${(s.basho || []).length}`).join(","); }
 // 束（GAS の bundle）。| は区切りなので名前から落とす
 const nm = s => String(s ?? "").replace(/\|/g, "／");
 function bundles(sc, D) {
@@ -173,7 +173,7 @@ function render() {
       `<div class="ask">きょうの話で</div>` + J.ask.map((a, n) => `<div class="lbl">${esc(a)}</div>` + inBox(n, false)).join("");
   } else if (sc.t === "jhon") {
     h += `<div class="lead">きょうの${esc(st.s)}「${esc(st.title)}」</div><div class="top"><small>いつも聞くこと</small>${esc(st.top)}</div>` + hon("", `<div class="say">${esc(J.say)}</div>` + (J.iikata ? `<div class="soe">${esc(J.iikata)}</div>` : ""));
-    btn = "かくして、もう一回";
+    btn = "次へ";
   } else if (sc.t === "jre") {
     h += `<div class="ask">見ないでもう一回</div><div class="lbl">${esc(st.top)}</div>` + inBox(0, true);
   } else if (sc.t === "b1") {
