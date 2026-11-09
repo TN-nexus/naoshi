@@ -18,6 +18,9 @@ button{font:inherit;color:inherit;cursor:pointer}
 .tag.社会{background:#fbe6d2;color:#8a4a12} .tag.理科{background:#dcefdc;color:#2c6a32}
 .step{font-size:15px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
 .step small{font-weight:400;color:var(--sub);font-size:13px}
+.dots{font-size:15px;letter-spacing:.12em;color:var(--sub);white-space:nowrap}
+.dots.re{letter-spacing:0;font-weight:700;color:var(--ng)}
+.cnt{font-size:15px;color:var(--sub);margin-top:14px}
 .sp{flex:1}
 .menu{border:1px solid var(--line);background:#fff;border-radius:8px;padding:0 12px;font-size:16px}
 .mn{position:absolute;right:14px;top:50px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px;z-index:30;display:flex;flex-direction:column;gap:6px;box-shadow:0 4px 14px rgba(0,0,0,.08)}
@@ -137,7 +140,16 @@ function advance(S, F) {
 // 何問目（Q の列の中の番号。R はいま済んでいる数）
 function qNum(S) { return S.steps.slice(0, S.pos + 1).filter(x => x[0] === "Q").length; }
 function total(S) { return S.steps.filter(x => x[0] === "Q").length; }
-if (typeof module !== "undefined") module.exports = { shuffle, buildSteps, newState, syncState, step, curEntry, pickWhen, pickAns, advance, qNum, total };
+// いまの論点（上段ブロック）の中の位置。at の画面（既定は いま）から、前の D と次の T・D の間を見る
+// → { n: 問の数, i: いまの問の位置（0〜）, rn: 再出の数, ri: いまの再出の位置（0〜。R のときだけ） }
+function blockPos(S, at = S.pos) {
+  let a = at; while (a > 0 && S.steps[a][0] !== "D") a--;
+  let b = a + 1; while (b < S.steps.length && !/^[TD]\|/.test(S.steps[b])) b++;
+  const seg = S.steps.slice(a + 1, b), off = at - a - 1;
+  return { n: seg.filter(x => x[0] === "Q").length, i: seg.slice(0, off).filter(x => x[0] === "Q").length,
+           rn: seg.filter(x => x[0] === "R").length, ri: seg.slice(0, off).filter(x => x[0] === "R").length };
+}
+if (typeof module !== "undefined") module.exports = { shuffle, buildSteps, newState, syncState, step, curEntry, pickWhen, pickAns, advance, qNum, total, blockPos };
 // CORE-END
 </script>
 <script>
@@ -186,8 +198,8 @@ if (!S || S.v !== 4) S = newState(F); else syncState(S, F);
 const save = () => ls.set(SKEY, S);
 let menuOpen = 0, t0 = Date.now(), onTop = true;
 
-function bar(tag, step) {
-  return `<div class="bar">${tag ? `<span class="tag ${esc(tag)}">${esc(tag)}</span>` : ""}<span class="step">${step || ""}</span><span class="sp"></span><button class="menu" id="mb">…</button></div>` +
+function bar(tag, step, mid = "") {
+  return `<div class="bar">${tag ? `<span class="tag ${esc(tag)}">${esc(tag)}</span>` : ""}<span class="step">${step || ""}</span><span class="sp"></span>${mid}<span class="sp"></span><button class="menu" id="mb">…</button></div>` +
     (menuOpen ? `<div class="mn">${menuOpen === 1 ? `<button id="m1">最初から</button>` : `<button class="danger" id="m2">ほんとうに最初から</button>`}<button id="m0">やめる</button></div>` : "");
 }
 function bindMenu() {
@@ -235,19 +247,22 @@ function drawDan(jid) {
   const j = J[jid];
   $app.innerHTML = bar(j.s, "") + `<div class="dan"><div class="say">${esc(j.say)}</div>` +
     `<div class="lbl">もし</div><div class="txt">${esc(j.moshi)}</div><div class="lbl">なら</div><div class="txt">${esc(j.nara)}</div>` +
-    (j.iff ? `<div class="iff">${esc(j.iff)}</div>` : "") + `</div>` + nextBtn("問題へ");
+    (j.iff ? `<div class="iff">${esc(j.iff)}</div>` : "") + `<div class="cnt">この論点は ${blockPos(S, S.pos + 1).n}問</div></div>` + nextBtn("問題へ");
   bindMenu(); bindNext(go);
 }
 
 // 問: 出題と返りを1画面で。いつ（社会）→答え を押すと、その場で印と ○×・正解・上段の「なら」1行・「次へ」（見方は上に出ているので返りでは繰り返さない）
 function drawItem() {
   const e = curEntry(S, F), it = BY[e.k], j = J[it.jodan] || {};
-  const stp = e.re ? `もう一度 <small>${qNum(S)}／${total(S)}</small>` : `${qNum(S)}／${total(S)}`;
+  // 全体 n／47 と、論点の中の位置（page.html と同じ点。済んだ●・いま◎・まだ○。再出は「もう一度 1／2」）
+  const stp = `${qNum(S)}／${total(S)}`, bp = blockPos(S);
+  const mid = e.re ? `<span class="dots re">もう一度 ${bp.ri + 1}／${bp.rn}</span>`
+    : `<span class="dots">${Array.from({ length: bp.n }, (_, i) => i < bp.i || (i === bp.i && e.a != null) ? "●" : i === bp.i ? "◎" : "○").join("")}</span>`;
   const answered = e.a != null, needW = e.wopts.length > 0;
   const cls = (v, mine, right) => !answered ? "" : (v === right ? " right" : v === mine ? " wrong" : "") + (v === mine ? " mine" : "");
   const btn = (v, i, kind, mine, right, wait) =>
     `<button class="c${cls(v, mine, right)}${wait ? " wait" : ""}" data-k="${kind}" data-v="${i}"${answered || wait ? " disabled" : ""}>${esc(v)}</button>`;
-  let h = bar(it.s, stp) + (j.say ? `<div class="head">見方: ${esc(j.say)}</div>` : "") +
+  let h = bar(it.s, stp, mid) + (j.say ? `<div class="head">見方: ${esc(j.say)}</div>` : "") +
     `<div class="q">${esc(it.q)}</div>` + (it.fig ? `<img class="fig" src="${esc(it.fig)}" alt="図">` : "");
   if (needW) {
     const wDone = e.w != null;
