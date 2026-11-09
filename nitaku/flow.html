@@ -29,6 +29,7 @@ h1{font-size:22px;line-height:1.5;margin:18vh 0 10px;font-weight:800}
 .txt{font-size:17px;line-height:1.55}
 .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:10px}
 .q{font-size:17px;line-height:1.6;white-space:pre-wrap;margin-bottom:8px}
+.fig{display:block;max-width:100%;max-height:22vh;margin:0 auto 6px;object-fit:contain}
 .ask{font-size:19px;font-weight:800;margin:6px 0 8px}
 .ch{display:flex;flex-direction:column;gap:10px}
 .c{min-height:56px;font-size:19px;line-height:1.35;padding:8px 12px;border:2px solid var(--line);border-radius:14px;background:#fff;text-align:center}
@@ -245,7 +246,7 @@ function drawIntro() {
 function drawItem() {
   const ss = S.sess, e = ss.q[ss.i], it = BY[e.k];
   const stp = `問題 ${Math.min(ss.n + 1, SESS_N)}` + (e.re ? "（もう一度）" : "");
-  const qh = `<div class="q">${esc(it.q)}</div>`;
+  const qh = `<div class="q">${esc(it.q)}</div>` + (it.fig ? `<img class="fig" src="${esc(it.fig)}" alt="図">` : "");
   const choose = (opts, cb, label = v => v) => {
     $app.querySelectorAll(".c[data-v]").forEach(el => el.onclick = () => cb(opts[+el.dataset.v]));
   };
