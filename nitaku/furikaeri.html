@@ -84,7 +84,7 @@ function bundles(sc, D) {
   if (sc.t === "shu") return ["宿題"];
   return [];
 }
-// 1画面の入力 → log の args（stage=教科、bundle=束、year=回、event=問い、aEra=入力、aYear=本の文／上段の言い方。正誤は空）
+// 1画面の入力 → log の args（stage=教科、bundle=束、year=回、event=問い、aEra=入力、aYear=本の文／上段の なぜ。正誤は空）
 function logRows(sc, D, inp) {
   if (sc.t === "core" || sc.t === "end") return [];
   const st = D.sets[sc.si], bs = bundles(sc, D), J = st.jodan, row = (bundle, event, aEra, aYear, ok = "") =>
