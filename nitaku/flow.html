@@ -60,6 +60,15 @@ button{font:inherit;color:inherit;cursor:pointer}
 .saijo .lbl{font-size:14px}
 .saijo .say{font-size:26px;margin:4px 0 14px}
 .end{font-size:22px;text-align:center;margin:26vh 0 16px}
+/* set の ui.bottom: 上の欄（問題・図。その欄だけスクロール）と下の固定欄（押すもの）に割る（帰りのバス 5B11。11/9 16:35） */
+#app.bt{height:calc(100dvh - var(--top,0px));min-height:0;padding-bottom:0;overflow:hidden}
+.bt .pane{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:8px}
+.bt .dock{flex:none;border-top:1px solid var(--line);padding:10px 0 calc(12px + env(safe-area-inset-bottom));background:var(--bg)}
+.bt .dock .next{margin-top:10px}
+.bt .dock .next:first-child{margin-top:0}
+.bt .res{margin-top:0}
+.fuda{display:block;width:100%;min-height:66px;font-size:19px;font-weight:800;line-height:1.4;border:2px solid var(--sel);background:var(--selbg);color:var(--sel);border-radius:14px;padding:10px 14px;text-align:left}
+.fuda small{display:block;font-size:13px;font-weight:400;color:var(--sub)}
 #err{position:fixed;left:0;right:0;bottom:0;background:#fff3f2;color:var(--ng);font-size:12px;white-space:pre-wrap;padding:4px 8px;z-index:60;display:none}
 #norec{position:fixed;top:1px;right:6px;font-size:10px;line-height:1.2;color:var(--sub);z-index:50}
 </style>
@@ -119,13 +128,15 @@ function curEntry(S, F, rnd = Math.random) {
   const k = st.slice(2);
   if (!S.cur || S.cur.k !== k) {
     const it = F.items.find(i => i.k === k);
-    S.cur = { k, re: st[0] === "R" ? 1 : 0, opts: shuffle(it.choices, rnd), wopts: it.wc.length >= 2 ? shuffle(it.wc, rnd) : [], w: null, a: null };
+    S.cur = { k, re: st[0] === "R" ? 1 : 0, opts: shuffle(it.choices, rnd), wopts: it.wc.length >= 2 ? shuffle(it.wc, rnd) : [], w: null, a: null,
+              nf: !!(F.ui && F.ui.fuda), f: false };   // nf＝札が要る（set の ui.fuda）。f＝札を押した（押すまで選択肢を出さない）
   }
   return S.cur;
 }
-// 押した（いつ→答えの順。答えは いつ のあと）。返り値は記録する行の種類
-function pickWhen(S, v) { const e = S.cur; if (!e || e.w != null || !e.wopts.length) return false; e.w = v; return true; }
-function pickAns(S, v) { const e = S.cur; if (!e || e.a != null || (e.wopts.length && e.w == null)) return false; e.a = v; return true; }
+// 押した（札→いつ→答えの順。札が要る set では札を押すまで いつ・答え は押せない）
+function openFuda(S) { const e = S.cur; if (!e || !e.nf || e.f) return false; e.f = true; return true; }
+function pickWhen(S, v) { const e = S.cur; if (!e || e.w != null || !e.wopts.length || (e.nf && !e.f)) return false; e.w = v; return true; }
+function pickAns(S, v) { const e = S.cur; if (!e || e.a != null || (e.nf && !e.f) || (e.wopts.length && e.w == null)) return false; e.a = v; return true; }
 // 次へ: T・D・R は進むだけ（H＝段なしの見出しは区切りの印で、画面は出さず飛ばす）。Q は済に数え、×ならそのブロックの末尾（次の T・D の前）に R を差し込む
 function advance(S, F) {
   const st = step(S);
@@ -155,7 +166,7 @@ function blockPos(S, at = S.pos) {
   return { n: seg.filter(x => x[0] === "Q").length, i: seg.slice(0, off).filter(x => x[0] === "Q").length,
            rn: seg.filter(x => x[0] === "R").length, ri: seg.slice(0, off).filter(x => x[0] === "R").length };
 }
-if (typeof module !== "undefined") module.exports = { shuffle, buildSteps, newState, syncState, step, curEntry, pickWhen, pickAns, advance, qNum, total, blockPos };
+if (typeof module !== "undefined") module.exports = { shuffle, buildSteps, newState, syncState, step, curEntry, openFuda, pickWhen, pickAns, advance, qNum, total, blockPos };
 // CORE-END
 </script>
 <script>
@@ -217,6 +228,10 @@ function bindMenu() {
   on("m1", () => { menuOpen = 2; render(); });
   on("m2", () => { menuOpen = 0; S = newState(F); onTop = true; save(); render(); });
 }
+const UI = F.ui || {};
+if (UI.bottom) $app.classList.add("bt");
+// 画面の組み: ui.bottom なら 上の欄（pane）と下の固定欄（dock）。無ければ今までどおり縦に並べる（5B10）
+const lay = (head, body, dock) => UI.bottom ? `${head}<div class="pane" id="pane">${body}</div><div class="dock">${dock}</div>` : head + body + dock;
 const nextBtn = (label, cls = "push", id = "nx") => `<button class="next ${cls}" id="${id}">${esc(label)}</button>`;
 function bindNext(f, id = "nx") { const el = document.getElementById(id); if (el) el.onclick = f; }
 const go = () => { advance(S, F); t0 = Date.now(); render(); scrollTo(0, 0); };
@@ -235,9 +250,9 @@ function render() {
 function drawTop() {
   const n = S.done.length, N = total(S), end = step(S) === "END";
   const fresh = S.pos === 0 && !S.cur;
-  $app.innerHTML = bar("", "") + `<div class="top"><h1>${esc(F.title || "見方→問題 5B10")}</h1><div class="big">${n}<small class="lead">／${N}</small></div>` +
-    (end ? `<p class="lead">ぜんぶ終わった</p>` : "") + `</div>` +
-    (end ? "" : nextBtn(fresh ? "はじめる" : "つづきから"));
+  $app.innerHTML = lay(bar("", ""), `<div class="top"><h1>${esc(F.title || "見方→問題 5B10")}</h1><div class="big">${n}<small class="lead">／${N}</small></div>` +
+    (end ? `<p class="lead">ぜんぶ終わった</p>` : "") + `</div>`,
+    (end ? "" : nextBtn(fresh ? "はじめる" : "つづきから")));
   bindMenu();
   bindNext(() => { onTop = false; t0 = Date.now(); render(); });
 }
@@ -245,22 +260,23 @@ function drawTop() {
 // 最上段: その教科が初めて出る直前に1回。読むだけ
 function drawSaijo(s) {
   const ts_ = (F.T && F.T[s]) || [];
-  $app.innerHTML = bar(s, "") + `<div class="saijo"><div class="lbl">${esc(s)}でいつも聞くこと</div>` +
-    ts_.map(t => `<div class="say">${esc(t.say)}</div>`).join("") + `</div>` + nextBtn("次へ");
+  $app.innerHTML = lay(bar(s, ""), `<div class="saijo"><div class="lbl">${esc(s)}でいつも聞くこと</div>` +
+    ts_.map(t => `<div class="say">${esc(t.say)}</div>`).join("") + `</div>`, nextBtn("次へ"));
   bindMenu(); bindNext(go);
 }
 
 // 段: 言い方（大きく1行）・もし→なら（2行）・もしもの1行（読むだけ）
 function drawDan(jid) {
   const j = J[jid];
-  $app.innerHTML = bar(j.s, "") + `<div class="dan"><div class="say">${esc(j.say)}</div>` +
+  $app.innerHTML = lay(bar(j.s, ""), `<div class="dan"><div class="say">${esc(j.say)}</div>` +
     `<div class="lbl">もし</div><div class="txt">${esc(j.moshi)}</div><div class="lbl">なら</div><div class="txt">${esc(j.nara)}</div>` +
-    (j.iff ? `<div class="iff">${esc(j.iff)}</div>` : "") + `<div class="cnt">この論点は ${blockPos(S, S.pos + 1).n}問</div></div>` + nextBtn("問題へ");
+    (j.iff ? `<div class="iff">${esc(j.iff)}</div>` : "") + `<div class="cnt">この論点は ${blockPos(S, S.pos + 1).n}問</div></div>`, nextBtn("問題へ"));
   bindMenu(); bindNext(go);
 }
 
 // 問: 出題と返りを1画面で。いつ（社会）→答え を押すと、その場で印と ○×・正解・上段の「なら」1行・「次へ」（見方は上に出ているので返りでは繰り返さない）
 function drawItem() {
+  if (UI.bottom) return drawItemB();
   const e = curEntry(S, F), it = BY[e.k], j = J[it.jodan] || {};
   // 全体 n／47 と、論点の中の位置（page.html と同じ点。済んだ●・いま◎・まだ○。再出は「もう一度 1／2」）
   const stp = `${qNum(S)}／${total(S)}`, bp = blockPos(S);
@@ -303,8 +319,54 @@ function drawItem() {
   });
   bindNext(go);
 }
+// 問（ui.bottom）: 上の欄に問題文・図、下の固定欄に 札 →（押すと）選択肢 →（押すと）○×・正解・一言・「次へ」
+function drawItemB() {
+  const e = curEntry(S, F), it = BY[e.k], j = J[it.jodan] || {};
+  const stp = `${qNum(S)}／${total(S)}`, bp = blockPos(S);
+  const mid = e.re ? `<span class="dots re">もう一度 ${bp.ri + 1}／${bp.rn}</span>`
+    : `<span class="dots">${Array.from({ length: bp.n }, (_, i) => i < bp.i || (i === bp.i && e.a != null) ? "●" : i === bp.i ? "◎" : "○").join("")}</span>`;
+  const fudaSay = it.jodan ? (j.say || "") : "おぼえる語";
+  const body = (!e.nf && j.say ? `<div class="head">見方: ${esc(j.say)}</div>` : "") +
+    `<div class="q">${esc(it.q)}</div>` + (it.fig ? `<img class="fig" src="${esc(it.fig)}" alt="図">` : "");
+  let dock;
+  if (e.nf && !e.f) {
+    dock = `<button class="fuda" id="fuda">${esc(fudaSay)} →<small>頭で答えてから押す</small></button>`;
+  } else if (e.a == null) {
+    dock = (e.wopts.length ? `<div class="ask">いつの話？</div><div class="wr">` + e.wopts.map((v, i) =>
+      `<button class="c${e.w != null ? (v === it.when ? " right" : v === e.w ? " wrong mine" : "") : ""}" data-k="w" data-v="${i}"${e.w != null ? " disabled" : ""}>${esc(v)}</button>`).join("") + `</div><div class="ask">答えは？</div>` : "") +
+      `<div class="ch">` + e.opts.map((v, i) => `<button class="c${e.wopts.length && e.w == null ? " wait" : ""}" data-k="a" data-v="${i}"${e.wopts.length && e.w == null ? " disabled" : ""}>${esc(v)}</button>`).join("") + `</div>`;
+  } else {
+    const okA = e.a === it.a;
+    dock = `<div class="res" id="res"><div class="row"><b class="${okA ? "ok" : "ng"}">${okA ? "○" : "×"}</b><span>${okA ? esc(it.a) : `正解は「${esc(it.a)}」<small class="lead">（えらんだ ${esc(e.a)}）</small>`}</span></div>` +
+      (e.wopts.length && e.w !== it.when ? `<div class="fb">いつ: ${esc(it.when)}</div>` : "") +
+      (it.hint ? `<div class="fb">${esc(it.hint)}</div>` : j.nara ? `<div class="fb">なら ${esc(j.nara)}</div>` : "") +
+      (!okA && !e.re ? `<div class="fb">${it.jodan ? "この論点" : "おぼえる語"}の最後にもう一度出る。</div>` : "") + `</div>` + nextBtn("次へ", "");
+  }
+  $app.innerHTML = lay(bar(it.s, stp, mid), body, dock);
+  bindMenu();
+  const fb = document.getElementById("fuda");
+  if (fb) fb.onclick = () => {
+    if (!openFuda(S)) return;
+    const sec = Math.round((Date.now() - t0) / 100) / 10;   // 札を押すまでの秒（頭で答える時間）
+    log({ stage: it.s, bundle: `札|${it.m || F.tag}|${it.n}`, year: String(e.re + 1), event: String(it.q).slice(0, 300), aEra: fudaSay, aYear: "", ok: "", sec });
+    t0 = Date.now(); render();
+  };
+  $app.querySelectorAll(".c[data-k]").forEach(el => el.onclick = () => {
+    const v = (el.dataset.k === "w" ? e.wopts : e.opts)[+el.dataset.v];
+    if (el.dataset.k === "w") {
+      if (!pickWhen(S, v)) return;
+      log({ stage: it.s, bundle: `いつ|${it.n}`, year: String(e.re + 1), event: String(it.q).slice(0, 300), aEra: v, aYear: it.when, ok: v === it.when ? 1 : 0, sec: "" });
+      t0 = Date.now(); render(); return;
+    }
+    if (!pickAns(S, v)) return;
+    const sec = Math.round((Date.now() - t0) / 100) / 10;   // 札（無ければ画面）から答えまで
+    log({ stage: it.s, bundle: `${it.m || F.tag}|${it.n}`, year: String(e.re + 1), event: String(it.q).slice(0, 300), aEra: v, aYear: it.a, ok: v === it.a ? 1 : 0, sec });
+    render();
+  });
+  bindNext(go);
+}
 function drawEnd() {
-  $app.innerHTML = bar("", "") + `<div class="end">おわり<br><span class="lead">${S.done.length} 問やった</span></div>`;
+  $app.innerHTML = lay(bar("", ""), `<div class="end">おわり<br><span class="lead">${S.done.length} 問やった</span></div>`, "");
   bindMenu();
 }
 if (TRY) {
