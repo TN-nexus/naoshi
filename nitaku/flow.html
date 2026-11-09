@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>見方→問題</title>
+<link rel="icon" href="data:,">
+<style>
+/* にたく（page.html）と同じ色・字。1画面1つ、スクロールさせない */
+:root{ --bg:#f6f5f1; --card:#fff; --ink:#1f2328; --sub:#6b6f76; --line:#d9d6cf; --ok:#1f7a4d; --ng:#b3261e; --sel:#2b5cb8; --selbg:#e6eefc; }
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;font-size:18px;line-height:1.6;-webkit-tap-highlight-color:transparent}
+#app{max-width:560px;margin:0 auto;padding:10px 14px 14px;min-height:calc(100dvh - var(--top,0px));display:flex;flex-direction:column}
+button{font:inherit;color:inherit;cursor:pointer}
+.bar{display:flex;align-items:center;gap:8px;min-height:34px;border-bottom:1px solid var(--line);margin-bottom:12px;padding-bottom:6px}
+.tag{font-size:13px;line-height:1.5;padding:1px 8px;border-radius:6px;white-space:nowrap;background:#eceae4}
+.tag.社会{background:#fbe6d2;color:#8a4a12} .tag.理科{background:#dcefdc;color:#2c6a32}
+.step{font-size:13px;color:var(--sub)}
+.sp{flex:1}
+.menu{border:1px solid var(--line);background:#fff;border-radius:8px;padding:0 12px;font-size:16px}
+.mn{position:absolute;right:14px;top:50px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px;z-index:30;display:flex;flex-direction:column;gap:6px;box-shadow:0 4px 14px rgba(0,0,0,.08)}
+.mn button{border:1.5px solid var(--ink);background:#fff;border-radius:8px;padding:8px 14px;font-size:16px}
+.mn button.danger{border-color:var(--ng);color:var(--ng)}
+h1{font-size:22px;line-height:1.5;margin:18vh 0 10px;font-weight:800}
+.lead{font-size:16px;color:var(--sub)}
+.say{font-size:24px;font-weight:800;line-height:1.45;margin:6px 0 4px}
+.lbl{font-size:13px;color:var(--sub);margin-top:10px}
+.txt{font-size:17px;line-height:1.55}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:10px}
+.q{font-size:17px;line-height:1.6;white-space:pre-wrap;margin-bottom:8px}
+.ask{font-size:19px;font-weight:800;margin:6px 0 8px}
+.ch{display:flex;flex-direction:column;gap:10px}
+.c{min-height:56px;font-size:19px;line-height:1.35;padding:8px 12px;border:2px solid var(--line);border-radius:14px;background:#fff;text-align:center}
+.c:disabled{cursor:default;color:inherit;opacity:1}
+.c.right{border-color:var(--ok);color:var(--ok);font-weight:800;border-width:3px;background:#e9f6ee}
+.c.picked{border-color:var(--sel);background:var(--selbg);font-weight:700}
+.c.picked-ng{color:#9a9a9a;text-decoration:line-through;background:#f1f0ec;border-color:var(--ng)}
+.fb{font-size:17px;line-height:1.55;margin:10px 2px 0}
+.next{display:block;width:100%;margin-top:auto;font-size:19px;font-weight:700;padding:13px;border-radius:10px;border:2px solid var(--ink);background:#fff}
+.gap{height:12px}
+.row{display:flex;align-items:baseline;gap:10px;font-size:18px;margin:6px 0}
+.row b{font-size:30px;width:34px;text-align:center}
+.ok{color:var(--ok)} .ng{color:var(--ng)}
+.end{font-size:20px;text-align:center;margin:28vh 0 16px}
+#err{position:fixed;left:0;right:0;bottom:0;background:#fff3f2;color:var(--ng);font-size:12px;white-space:pre-wrap;padding:4px 8px;z-index:60;display:none}
+#norec{position:fixed;top:1px;right:6px;font-size:10px;line-height:1.2;color:var(--sub);z-index:50}
+</style>
+</head>
+<body>
+<div id="app"><p class="lead">よみこみ中…</p></div>
+<div id="err"></div>
+<script>
+window.onerror = (m, s, l, c) => { const e = document.getElementById("err"); e.style.display = "block"; e.textContent += `${m} (${l}:${c})\n`; };
+</script>
+<script src="flow_data.js"></script>
+<script>
+// CORE-BEGIN 流れの規則（純粋関数。node で単体: apps/nitaku/README.md）
+const SESS_N = 10;
+function shuffle(a, rnd = Math.random) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+// なら を1文に（画面Bは2〜3行まで）
+function shortNara(s) {
+  s = String(s || "").replace(/^①/, "").split(/[。②]/)[0].replace(/[（(][^）)]*$/, "");
+  if (s.length <= 46) return s;
+  const cut = s.lastIndexOf("、", 46);
+  return s.slice(0, cut > 20 ? cut : 46) + "…";
+}
+// 説明〜もしも の画面の並び
+function introScreens(F) {
+  const out = [{ t: "title" }, { t: "top", s: "社会" }, { t: "top", s: "理科" }];
+  for (const f of F.feat) out.push({ t: "jodan", j: f.j });
+  out.push({ t: "lens", s: "社会" }, { t: "lens", s: "理科" });
+  for (const f of F.feat) out.push({ t: "quiz", j: f.j, w: f.w });
+  out.push({ t: "moshi", s: "社会" }, { t: "moshi", s: "理科" });
+  return out;
+}
+// 理科・社会を交互に（json の順を保つ）
+function interleave(items) {
+  const a = items.filter(i => i.s === "理科").map(i => i.k), b = items.filter(i => i.s === "社会").map(i => i.k), out = [];
+  for (let i = 0; i < Math.max(a.length, b.length); i++) { if (a[i]) out.push(a[i]); if (b[i]) out.push(b[i]); }
+  return out;
+}
+function newState(F) { return { v: 1, intro: 0, introDone: false, order: interleave(F.items), next: 0, sess: null, done: [] }; }
+function qEntry(it, re, rnd) {
+  return { k: it.k, re, opts: shuffle(it.choices, rnd), jopts: shuffle([it.jodan].concat(it.jw), rnd), phase: it.wc.length >= 2 ? "when" : "jodan",
+           wopts: it.wc.length >= 2 ? shuffle(it.wc, rnd) : [], w: null, j: null, a: null };
+}
+// 1セッション（最大10問）を始める。尽きていれば null
+function startSession(S, F, day, rnd = Math.random) {
+  const by = Object.fromEntries(F.items.map(i => [i.k, i]));
+  const ks = [];
+  while (S.next < S.order.length && ks.length < SESS_N) { const k = S.order[S.next++]; if (by[k]) ks.push(k); }
+  if (!ks.length) { S.sess = null; return null; }
+  S.sess = { day, i: 0, n: 0, q: ks.map(k => qEntry(by[k], 0, rnd)) };
+  return S.sess;
+}
+// 1問の返りまで済んだら次へ。答え×で初回なら後ろに1回だけ回す
+function finishItem(S, F, rnd = Math.random) {
+  const ss = S.sess, e = ss.q[ss.i], it = F.items.find(i => i.k === e.k);
+  const ok = e.a === it.a;
+  if (e.re === 0) { ss.n++; if (!S.done.includes(e.k)) S.done.push(e.k); }
+  if (!ok && e.re === 0) ss.q.push(qEntry(it, 1, rnd));
+  ss.i++;
+  return ss.i >= ss.q.length;
+}
+function remaining(S) { return S.order.length - S.next; }
+if (typeof module !== "undefined") module.exports = { SESS_N, shuffle, shortNara, introScreens, interleave, newState, qEntry, startSession, finishItem, remaining };
+// CORE-END
+</script>
+<script>
+const F = (typeof FLOW !== "undefined" && FLOW) || { items: [], feat: [], J: {}, top: {}, lens: {}, moshi: {} };
+const J = F.J, BY = Object.fromEntries(F.items.map(i => [i.k, i]));
+const params = new URLSearchParams(location.search);
+const DEPLOY = params.get("d") || "";
+const API = DEPLOY ? `https://script.google.com/macros/s/${encodeURIComponent(DEPLOY)}/exec` : "";
+const TRY = params.get("try") === "1";
+const SKEY = TRY ? "nitaku.flow.try" : "nitaku.flow.v1", QKEY = TRY ? "nitaku.flowq.try" : "nitaku.flowq.v1", DKEY = "nendai.dev";
+const MODE = TRY ? "nitaku_flow_try" : "nitaku_flow";
+const $app = document.getElementById("app");
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const ls = { get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+             set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} } };
+let DEV = TRY ? "テスト-パパ" : ls.get(DKEY, "");
+if (!DEV) { DEV = "n" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); ls.set(DKEY, DEV); }
+function ts() {
+  const d = new Date(), p = n => String(n).padStart(2, "0"), o = -d.getTimezoneOffset();
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}${o >= 0 ? "+" : "-"}${p(Math.floor(Math.abs(o) / 60))}:${p(Math.abs(o) % 60)}`;
+}
+const today = () => ts().slice(0, 10);
+let flushing = false;
+function log(args) {
+  if (!API) return;
+  const q = ls.get(QKEY, []); q.push(Object.assign({ dev: DEV, ts: ts(), mode: MODE }, args)); ls.set(QKEY, q); flush();
+}
+async function flush() {
+  if (!API || flushing) return;
+  flushing = true;
+  try {
+    for (;;) {
+      const q = ls.get(QKEY, []); if (!q.length) break;
+      const r = await fetch(API, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, credentials: "omit",
+                                   body: JSON.stringify({ app: "nendai", op: "log", args: q[0] }) });
+      if (!r.ok) break;
+      const q2 = ls.get(QKEY, []); q2.shift(); ls.set(QKEY, q2);
+    }
+  } catch (e) { /* 次の機会に */ }
+  flushing = false;
+}
+window.addEventListener("online", flush);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) flush(); });
+
+const INTRO = introScreens(F);
+let S = ls.get(SKEY, null);
+if (!S || S.v !== 1) S = newState(F);
+// データが差し替わったら: 新しい問を order の後ろに足す・消えた問は飛ばす
+for (const k of interleave(F.items)) if (!S.order.includes(k)) S.order.push(k);
+if (S.sess) S.sess.q = S.sess.q.filter(e => BY[e.k]);
+const save = () => ls.set(SKEY, S);
+let menuOpen = 0, pickNow = null, t0 = Date.now();
+
+function bar(tag, step) {
+  return `<div class="bar">${tag ? `<span class="tag ${esc(tag)}">${esc(tag)}</span>` : ""}<span class="step">${esc(step || "")}</span><span class="sp"></span><button class="menu" id="mb">…</button></div>` +
+    (menuOpen ? `<div class="mn">${menuOpen === 1 ? `<button id="m3">説明をもう一度</button><button id="m1">最初から</button>` : `<button class="danger" id="m2">ほんとうに最初から</button>`}<button id="m0">やめる</button></div>` : "");
+}
+function bindMenu() {
+  const on = (id, f) => { const el = document.getElementById(id); if (el) el.onclick = f; };
+  on("mb", () => { menuOpen = menuOpen ? 0 : 1; render(); });
+  on("m0", () => { menuOpen = 0; render(); });
+  on("m1", () => { menuOpen = 2; render(); });
+  on("m2", () => { menuOpen = 0; S = newState(F); save(); render(); });
+  on("m3", () => { menuOpen = 0; S.intro = 0; S.introDone = false; pickNow = null; save(); render(); });
+}
+function nextBtn(label, id = "nx") { return `<button class="next" id="${id}">${esc(label)}</button>`; }
+function bindNext(f, id = "nx") { const el = document.getElementById(id); if (el) el.onclick = f; }
+const say = id => (J[id] && J[id].say) || id;
+// 見分け: 正しい上段と押した上段の条件だけ（ID は見せない）
+function mwHtml(right, picked) {
+  const mw = (J[right] && J[right].mw) || {}, ids = [right].concat(picked && picked !== right ? [picked] : []).filter(x => mw[x]);
+  if (!ids.length) return "";
+  return `<div class="fb">こう見分ける<br>` + ids.map(x => `${x === right ? "○" : "・"} ${esc(mw[x])}なら「${esc(say(x))}」`).join("<br>") + `</div>`;
+}
+
+function render() {
+  save();
+  if (!S.introDone) return drawIntro();
+  if (!S.sess || (S.sess.i >= S.sess.q.length && S.sess.day !== today())) {
+    if (!S.sess || S.sess.i >= S.sess.q.length) { if (!startSession(S, F, today())) return drawEnd(); save(); }
+  }
+  if (S.sess.i >= S.sess.q.length) return drawEnd();
+  drawItem();
+}
+function introNext() { pickNow = null; S.intro++; if (S.intro >= INTRO.length) S.introDone = true; render(); }
+
+function drawIntro() {
+  const sc = INTRO[S.intro], stp = `見方 ${S.intro + 1}/${INTRO.length}`;
+  let h = "";
+  if (sc.t === "title") {
+    h = bar("", "") + `<h1>${esc((F.test || "").split(" ")[0] || "5B10")} のテストを解く前に、見方を2つ</h1><div class="lead">読む → 何の問題か決める → 手を動かす</div>` + nextBtn("次へ");
+  } else if (sc.t === "top") {
+    h = bar(sc.s, stp) + `<div class="lead">${sc.s}のいちばん上の見方</div><div class="gap"></div>` +
+      F.top[sc.s].map(t => `<div class="card"><div class="say">${esc(t.say)}</div><div class="txt">${esc(t.nara)}</div></div>`).join("") + nextBtn("次へ");
+  } else if (sc.t === "jodan") {
+    const j = J[sc.j];
+    h = bar(j.s, stp) + `<div class="lead">今回のテストに出る見方</div><div class="say">${esc(j.say)}</div>` +
+      `<div class="lbl">もし</div><div class="txt">${esc(j.moshi)}</div><div class="lbl">なら</div><div class="txt">${esc(shortNara(j.nara))}</div>` + nextBtn("次へ");
+  } else if (sc.t === "lens") {
+    const L = F.lens[sc.s], opts = [L.want, L.other];
+    const btn = id => `<button class="c ${pickNow === id ? "picked" : ""}" data-v="${esc(id)}" ${pickNow ? "disabled" : ""}>${esc(say(id))}</button>`;
+    h = bar(sc.s, stp) + `<div class="ask">${esc(L.q)}</div><div class="ch">${opts.map(btn).join("")}</div>` +
+      (pickNow ? `<div class="fb">${esc(pickNow === L.want ? L.ok : L.alt)}</div>` + nextBtn("次へ") : "");
+    $app.innerHTML = h; bindMenu();
+    $app.querySelectorAll(".c[data-v]").forEach(el => el.onclick = () => {
+      pickNow = el.dataset.v; log({ stage: sc.s, bundle: `レンズ|${sc.s}`, event: L.q, aEra: pickNow, aYear: "", ok: "", sec: "" }); drawIntro();
+    });
+    return bindNext(introNext);
+  } else if (sc.t === "quiz") {
+    const j = J[sc.j];
+    sc._o = sc._o || shuffle([sc.j].concat(sc.w));
+    const okp = pickNow === sc.j;
+    const btn = id => {
+      let c = "c"; if (pickNow) { if (id === sc.j) c += " right"; else if (id === pickNow) c += " picked-ng"; }
+      return `<button class="${c}" data-v="${esc(id)}" ${pickNow ? "disabled" : ""}>${esc(say(id))}</button>`;
+    };
+    h = bar(j.s, stp) + `<div class="lbl">もし</div><div class="txt">${esc(j.moshi)}</div><div class="ask">今回の上段は？</div><div class="ch">${sc._o.map(btn).join("")}</div>` +
+      (pickNow ? (okp ? `<div class="fb">そう。</div>` : (mwHtml(sc.j, pickNow) || `<div class="fb">なら: ${esc(shortNara(j.nara))}</div>`)) + nextBtn("次へ") : "");
+    $app.innerHTML = h; bindMenu();
+    $app.querySelectorAll(".c[data-v]").forEach(el => el.onclick = () => {
+      pickNow = el.dataset.v; log({ stage: j.s, bundle: `上段|導入_${sc.j}`, event: j.moshi, aEra: pickNow, aYear: sc.j, ok: pickNow === sc.j ? 1 : 0, sec: "" }); drawIntro();
+    });
+    return bindNext(introNext);
+  } else if (sc.t === "moshi") {
+    const M = F.moshi[sc.s], last = S.intro === INTRO.length - 1;
+    const btn = v => `<button class="c ${pickNow === v ? "picked" : ""}" data-v="${esc(v)}" ${pickNow ? "disabled" : ""}>${esc(v)}</button>`;
+    h = bar(sc.s, stp) + `<div class="lead">もしも〜だったら？（${esc(say(M.j))}）</div><div class="ask">${esc(M.q)}</div><div class="ch">${M.choices.map(btn).join("")}</div>` +
+      (pickNow ? `<div class="fb">そういう考え方もあるね。<br>こう考えるといいよ: ${esc(M.tip)}</div>` + nextBtn(last ? "ではでは、実際に問題を解いてみよう" : "次へ") : "");
+    $app.innerHTML = h; bindMenu();
+    $app.querySelectorAll(".c[data-v]").forEach(el => el.onclick = () => {
+      pickNow = el.dataset.v; log({ stage: sc.s, bundle: `もしも|${sc.s}`, event: M.q, aEra: pickNow, aYear: "", ok: "", sec: "" }); drawIntro();
+    });
+    return bindNext(introNext);
+  }
+  $app.innerHTML = h; bindMenu(); bindNext(introNext);
+}
+
+function drawItem() {
+  const ss = S.sess, e = ss.q[ss.i], it = BY[e.k];
+  const stp = `問題 ${Math.min(ss.n + 1, SESS_N)}` + (e.re ? "（もう一度）" : "");
+  const qh = `<div class="q">${esc(it.q)}</div>`;
+  const choose = (opts, cb, label = v => v) => {
+    $app.querySelectorAll(".c[data-v]").forEach(el => el.onclick = () => cb(opts[+el.dataset.v]));
+  };
+  const btns = (opts, label = v => v) => `<div class="ch">${opts.map((v, i) => `<button class="c" data-v="${i}">${esc(label(v))}</button>`).join("")}</div>`;
+  if (e.phase === "when") {
+    $app.innerHTML = bar(it.s, stp) + qh + `<div class="ask">いつの話？</div>` + btns(e.wopts); bindMenu();
+    return choose(e.wopts, v => {
+      e.w = v; e.phase = "jodan";
+      log({ stage: it.s, bundle: `いつ|${it.n}`, year: String(e.re + 1), event: String(it.q).slice(0, 300), aEra: v, aYear: it.when, ok: v === it.when ? 1 : 0, sec: "" });
+      render();
+    });
+  }
+  if (e.phase === "jodan") {
+    $app.innerHTML = bar(it.s, stp) + qh + `<div class="ask">${it.s === "社会" ? "どの見方の話？" : "何の話？"}</div>` + btns(e.jopts, say); bindMenu();
+    return choose(e.jopts, v => {
+      e.j = v; e.phase = "ans"; t0 = Date.now();
+      log({ stage: it.s, bundle: `上段|${it.n}`, year: String(e.re + 1), event: String(it.q).slice(0, 300), aEra: v, aYear: it.jodan, ok: v === it.jodan ? 1 : 0, sec: "" });
+      render();
+    });
+  }
+  if (e.phase === "ans") {
+    $app.innerHTML = bar(it.s, stp) + qh + `<div class="ask">答えは？</div>` + btns(e.opts); bindMenu();
+    t0 = t0 || Date.now();
+    return choose(e.opts, v => {
+      e.a = v; e.phase = "res";
+      const sec = Math.round((Date.now() - t0) / 100) / 10;
+      log({ stage: it.s, bundle: `${F.tag}|${it.n}`, year: String(e.re + 1), event: String(it.q).slice(0, 300), aEra: v, aYear: it.a, ok: v === it.a ? 1 : 0, sec });
+      render();
+    });
+  }
+  // res
+  const okA = e.a === it.a, okJ = e.j === it.jodan;
+  const row = (ok, txt) => `<div class="row"><b class="${ok ? "ok" : "ng"}">${ok ? "○" : "×"}</b><span>${txt}</span></div>`;
+  $app.innerHTML = bar(it.s, stp) +
+    (e.w != null ? row(e.w === it.when, `いつ: ${esc(it.when)}`) : "") +
+    row(okJ, `見方: ${esc(say(it.jodan))}`) +
+    row(okA, `答え: ${esc(it.a)}${okA ? "" : `（えらんだ ${esc(e.a)}）`}`) +
+    (!okJ ? mwHtml(it.jodan, e.j) : "") +
+    (!okA && e.re === 0 ? `<div class="fb lead">この問はあとでもう一度出る。</div>` : "") +
+    nextBtn("次へ");
+  bindMenu();
+  bindNext(() => { finishItem(S, F); render(); });
+}
+function drawEnd() {
+  const n = S.sess ? S.sess.n : 0, more = remaining(S) > 0;
+  $app.innerHTML = bar("", "") + `<div class="end">きょうの分はここまで。<br><span class="lead">${n} 問やった</span></div>` +
+    (more ? nextBtn("つづきをやる", "more") : "");
+  bindMenu();
+  bindNext(() => { startSession(S, F, today()); render(); }, "more");
+}
+if (TRY) {
+  document.body.insertAdjacentHTML("afterbegin", '<div style="position:fixed;top:0;left:0;right:0;z-index:55;background:var(--selbg);color:var(--sel);border-bottom:1px solid var(--line);font-size:13px;text-align:center;padding:1px 8px">試し（娘の記録に混ざらない）</div>');
+  document.body.style.paddingTop = "22px"; document.documentElement.style.setProperty("--top", "22px");
+}
+if (!API) { const t = document.createElement("div"); t.id = "norec"; t.textContent = "きろくなし"; document.body.appendChild(t); }
+if (!F.items.length) $app.innerHTML = `<p class="lead">データがありません</p>`; else render();
+flush();
+</script>
+</body>
+</html>
