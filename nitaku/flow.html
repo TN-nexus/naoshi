@@ -80,6 +80,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .kkline{font-size:16px;font-weight:700;color:var(--sel);margin:2px 0 6px}
 .kb{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:3px;margin:6px 0}.kb2{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:3px;margin-bottom:8px}
 .k{min-width:0;font-size:16px;padding:7px 0;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:inherit}
+.rule{font-size:12px;line-height:1.45;color:var(--sub,#666);margin:2px 0 4px}.rules{text-align:left;font-size:14px;line-height:1.5;margin:14px 0}.rules p{margin:4px 0}
 .typed{font-size:24px;text-align:center;letter-spacing:4px;min-height:34px}.typed .cur{opacity:.4}
 .numrow{display:flex;align-items:center;justify-content:center;gap:6px;font-size:18px;margin:8px 0}.numrow input{font-size:22px;width:5.5em;text-align:center;padding:6px;border:1px solid var(--line);border-radius:6px}
 #err{position:fixed;left:0;right:0;bottom:0;background:#fff3f2;color:var(--ng);font-size:12px;white-space:pre-wrap;padding:4px 8px;z-index:60;display:none}
@@ -264,11 +265,12 @@ function render() {
 }
 
 // トップ: 題・全体の進み n／47・ボタン1つ
+const RULE_KANA = "ひらがなで頭の2文字。小さい ゃ ゅ ょ っ も1文字（きょうと→きょ）。のばす音は ー（ケーキ→けー）。が・ず などは か・す を押してから ゛", RULE_NUM = "数字だけ。単位や「分の1」「周半」は書いてあるので、□に入る数字を打つ";   // 答え方（行きのバス ui.input。11/12 パパ「入力ルールは書いて」）
 function drawTop() {
   const n = S.done.length, N = total(S), end = step(S) === "END";
   const fresh = S.steps.slice(0, S.pos).every(x => x[0] === "H") && !S.cur;   // 先頭の区切り H（plain）は飛ばした分も「まだ」
   $app.innerHTML = lay(bar("", ""), `<div class="top"><h1>${esc(F.title || "見方→問題 5B10")}</h1><div class="big">${n}<small class="lead">／${N}</small></div>` +
-    (end ? `<p class="lead">ぜんぶ終わった</p>` : "") + `</div>`,
+    (end ? `<p class="lead">ぜんぶ終わった</p>` : "") + (UI.input ? `<div class="rules"><b>答え方</b><p>・ことば: ${RULE_KANA}</p><p>・数: ${RULE_NUM}</p><p>・そのほか: 選ぶ</p><p>まちがえた問は、5問のおわりにもう一度出る</p></div>` : "") + `</div>`,
     (end ? "" : nextBtn(fresh ? "はじめる" : "つづきから")));
   bindMenu();
   bindNext(() => { onTop = false; t0 = Date.now(); render(); });
@@ -357,13 +359,13 @@ function drawItemB() {
   if (UI.input && it.inp && e.a == null) {   // 答えを出す（行きのバス 5B11。11/12 パパ）: kana＝頭の2文字を50音の盤で／num＝数字を打つ。決定で判定
     const ip = it.inp, ty = e.ty || "";
     if (ip.t === "num") {
-      dock = `<div class="ask">数字を入れて「決定」</div><div class="numrow">${esc(ip.pre || "")}<input id="numin" inputmode="decimal" autocomplete="off" value="${esc(ty)}">${esc(ip.post || "")}</div>` +
+      dock = `<div class="ask">数字を入れて「決定」</div><div class="rule">${RULE_NUM}</div><div class="numrow">${esc(ip.pre || "")}<input id="numin" inputmode="decimal" autocomplete="off" value="${esc(ty)}">${esc(ip.post || "")}</div>` +
         `<button class="c" id="ok">決定</button>`;
     } else {
       const cols = ["あいうえお", "かきくけこ", "さしすせそ", "たちつてと", "なにぬねの", "はひふへほ", "まみむめも", "や ゆ よ", "らりるれろ", "わ を ん"];
       const cell = c => c === " " ? `<span></span>` : `<button class="k" data-c="${c}">${c}</button>`;
       const grid = [0, 1, 2, 3, 4].map(r => cols.map(c => cell(c[r] || " ")).join("")).join("");
-      dock = `<div class="ask">${ip.pre ? esc(ip.pre) + "だれ？ 名前の頭の2文字" : "答えの頭の2文字は？"}</div>` +
+      dock = `<div class="ask">${ip.pre ? esc(ip.pre) + "だれ？ 名前の頭の2文字" : "答えの頭の2文字は？"}</div><div class="rule">${RULE_KANA}</div>` +
         `<div class="typed">${esc(ip.pre || "")}<b>${esc(ty) || "&nbsp;"}</b>${ty.length < 2 ? "<span class=\"cur\">＿</span>" : ""}</div>` +
         `<div class="kb">${grid}</div><div class="kb2">${["゛", "゜", "ゃ", "ゅ", "ょ", "っ", "ー"].map(c => `<button class="k" data-c="${c}">${c}</button>`).join("")}<button class="k" data-c="BS">消す</button></div>` +
         `<button class="c" id="ok"${ty.length === 2 ? "" : " disabled"}>決定</button>`;
