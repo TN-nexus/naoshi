@@ -350,13 +350,17 @@ function drawItemB() {
     : `<button class="fuda on" disabled><span class="fm">${esc(j.kk ? `もし ${j.fm || j.say} →` : fudaSay)}</span>${j.kk ? `<span class="kk">${esc(j.kk)}、で考える</span>` : ""}</button>`;
   const lock = e.nf && !e.f;
   let dock;
-  if (e.a == null) {
+  if (UI.reveal && e.a == null) {   // 伏せて言う（行きのバス 5B11。11/12 パパ）: 頭で言う →「こたえを見る」→ 正解と一言 →「言えた／言えなかった」を自分で
+    dock = !e.rv ? `<div class="ask">頭の中で答えを言ってから</div><button class="c" id="rv">こたえを見る</button>`
+      : `<div class="res"><div class="row"><b>こたえ</b><span>${esc(it.a)}</span></div>${it.hint ? `<div class="fb">${esc(it.hint)}</div>` : ""}</div>` +
+        `<div class="ch"><button class="c" data-k="s" data-v="1">言えた</button><button class="c" data-k="s" data-v="0">言えなかった</button></div>`;
+  } else if (e.a == null) {
     dock = fudaBtn + (e.wopts.length ? `<div class="ask">いつの話？</div><div class="wr">` + e.wopts.map((v, i) =>
       `<button class="c${e.w != null ? (v === it.when ? " right" : v === e.w ? " wrong mine" : "") : ""}" data-k="w" data-v="${i}"${e.w != null ? " disabled" : ""}>${esc(v)}</button>`).join("") + `</div><div class="ask">答えは？</div>` : "") +
       `<div class="ch">` + e.opts.map((v, i) => { const wt = lock || (e.wopts.length && e.w == null); return `<button class="c${wt ? " wait" : ""}" data-k="a" data-v="${i}"${wt ? " disabled" : ""}>${esc(v)}</button>`; }).join("") + `</div>`;
   } else {
     const okA = e.a === it.a;
-    dock = fudaBtn + `<div class="res" id="res"><div class="row"><b class="${okA ? "ok" : "ng"}">${okA ? "○" : "×"}</b><span>${okA ? esc(it.a) : `正解は「${esc(it.a)}」<small class="lead">（えらんだ ${esc(e.a)}）</small>`}</span></div>` +
+    dock = fudaBtn + `<div class="res" id="res"><div class="row"><b class="${okA ? "ok" : "ng"}">${okA ? "○" : "×"}</b><span>${okA ? esc(it.a) : UI.reveal ? `こたえは「${esc(it.a)}」。あとでもう一度出るよ` : `正解は「${esc(it.a)}」<small class="lead">（えらんだ ${esc(e.a)}）</small>`}</span></div>` +
       (e.wopts.length && e.w !== it.when ? `<div class="fb">いつ: ${esc(it.when)}</div>` : "") +
       (it.hint ? `<div class="fb">${esc(it.hint)}</div>` : j.nara ? `<div class="fb">なら ${esc(j.nara)}</div>` : "") +
       `</div>` + nextBtn("次へ", "");
@@ -371,7 +375,15 @@ function drawItemB() {
     log({ stage: it.s, bundle: `札|${it.m || F.tag}|${it.n}`, year: String(e.re + 1), event: String(it.q).slice(0, 300), aEra: fudaSay, aYear: "", ok: "", sec });
     t0 = Date.now(); render();
   };
+  const rvb = document.getElementById("rv");
+  if (rvb) rvb.onclick = () => { if (e.rv) return; e.rv = Math.round((Date.now() - t0) / 100) / 10 || 0.1; save(); render(); };   // e.rv＝見るまでの秒（頭で言う時間）
   $app.querySelectorAll(".c[data-k]").forEach(el => el.onclick = () => {
+    if (el.dataset.k === "s") {   // 伏せて言う: 言えた→正解を押したのと同じ、言えなかった→×（ブロックの末尾でもう一度）
+      const said = el.dataset.v === "1", v = said ? it.a : "（言えなかった）";
+      if (!pickAns(S, v)) return;
+      log({ stage: it.s, bundle: `${it.m || F.tag}|${it.n}`, year: String(e.re + 1), event: String(it.q).slice(0, 300), aEra: said ? "言えた" : "言えなかった", aYear: it.a, ok: said ? 1 : 0, sec: e.rv });
+      render(); return;
+    }
     const v = (el.dataset.k === "w" ? e.wopts : e.opts)[+el.dataset.v];
     if (el.dataset.k === "w") {
       if (!pickWhen(S, v)) return;
