@@ -78,6 +78,10 @@ button{font:inherit;color:inherit;cursor:pointer}
 .bt .pane.ctr > .mid{margin:auto 0}
 .bt .dock .fuda + .res{margin-top:8px}
 .kkline{font-size:16px;font-weight:700;color:var(--sel);margin:2px 0 6px}
+.kb{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:3px;margin:6px 0}.kb2{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:3px;margin-bottom:8px}
+.k{min-width:0;font-size:16px;padding:7px 0;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:inherit}
+.typed{font-size:24px;text-align:center;letter-spacing:4px;min-height:34px}.typed .cur{opacity:.4}
+.numrow{display:flex;align-items:center;justify-content:center;gap:6px;font-size:18px;margin:8px 0}.numrow input{font-size:22px;width:5.5em;text-align:center;padding:6px;border:1px solid var(--line);border-radius:6px}
 #err{position:fixed;left:0;right:0;bottom:0;background:#fff3f2;color:var(--ng);font-size:12px;white-space:pre-wrap;padding:4px 8px;z-index:60;display:none}
 #norec{position:fixed;top:1px;right:6px;font-size:10px;line-height:1.2;color:var(--sub);z-index:50}
 </style>
@@ -160,7 +164,7 @@ function advance(S, F) {
   if (!e || e.a == null) return st;
   if (st[0] === "Q") {
     if (!S.done.includes(it.k)) S.done.push(it.k);
-    if (e.a !== it.a && !S.wrong.includes(it.k)) { S.wrong.push(it.k); S.steps.splice(at(S.pos + 1), 0, "R|" + it.k); }
+    if ((e.ok != null ? !e.ok : e.a !== it.a) && !S.wrong.includes(it.k)) { S.wrong.push(it.k); S.steps.splice(at(S.pos + 1), 0, "R|" + it.k); }
   }
   S.pos++;
   S.cur = null;
@@ -350,7 +354,21 @@ function drawItemB() {
     : `<button class="fuda on" disabled><span class="fm">${esc(j.kk ? `もし ${j.fm || j.say} →` : fudaSay)}</span>${j.kk ? `<span class="kk">${esc(j.kk)}、で考える</span>` : ""}</button>`;
   const lock = e.nf && !e.f;
   let dock;
-  if (UI.reveal && e.a == null) {   // 伏せて言う（行きのバス 5B11。11/12 パパ）: 頭で言う →「こたえを見る」→ 正解と一言 →「言えた／言えなかった」を自分で
+  if (UI.input && it.inp && e.a == null) {   // 答えを出す（行きのバス 5B11。11/12 パパ）: kana＝頭の2文字を50音の盤で／num＝数字を打つ。決定で判定
+    const ip = it.inp, ty = e.ty || "";
+    if (ip.t === "num") {
+      dock = `<div class="ask">数字を入れて「決定」</div><div class="numrow">${esc(ip.pre || "")}<input id="numin" inputmode="decimal" autocomplete="off" value="${esc(ty)}">${esc(ip.post || "")}</div>` +
+        `<button class="c" id="ok">決定</button>`;
+    } else {
+      const cols = ["あいうえお", "かきくけこ", "さしすせそ", "たちつてと", "なにぬねの", "はひふへほ", "まみむめも", "や ゆ よ", "らりるれろ", "わ を ん"];
+      const cell = c => c === " " ? `<span></span>` : `<button class="k" data-c="${c}">${c}</button>`;
+      const grid = [0, 1, 2, 3, 4].map(r => cols.map(c => cell(c[r] || " ")).join("")).join("");
+      dock = `<div class="ask">${ip.pre ? esc(ip.pre) + "だれ？ 名前の頭の2文字" : "答えの頭の2文字は？"}</div>` +
+        `<div class="typed">${esc(ip.pre || "")}<b>${esc(ty) || "&nbsp;"}</b>${ty.length < 2 ? "<span class=\"cur\">＿</span>" : ""}</div>` +
+        `<div class="kb">${grid}</div><div class="kb2">${["゛", "゜", "ゃ", "ゅ", "ょ", "っ", "ー"].map(c => `<button class="k" data-c="${c}">${c}</button>`).join("")}<button class="k" data-c="BS">消す</button></div>` +
+        `<button class="c" id="ok"${ty.length === 2 ? "" : " disabled"}>決定</button>`;
+    }
+  } else if (UI.reveal && e.a == null) {   // 伏せて言う（行きのバス 5B11。11/12 パパ）: 頭で言う →「こたえを見る」→ 正解と一言 →「言えた／言えなかった」を自分で
     dock = !e.rv ? `<div class="ask">頭の中で答えを言ってから</div><button class="c" id="rv">こたえを見る</button>`
       : `<div class="res"><div class="row"><b>こたえ</b><span>${esc(it.a)}</span></div>${it.hint ? `<div class="fb">${esc(it.hint)}</div>` : ""}</div>` +
         `<div class="ch"><button class="c" data-k="s" data-v="1">言えた</button><button class="c" data-k="s" data-v="0">言えなかった</button></div>`;
@@ -359,8 +377,8 @@ function drawItemB() {
       `<button class="c${e.w != null ? (v === it.when ? " right" : v === e.w ? " wrong mine" : "") : ""}" data-k="w" data-v="${i}"${e.w != null ? " disabled" : ""}>${esc(v)}</button>`).join("") + `</div><div class="ask">答えは？</div>` : "") +
       `<div class="ch">` + e.opts.map((v, i) => { const wt = lock || (e.wopts.length && e.w == null); return `<button class="c${wt ? " wait" : ""}" data-k="a" data-v="${i}"${wt ? " disabled" : ""}>${esc(v)}</button>`; }).join("") + `</div>`;
   } else {
-    const okA = e.a === it.a;
-    dock = fudaBtn + `<div class="res" id="res"><div class="row"><b class="${okA ? "ok" : "ng"}">${okA ? "○" : "×"}</b><span>${okA ? esc(it.a) : UI.reveal ? `こたえは「${esc(it.a)}」。あとでもう一度出るよ` : `正解は「${esc(it.a)}」<small class="lead">（えらんだ ${esc(e.a)}）</small>`}</span></div>` +
+    const okA = UI.input && it.inp ? e.ok === 1 : e.a === it.a;
+    dock = fudaBtn + `<div class="res" id="res"><div class="row"><b class="${okA ? "ok" : "ng"}">${okA ? "○" : "×"}</b><span>${okA ? esc(it.a) : UI.reveal || (UI.input && it.inp) ? `こたえは「${esc(it.a)}」${UI.input && it.inp ? `<small class="lead">（入れた ${esc(e.a)}）</small>` : "。あとでもう一度出るよ"}` : `正解は「${esc(it.a)}」<small class="lead">（えらんだ ${esc(e.a)}）</small>`}</span></div>` +
       (e.wopts.length && e.w !== it.when ? `<div class="fb">いつ: ${esc(it.when)}</div>` : "") +
       (it.hint ? `<div class="fb">${esc(it.hint)}</div>` : j.nara ? `<div class="fb">なら ${esc(j.nara)}</div>` : "") +
       `</div>` + nextBtn("次へ", "");
@@ -375,6 +393,32 @@ function drawItemB() {
     log({ stage: it.s, bundle: `札|${it.m || F.tag}|${it.n}`, year: String(e.re + 1), event: String(it.q).slice(0, 300), aEra: fudaSay, aYear: "", ok: "", sec });
     t0 = Date.now(); render();
   };
+  if (UI.input && it.inp && e.a == null) {
+    const DK = { か: "が", き: "ぎ", く: "ぐ", け: "げ", こ: "ご", さ: "ざ", し: "じ", す: "ず", せ: "ぜ", そ: "ぞ", た: "だ", ち: "ぢ", つ: "づ", て: "で", と: "ど", は: "ば", ひ: "び", ふ: "ぶ", へ: "べ", ほ: "ぼ", う: "ゔ" };
+    const HD = { は: "ぱ", ひ: "ぴ", ふ: "ぷ", へ: "ぺ", ほ: "ぽ" };
+    $app.querySelectorAll(".k").forEach(el => el.onclick = () => {
+      let ty = e.ty || ""; const c = el.dataset.c, last = ty.slice(-1);
+      if (c === "BS") ty = ty.slice(0, -1);
+      else if (c === "゛") { if (DK[last]) ty = ty.slice(0, -1) + DK[last]; }
+      else if (c === "゜") { if (HD[last]) ty = ty.slice(0, -1) + HD[last]; }
+      else if (ty.length < 2) ty += c;
+      e.ty = ty; save(); render();
+    });
+    const ni = document.getElementById("numin");
+    if (ni) { ni.oninput = () => { e.ty = ni.value; save(); }; }
+    const ok = document.getElementById("ok");
+    if (ok) ok.onclick = () => {
+      const kata = x => String(x).replace(/[ァ-ヶ]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0x60)).replace(/\s/g, "");
+      const ip = it.inp, ty = ip.t === "num" ? String(e.ty || "").replace(/[０-９．]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0)).trim() : e.ty || "";
+      if (!ty || (ip.t !== "num" && ty.length !== 2)) return;
+      const good = ip.t === "num" ? Number(ty) === Number(ip.a) : kata(ty) === kata(ip.a);
+      const sec = Math.round((Date.now() - t0) / 100) / 10;
+      if (!pickAns(S, (ip.pre || "") + ty)) return;
+      e.ok = good ? 1 : 0;
+      log({ stage: it.s, bundle: `${it.m || F.tag}|${it.n}`, year: String(e.re + 1), event: String(it.q).slice(0, 300), aEra: (ip.pre || "") + ty, aYear: it.a, ok: e.ok, sec });
+      render();
+    };
+  }
   const rvb = document.getElementById("rv");
   if (rvb) rvb.onclick = () => { if (e.rv) return; e.rv = Math.round((Date.now() - t0) / 100) / 10 || 0.1; save(); render(); };   // e.rv＝見るまでの秒（頭で言う時間）
   $app.querySelectorAll(".c[data-k]").forEach(el => el.onclick = () => {
