@@ -9,11 +9,11 @@ a.b{display:block;background:#fff;border:2px solid #d9d6cf;border-radius:16px;pa
 a.b small{display:block;font-size:14px;font-weight:400;color:#6b6f76;margin-top:4px}
 </style></head><body><div id="app">
 <h1>てみー</h1>
-<a class="b" id="nitaku" href="../nitaku/">理科社会一問一答<small>二択。10問ずつ、×はもう一回</small></a>
+<!-- 二択（../nitaku/）は 2026-11-15 夜に休止・公開リポから下ろした（安全面）。再開するときに戻す -->
 <a class="b" id="sim" href="../sim/">算数シミュレーション<small>▶を押すと解き方が動く</small></a>
 <a class="b" id="rika" href="../sim/rika_junkan.html">理科シミュレーション<small>血液の循環。▶で血が流れる</small></a>
 </div>
 <script>
 // GAS のデプロイ ID（d）と openExternalBrowser は URL でだけ渡す（公開リポに書かない）
-const q = location.search; document.getElementById("rika").href = "../sim/rika_junkan.html" + (q || "?") + "&v=" + Date.now(); document.getElementById("sim").href = "../sim/" + (q || "?") + "&v=" + Date.now(); document.getElementById("nitaku").href = "../nitaku/" + (q || "?") + "&v=" + Date.now();   // v は古い版のキャッシュよけ（Safari）
+const q = location.search; document.getElementById("rika").href = "../sim/rika_junkan.html" + (q || "?") + "&v=" + Date.now(); document.getElementById("sim").href = "../sim/" + (q || "?") + "&v=" + Date.now();   // v は古い版のキャッシュよけ（Safari）
 </script></body></html>
