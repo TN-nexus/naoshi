@@ -179,10 +179,10 @@ function advance(S, F) {
   if (st[0] === "Q") {
     if (!S.done.includes(it.k)) S.done.push(it.k);
     if ((e.ok != null ? !e.ok : e.a !== it.a) && !S.wrong.includes(it.k)) { S.wrong.push(it.k); S.steps.splice(at(S.pos + 1), 0, "R|" + it.k); if (F.ui && F.ui.twice) (S.need = S.need || {})[it.k] = 2; }
-  } else if (st[0] === "R" && F.ui && F.ui.twice) {   // ui.twice（11/16 パパ）: ×の問は、出し直しで2回正解するまでブロックの末尾に戻る（×なら回数は減らない）
+  } else if (st[0] === "R" && F.ui && F.ui.twice) {   // ui.twice（11/16 パパ）: ×の問は、出し直しで2回正解するまで消えない。1回目はそのブロックの末尾、2回目からは次のブロックの末尾（×なら回数は減らない）
     const n = S.need = S.need || {}; if (n[it.k] == null) n[it.k] = 1;
     if (e.ok != null ? e.ok : e.a === it.a) n[it.k]--;
-    if (n[it.k] > 0) S.steps.splice(at(S.pos + 1), 0, "R|" + it.k);
+    if (n[it.k] > 0) { const b = at(S.pos + 1); S.steps.splice(b < S.steps.length ? at(b + 1) : b, 0, "R|" + it.k); }   // 続けて出さない: 次のブロックの末尾へ（最後のブロックだけは全体の末尾）
   }
   S.pos++;
   S.cur = null;
