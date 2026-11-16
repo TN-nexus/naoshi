@@ -178,7 +178,11 @@ function advance(S, F) {
   if (!e || e.a == null) return st;
   if (st[0] === "Q") {
     if (!S.done.includes(it.k)) S.done.push(it.k);
-    if ((e.ok != null ? !e.ok : e.a !== it.a) && !S.wrong.includes(it.k)) { S.wrong.push(it.k); S.steps.splice(at(S.pos + 1), 0, "R|" + it.k); }
+    if ((e.ok != null ? !e.ok : e.a !== it.a) && !S.wrong.includes(it.k)) { S.wrong.push(it.k); S.steps.splice(at(S.pos + 1), 0, "R|" + it.k); if (F.ui && F.ui.twice) (S.need = S.need || {})[it.k] = 2; }
+  } else if (st[0] === "R" && F.ui && F.ui.twice) {   // ui.twice（11/16 パパ）: ×の問は、出し直しで2回正解するまでブロックの末尾に戻る（×なら回数は減らない）
+    const n = S.need = S.need || {}; if (n[it.k] == null) n[it.k] = 1;
+    if (e.ok != null ? e.ok : e.a === it.a) n[it.k]--;
+    if (n[it.k] > 0) S.steps.splice(at(S.pos + 1), 0, "R|" + it.k);
   }
   S.pos++;
   S.cur = null;
@@ -284,7 +288,7 @@ function drawTop() {
   const n = S.done.length, N = total(S), end = step(S) === "END";
   const fresh = S.steps.slice(0, S.pos).every(x => x[0] === "H") && !S.cur;   // 先頭の区切り H（plain）は飛ばした分も「まだ」
   $app.innerHTML = lay(bar("", ""), `<div class="top"><h1>${esc(F.title || "見方→問題 5B10")}</h1><div class="big">${n}<small class="lead">／${N}</small></div>` +
-    (end ? `<p class="lead">ぜんぶ終わった</p>` : "") + (UI.input ? `<div class="rules"><b>答え方</b><p>・ことば: ${RULE_KANA}</p><p>・数: ${RULE_NUM}</p><p>・そのほか: 選ぶ</p><p>まちがえた問は、5問のおわりにもう一度出る</p></div>` : "") + `</div>`,
+    (end ? `<p class="lead">ぜんぶ終わった</p>` : "") + (UI.input ? `<div class="rules"><b>答え方</b><p>・ことば: ${RULE_KANA}</p><p>・数: ${RULE_NUM}</p><p>・そのほか: 選ぶ</p><p>まちがえた問は、5問のおわりにもう一度出る</p></div>` : "") + (UI.twice && !end ? `<div class="rules"><p>まちがえた問は、2回 正解するまで出る</p></div>` : "") + `</div>`,
     (end ? "" : nextBtn(fresh ? "はじめる" : "つづきから")));
   bindMenu();
   bindNext(() => { onTop = false; t0 = Date.now(); render(); });
