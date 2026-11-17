@@ -19,6 +19,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:"Hiragino Sans",
 .streak{min-height:26px;text-align:center;font-weight:700;color:#c2410c;font-size:17px}
 .main{flex:1;display:flex;flex-direction:column;justify-content:center;padding:0 14px;min-height:0}
 .inst{font-size:14px;color:var(--sub);margin-bottom:2px}
+.inst.strong{font-size:18px;font-weight:700;color:#c2410c}
 .ex{font-size:14px;color:var(--sub);margin-bottom:10px;font-variant-numeric:tabular-nums}
 .q{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 8px;text-align:center;font-size:30px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.9}
 .q.s{font-size:24px}
@@ -200,17 +201,18 @@ function newState() {
            opi: 0, diag: { opi: 0, lv: 1, miss: 0 }, set: null, streak: 0, sets: 0, p: null };
 }
 // 診断の1問の結果を入れる。2回つづけて×なら、その1つ目のレベルを現在地にして次の種目へ
+function dops(S) { return (S.dops && S.dops.length) ? S.dops : OPS; }   // しらべ直すときは一部の種目だけ
 function diagStep(S, ok) {
-  const d = S.diag, op = OPS[d.opi];
+  const d = S.diag, op = dops(S)[d.opi];
   d.miss = ok ? 0 : d.miss + 1;
   let done = false;
   if (d.miss >= 2) { S.cur[op] = d.lv - 1; done = true; }
   else if (d.lv >= MAX[op]) { S.cur[op] = MAX[op]; done = true; }
-  else d.lv++;
-  if (done) { d.opi++; d.lv = 1; d.miss = 0; if (d.opi >= OPS.length) { S.phase = "run"; S.opi = 0; } }
+  else do { d.lv++; } while (LV[op][d.lv].f === "part");   // 部品の段（1のくらいだけ等）は診断で出さない（答え方を取り違えやすい。11/17）
+  if (done) { d.opi++; d.lv = 1; d.miss = 0; if (d.opi >= dops(S).length) { S.phase = "run"; S.opi = 0; S.dops = null; } }
   return S;
 }
-function diagNow(S) { return { op: OPS[S.diag.opi], lv: S.diag.lv }; }
+function diagNow(S) { return { op: dops(S)[S.diag.opi], lv: S.diag.lv }; }
 // セットを始める。前回が PASS 問以上なら1つ上のレベルへ
 function startSet(S) {
   const op = OPS[S.opi];
@@ -286,6 +288,13 @@ document.addEventListener("visibilitychange", () => { if (document.hidden) hid =
 let S = ls.get(SKEY, null);
 if (!S || S.v !== 1) S = newState();
 const save = () => ls.set(SKEY, S);
+// 送り直し（?r=<印>&rd=add,sub）: 印が前と違うとき1回だけ、rd の種目をしらべ直す（ほかの種目の現在地は残す）
+const R = params.get("r") || "", RD = (params.get("rd") || "").split(",").filter(o => OPS.includes(o));
+if (R && S.r !== R) {
+  S.r = R;
+  if (S.phase !== "new" && RD.length) { S.phase = "diag"; S.dops = RD; S.diag = { opi: 0, lv: 1, miss: 0 }; S.set = null; S.p = null; RD.forEach(o => { S.last[o] = null; }); }
+  save();
+}
 // いまの1問の、画面だけの状態
 let P = null, kind = "", bi = 0, vals = [], buf = "", mode = "first", firstTry = true, firstIn = "", hint = null, t0 = 0, ms1 = 0, hid = false, lock = false, msg = "", msgCls = "";
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -340,7 +349,7 @@ function render() {
     <div class="head"><b>${OPN[P.op]} レベル${P.lv}</b><span>${headR}</span></div>${dots}
     <div class="streak">${S.streak >= 2 ? `🔥 ${S.streak}問れんぞく正解` : ""}</div>
     <div class="main">
-      <div class="inst">${esc(instD)}</div><div class="ex">（例）${esc(ex)}</div>
+      <div class="inst${P.f === "part" ? " strong" : ""}">${esc(instD)}</div><div class="ex">（例）${esc(ex)}</div>
       <div class="q${(P.f === "mid" || P.f === "qr") ? " s" : ""}">${boxesHtml()}</div>
       <div class="msg ${msgCls}">${msg || (P.b.length > 1 && bi < P.b.length - 1 ? "入れたら「つぎ」で、となりの箱へ" : "")}</div>
     </div>
