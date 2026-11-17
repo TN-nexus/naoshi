@@ -13,6 +13,10 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:"Hiragino Sans",
 #app{height:100%;display:flex;flex-direction:column;max-width:520px;margin:0 auto}
 .head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px 4px;font-size:15px;color:var(--sub)}
 .head b{color:var(--ink);font-size:17px}
+.ops{display:flex;gap:10px;justify-content:center;padding:10px 0 0}
+.op{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;font-weight:800;line-height:1}
+.op.now{box-shadow:0 0 0 3px var(--bg),0 0 0 6px var(--ink)}
+#banner .ic{margin-bottom:18px}
 .dots{display:flex;gap:5px;justify-content:center;padding:2px 0 6px}
 .dots i{width:9px;height:9px;border-radius:50%;background:var(--line)}
 .dots i.o{background:var(--ok)} .dots i.x{background:var(--ng)} .dots i.now{background:var(--sel)}
@@ -50,14 +54,14 @@ table{border-collapse:collapse;font-size:13px;width:100%} td,th{border:1px solid
 <body>
 <div id="app"></div>
 <canvas id="fx"></canvas>
-<div id="banner"><div class="a"></div><div class="b"></div><div class="c"></div></div>
+<div id="banner"><div class="ic"></div><div class="a"></div><div class="b"></div><div class="c"></div></div>
 <script>
 // CORE-BEGIN（純粋関数。node で new Function に入れて単体を回せる）
 const OPS = ["add", "sub", "mul", "div"];
 const OPN = { add: "たし算", sub: "ひき算", mul: "かけ算", div: "わり算" };
 const MAX = { add: 11, sub: 12, mul: 8, div: 10 };
 const SIGN = { add: "+", sub: "−", mul: "×", div: "÷" };
-const SET_N = 5, PASS = 5;   // 1セット5問・5問とも最初の入力で正解なら次のレベル（11/17 夕5 パパ。診断は別）
+const SET_N = 5;   // 1セット5問・5問とも最初の入力で正解なら次のレベル（11/17 夕5 パパ。診断は別）
 const T_ANS = "計算しなさい。", T_TOP = "上のくらいから計算して、答えを入れなさい。";
 const T_A2 = "10のくらいだけをたして、1のくらいだけをたしてから、答えをもとめなさい。";
 const T_A3 = "100のくらいと10のくらいをたしてから、1のくらいをたして、答えをもとめなさい。";
@@ -200,33 +204,69 @@ function newState() {
   return { v: 1, phase: "new", cur: { add: 1, sub: 1, mul: 1, div: 1 }, last: { add: null, sub: null, mul: null, div: null },
            opi: 0, diag: { opi: 0, lv: 1, miss: 0 }, set: null, streak: 0, sets: 0, p: null };
 }
-// 診断の1問の結果を入れる。2回つづけて×なら、その1つ目のレベルを現在地にして次の種目へ
 function dops(S) { return (S.dops && S.dops.length) ? S.dops : OPS; }   // しらべ直すときは一部の種目だけ
+// 診断の1問の結果を入れる。2回つづけて×か最終の段で、その種目は終わり。現在地は「最初に×だった段」（×が無ければ最終の段。11/17 夕6 パパ）
 function diagStep(S, ok) {
   const d = S.diag, op = dops(S)[d.opi];
+  if (d.low === undefined) d.low = d.first != null ? d.first : null;   // 11/17 の途中の診断から続くとき
   d.miss = ok ? 0 : d.miss + 1;
-  if (d.miss === 1) d.first = d.lv;   // つづけて×の1つ目（部品の段を飛ばすので lv-1 とは限らない）
+  if (!ok && d.low == null) d.low = d.lv;
   let done = false;
-  if (d.miss >= 2) { S.cur[op] = d.first; done = true; }
-  else if (d.lv >= MAX[op]) { S.cur[op] = MAX[op]; done = true; }
+  if (d.miss >= 2 || d.lv >= MAX[op]) { S.cur[op] = d.low != null ? d.low : MAX[op]; done = true; }
   else do { d.lv++; } while (LV[op][d.lv].f === "part");   // 部品の段（1のくらいだけ等）は診断で出さない（答え方を取り違えやすい。11/17）
-  if (done) { d.opi++; d.lv = 1; d.miss = 0; if (d.opi >= dops(S).length) { S.phase = "run"; if (!S.dops) S.opi = 0; S.dops = null; } }   // しらべ直しのあとは、止まっていた種目のつづきから
+  if (done) { d.opi++; d.lv = 1; d.miss = 0; d.low = null; d.first = null; if (d.opi >= dops(S).length) { S.phase = "run"; if (!S.dops) S.opi = 0; S.dops = null; } }   // しらべ直しのあとは、止まっていた種目のつづきから
   return S;
 }
 function diagNow(S) { return { op: dops(S)[S.diag.opi], lv: S.diag.lv }; }
-// セットを始める。前回が PASS 問以上なら1つ上のレベルへ
-function startSet(S) {
-  const op = OPS[S.opi];
-  let up = false;
-  if (S.last[op] != null && S.last[op] >= PASS && S.cur[op] < MAX[op]) { S.cur[op]++; up = true; }
-  while (LV[op][S.cur[op]].f === "part") S.cur[op]++;   // 部品の段（1のくらいだけ等）は出さない。番号は本のまま飛ばす（11/17 パパ）
-  S.last[op] = null;
-  S.set = { op, lv: S.cur[op], i: 0, ok: 0, up, marks: [] };
+// 11/17 夕6（パパ）: 5問とも正解で次の段。届かなければ次の周も同じ段、2回つづけて届かなければ1段もどる。
+// 最終の段で5問とも正解ならその種目はクリア（もう出さない）。4種目ともクリアで卒業。
+// lap＝種目ごとの終えたセットの数（アイコンの色）、fail＝つづけて届かなかった回数、cleared＝クリアした種目、note＝次のセットの頭に出す一言
+function ensure(S) {
+  if (!S.lap) { S.lap = { add: 0, sub: 0, mul: 0, div: 0 }; for (let i = 0; i < (S.sets || 0); i++) S.lap[OPS[i % OPS.length]]++; }
+  if (!S.fail) S.fail = { add: 0, sub: 0, mul: 0, div: 0 };
+  if (!S.cleared) S.cleared = {};
+  if (!S.note) S.note = {};
   return S;
 }
+function nextLv(op, lv) { let l = lv + 1; while (l < MAX[op] && LV[op][l].f === "part") l++; return Math.min(l, MAX[op]); }
+function prevLv(op, lv) { let l = lv - 1; while (l > 1 && LV[op][l].f === "part") l--; return Math.max(l, 1); }
+// 落とす先: 3箱の段からは1つ前の3箱の段（小さい数で分け方を固め直す。無ければ1つ前の段）。ほかは1つ前の段
+function dropLv(op, lv) {
+  if (LV[op][lv].f === "mid") for (let l = lv - 1; l >= 1; l--) if (LV[op][l].f === "mid") return l;
+  return prevLv(op, lv);
+}
+function allCleared(S) { return OPS.every(o => S.cleared[o]); }
+// セットを始める（クリアした種目は飛ばす）。全部クリアなら phase を grad にして set は作らない
+function startSet(S) {
+  ensure(S);
+  if (allCleared(S)) { S.phase = "grad"; S.set = null; return S; }
+  while (S.cleared[OPS[S.opi]]) S.opi = (S.opi + 1) % OPS.length;
+  const op = OPS[S.opi];
+  while (LV[op][S.cur[op]].f === "part") S.cur[op]++;   // 部品の段（1のくらいだけ等）は出さない。番号は本のまま飛ばす（11/17 パパ）
+  S.set = { op, lv: S.cur[op], i: 0, ok: 0, note: S.note[op] || "", marks: [] };
+  S.note[op] = "";
+  return S;
+}
+// セットを終える。返りの S.res: clear／up／down／stay
 function endSet(S) {
-  S.last[S.set.op] = S.set.ok;
+  ensure(S);
+  const st = S.set, op = st.op;
+  let res = "stay";
+  S.lap[op]++;
+  if (st.ok >= SET_N) {
+    S.fail[op] = 0;
+    if (st.lv >= MAX[op]) { S.cleared[op] = true; res = "clear"; }
+    else { S.cur[op] = nextLv(op, st.lv); S.note[op] = "up"; res = "up"; }
+  } else {
+    S.fail[op]++;
+    if (S.fail[op] >= 2) {
+      S.fail[op] = 0;
+      if (st.lv > 1) { S.cur[op] = dropLv(op, st.lv); S.note[op] = "down"; res = "down"; }
+    }
+  }
+  S.last[op] = st.ok; S.res = res;
   S.opi = (S.opi + 1) % OPS.length; S.set = null; S.sets++;
+  if (allCleared(S)) S.phase = "grad";
   return S;
 }
 // CORE-END
@@ -289,11 +329,17 @@ document.addEventListener("visibilitychange", () => { if (document.hidden) hid =
 
 let S = ls.get(SKEY, null);
 if (!S || S.v !== 1) S = newState();
+ensure(S);
 const save = () => ls.set(SKEY, S);
 // 送り直し（?r=<印>&rd=add,sub）: 印が前と違うとき1回だけ、rd の種目をしらべ直す（ほかの種目の現在地は残す）
 const R = params.get("r") || "", RD = (params.get("rd") || "").split(",").filter(o => OPS.includes(o));
 if (R && S.r !== R) {
+  if (TRY) S = ensure(newState());   // 試しは、印が変わったら最初から（パパが新しい版を頭から見られるように）
   S.r = R;
+  for (const kv of (params.get("cur") || "").split(",")) {   // cur=div:6,mul:6 ＝その種目の現在地を置き直す（印が変わったとき1回だけ）
+    const [o, v] = kv.split(":"), n = parseInt(v, 10);
+    if (OPS.includes(o) && n >= 1 && n <= MAX[o] && S.phase !== "new") { S.cur[o] = n; S.last[o] = null; ensure(S); S.fail[o] = 0; S.cleared[o] = false; S.note[o] = ""; if (S.set && S.set.op === o) { S.set = null; S.p = null; } }
+  }
   if (S.phase !== "new" && RD.length) { S.phase = "diag"; S.dops = RD; S.diag = { opi: 0, lv: 1, miss: 0 }; S.set = null; S.p = null; RD.forEach(o => { S.last[o] = null; }); }
   save();
 }
@@ -301,7 +347,20 @@ if (R && S.r !== R) {
 let P = null, kind = "", bi = 0, vals = [], buf = "", mode = "first", firstTry = true, firstIn = "", hint = null, t0 = 0, ms1 = 0, hid = false, lock = false, msg = "", msgCls = "";
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
+const LAPC = ["#c9c6bf", "#2b5cb8", "#1f7a4d", "#e07a00", "#8b3fc7", "#d6336c", "#0f8f9c"];   // 0＝グレー、1周目から6色を回す
+function iconsHtml(nowOp) {
+  ensure(S);
+  return `<div class="ops">${OPS.map(o => {
+    const n = S.lap[o] || 0, col = S.cleared[o] ? "#d4a017" : LAPC[n ? 1 + (n - 1) % 6 : 0];
+    return `<span class="op${o === nowOp ? " now" : ""}${S.cleared[o] ? " clr" : ""}" style="background:${col}">${S.cleared[o] ? "★" : SIGN[o]}</span>`;
+  }).join("")}</div>`;
+}
+function grad() {
+  $app.innerHTML = `<div class="center">${iconsHtml("")}<h1>ぜんぶクリア！</h1><p>たし算・ひき算・かけ算・わり算、さいごの段までできたよ。</p><p>そつぎょう、おめでとう。</p></div>`;
+  fireworks();
+}
 function next() {
+  if (S.phase === "grad") return grad();
   if (S.phase === "new") return intro();
   if (S.phase === "diag") {
     if (!S.p || S.p.kind !== "diag") { const d = diagNow(S); S.p = { kind: "diag", p: diagForm(gen(d.op, d.lv)) }; save(); }
@@ -309,7 +368,8 @@ function next() {
   }
   if (!S.set) {
     startSet(S); S.p = null; save();
-    return banner(`${OPN[S.set.op]} レベル${S.set.lv}`, LV[S.set.op][S.set.lv].t, S.set.up ? "レベルアップ！" : "", 1500, next);
+    if (S.phase === "grad") return grad();
+    return banner(`${OPN[S.set.op]} レベル${S.set.lv}`, LV[S.set.op][S.set.lv].t, S.set.note === "up" ? "レベルアップ！" : S.set.note === "down" ? "前の段で、かためよう" : "", 1500, next, S.set.op);
   }
   if (!S.p || S.p.kind === "diag") { S.p = { kind: S.set.i >= SET_N ? "extra" : "set", p: gen(S.set.op, S.set.lv) }; save(); }
   show();
@@ -348,6 +408,7 @@ function render() {
   const ex = mode === "redo" ? L.r : (kind === "diag" && P.f === "mid" && L.f === "ans") ? L.r : L.e;
   const instD = (kind === "diag" && P.f === "mid" && L.f === "ans") ? "上のくらいから分けて、答えをもとめなさい。" : inst;
   $app.innerHTML = `
+    ${kind === "diag" ? "" : iconsHtml(P.op)}
     <div class="head"><b>${OPN[P.op]} レベル${P.lv}</b><span>${headR}</span></div>${dots}
     <div class="streak">${S.streak >= 2 ? `🔥 ${S.streak}問れんぞく正解` : ""}</div>
     <div class="main">
@@ -415,11 +476,14 @@ function after() {
   if (kind === "set") { st.marks.push(firstTry ? 1 : 0); if (firstTry) st.ok++; st.i++; }
   const needExtra = (kind === "set" && st.i >= SET_N && !firstTry) || (kind === "extra" && !firstTry);
   if (st.i < SET_N || needExtra) { save(); return next(); }
-  const score = st.ok, name = `${OPN[st.op]} レベル${st.lv}`;
+  const score = st.ok, name = `${OPN[st.op]} レベル${st.lv}`, op = st.op;
   endSet(S); save();
-  fireworks(); banner("クリア！", `${name}　${SET_N}問中 ${score}問`, score >= PASS ? "つぎは レベルアップ" : "", 2200, next);
+  fireworks();
+  if (S.res === "clear") return banner(`${OPN[op]} クリア！`, "さいごの段までできたよ。おめでとう！", S.phase === "grad" ? "" : "のこりの種目をつづけよう", 3600, next);
+  banner("できた！", `${name}　${SET_N}問中 ${score}問`, S.res === "up" ? "つぎは レベルアップ" : S.res === "down" ? "つぎは 前の段で かためよう" : "つぎも この段。5問ぜんぶ正解でレベルアップ", 2200, next);
 }
-function banner(a, b, c, ms, cb) {
+function banner(a, b, c, ms, cb, nowOp) {
+  $banner.querySelector(".ic").innerHTML = S.phase === "run" || S.phase === "grad" ? iconsHtml(nowOp || "") : "";
   $banner.querySelector(".a").textContent = a; $banner.querySelector(".b").textContent = b; $banner.querySelector(".c").textContent = c || "";
   $banner.style.display = "flex"; $app.innerHTML = "";
   setTimeout(() => { $banner.style.display = "none"; cb(); }, ms);
