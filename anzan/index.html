@@ -205,8 +205,9 @@ function dops(S) { return (S.dops && S.dops.length) ? S.dops : OPS; }   // し�
 function diagStep(S, ok) {
   const d = S.diag, op = dops(S)[d.opi];
   d.miss = ok ? 0 : d.miss + 1;
+  if (d.miss === 1) d.first = d.lv;   // つづけて×の1つ目（部品の段を飛ばすので lv-1 とは限らない）
   let done = false;
-  if (d.miss >= 2) { S.cur[op] = d.lv - 1; done = true; }
+  if (d.miss >= 2) { S.cur[op] = d.first; done = true; }
   else if (d.lv >= MAX[op]) { S.cur[op] = MAX[op]; done = true; }
   else do { d.lv++; } while (LV[op][d.lv].f === "part");   // 部品の段（1のくらいだけ等）は診断で出さない（答え方を取り違えやすい。11/17）
   if (done) { d.opi++; d.lv = 1; d.miss = 0; if (d.opi >= dops(S).length) { S.phase = "run"; S.opi = 0; S.dops = null; } }
