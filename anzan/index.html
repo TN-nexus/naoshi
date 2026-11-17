@@ -210,7 +210,7 @@ function diagStep(S, ok) {
   if (d.miss >= 2) { S.cur[op] = d.first; done = true; }
   else if (d.lv >= MAX[op]) { S.cur[op] = MAX[op]; done = true; }
   else do { d.lv++; } while (LV[op][d.lv].f === "part");   // 部品の段（1のくらいだけ等）は診断で出さない（答え方を取り違えやすい。11/17）
-  if (done) { d.opi++; d.lv = 1; d.miss = 0; if (d.opi >= dops(S).length) { S.phase = "run"; S.opi = 0; S.dops = null; } }
+  if (done) { d.opi++; d.lv = 1; d.miss = 0; if (d.opi >= dops(S).length) { S.phase = "run"; if (!S.dops) S.opi = 0; S.dops = null; } }   // しらべ直しのあとは、止まっていた種目のつづきから
   return S;
 }
 function diagNow(S) { return { op: dops(S)[S.diag.opi], lv: S.diag.lv }; }
