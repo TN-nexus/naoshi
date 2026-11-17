@@ -466,12 +466,12 @@ function complete() {
 }
 function after() {
   S.p = null;
+  S.streak = firstTry ? S.streak + 1 : 0;   // 調べ直しの問も数える（パパ 11/17 夜）
   if (kind === "diag") {
     diagStep(S, firstTry); save();
     if (S.phase === "run") return banner("しらべおわり", "ここからスタート", OPS.map(o => `${OPN[o]} ${S.cur[o]}`).join("　"), 2600, next);
     return next();
   }
-  S.streak = firstTry ? S.streak + 1 : 0;
   const st = S.set;
   if (kind === "set") { st.marks.push(firstTry ? 1 : 0); if (firstTry) st.ok++; st.i++; }
   const needExtra = (kind === "set" && st.i >= SET_N && !firstTry) || (kind === "extra" && !firstTry);
