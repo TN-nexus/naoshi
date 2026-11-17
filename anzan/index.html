@@ -219,6 +219,7 @@ function startSet(S) {
   const op = OPS[S.opi];
   let up = false;
   if (S.last[op] != null && S.last[op] >= PASS && S.cur[op] < MAX[op]) { S.cur[op]++; up = true; }
+  while (LV[op][S.cur[op]].f === "part") S.cur[op]++;   // 部品の段（1のくらいだけ等）は出さない。番号は本のまま飛ばす（11/17 パパ）
   S.last[op] = null;
   S.set = { op, lv: S.cur[op], i: 0, ok: 0, up, marks: [] };
   return S;
