@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="robots" content="noindex">
+<title>あんざん</title>
+<style>
+:root{ --bg:#f6f5f1; --card:#fff; --ink:#1f2328; --sub:#6b6f76; --line:#d9d6cf; --ok:#1f7a4d; --okbg:#e3f3ea; --ng:#b3261e; --ngbg:#fbe9e7; --sel:#2b5cb8; --selbg:#e6eefc; }
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;font-size:18px;line-height:1.5;-webkit-tap-highlight-color:transparent;touch-action:manipulation;overflow:hidden}
+#app{height:100%;display:flex;flex-direction:column;max-width:520px;margin:0 auto}
+.head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px 4px;font-size:15px;color:var(--sub)}
+.head b{color:var(--ink);font-size:17px}
+.dots{display:flex;gap:5px;justify-content:center;padding:2px 0 6px}
+.dots i{width:9px;height:9px;border-radius:50%;background:var(--line)}
+.dots i.o{background:var(--ok)} .dots i.x{background:var(--ng)} .dots i.now{background:var(--sel)}
+.streak{min-height:26px;text-align:center;font-weight:700;color:#c2410c;font-size:17px}
+.main{flex:1;display:flex;flex-direction:column;justify-content:center;padding:0 14px;min-height:0}
+.inst{font-size:14px;color:var(--sub);margin-bottom:2px}
+.ex{font-size:14px;color:var(--sub);margin-bottom:10px;font-variant-numeric:tabular-nums}
+.q{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 8px;text-align:center;font-size:30px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.9}
+.q.s{font-size:24px}
+.q .t{white-space:nowrap}
+.box{display:inline-block;min-width:62px;height:46px;line-height:42px;border:2px solid var(--line);border-radius:8px;padding:0 6px;margin:0 2px;vertical-align:middle;background:#fff;font-size:26px}
+.q.s .box{min-width:54px;font-size:22px}
+.box.now{border-color:var(--sel);background:var(--selbg)}
+.box.done{border-color:var(--ok);background:var(--okbg);color:var(--ok)}
+.box.bad{border-color:var(--ng);background:var(--ngbg)}
+.msg{min-height:54px;text-align:center;font-size:17px;padding-top:8px}
+.msg.ng{color:var(--ng);font-weight:700} .msg.ok{color:var(--ok);font-weight:700}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;padding:8px 12px calc(12px + env(safe-area-inset-bottom))}
+.pad button{font:inherit;font-size:26px;font-weight:700;height:58px;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink)}
+.pad button:active{background:var(--selbg)}
+.pad .okb{background:var(--sel);color:#fff;border-color:var(--sel);font-size:20px}
+.pad .del{font-size:18px;color:var(--sub)}
+.center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px}
+.center h1{font-size:28px;margin:0 0 12px}
+.center p{margin:6px 0;color:var(--sub)}
+.big{font:inherit;font-size:22px;font-weight:700;padding:16px 44px;border-radius:14px;border:0;background:var(--sel);color:#fff;margin-top:22px}
+#fx{position:fixed;inset:0;pointer-events:none;display:none;z-index:9}
+#banner{position:fixed;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;background:rgba(246,245,241,.96);z-index:8;text-align:center}
+#banner .a{font-size:34px;font-weight:800} #banner .b{font-size:18px;color:var(--sub);margin-top:8px} #banner .c{font-size:20px;color:#c2410c;font-weight:700;margin-top:10px;min-height:28px}
+table{border-collapse:collapse;font-size:13px;width:100%} td,th{border:1px solid var(--line);padding:3px 5px;text-align:left}
+.oya{padding:14px;overflow:auto;height:100%}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<canvas id="fx"></canvas>
+<div id="banner"><div class="a"></div><div class="b"></div><div class="c"></div></div>
+<script>
+// CORE-BEGIN（純粋関数。node で new Function に入れて単体を回せる）
+const OPS = ["add", "sub", "mul", "div"];
+const OPN = { add: "たし算", sub: "ひき算", mul: "かけ算", div: "わり算" };
+const MAX = { add: 11, sub: 12, mul: 8, div: 10 };
+const SIGN = { add: "+", sub: "−", mul: "×", div: "÷" };
+const SET_N = 10, PASS = 8;
+const T_ANS = "計算しなさい。", T_TOP = "上のくらいから計算して、答えを入れなさい。";
+const T_A2 = "10のくらいだけをたして、1のくらいだけをたしてから、答えをもとめなさい。";
+const T_A3 = "100のくらいと10のくらいをたしてから、1のくらいをたして、答えをもとめなさい。";
+const T_S3 = "100のくらいと10のくらいをひいてから、1のくらいをひいて、答えをもとめなさい。";
+const T_M = "まず10のくらいとかけて、そのあと1のくらいとかけて、答えをもとめなさい。";
+const T_R = "あまりももとめなさい。わりきれるときは、あまり 0 と入れなさい。";
+// レベルの表: f＝形（ans 答えだけ／part 部品／mid 途中2つ＋答え／qr 商とあまり）、t＝指示、e＝例、r＝間違えたとき3箱で出す例（答えだけで分解がある段）
+const LV = {
+  add: [null,
+    { f: "ans", t: T_ANS, e: "7 + 4 = 11" },
+    { f: "ans", t: T_ANS, e: "67 + 8 = 75" },
+    { f: "part", t: "1のくらいだけをたしなさい。", e: "67 + 28 ⇒ 15" },
+    { f: "part", t: "10のくらいだけをたしなさい。", e: "67 + 89 ⇒ 140" },
+    { f: "mid", t: T_A2, e: "67 + 22 = 80 + 9 = 89" },
+    { f: "mid", t: T_A2, e: "67 + 28 = 80 + 15 = 95" },
+    { f: "ans", t: T_TOP, e: "67 + 28 = 95", r: "67 + 28 = 80 + 15 = 95" },
+    { f: "mid", t: T_A3, e: "235 + 81 = 310 + 6 = 316" },
+    { f: "ans", t: T_TOP, e: "235 + 81 = 316", r: "235 + 81 = 310 + 6 = 316" },
+    { f: "mid", t: T_A3, e: "317 + 524 = 830 + 11 = 841" },
+    { f: "ans", t: T_TOP, e: "317 + 524 = 841", r: "317 + 524 = 830 + 11 = 841" }],
+  sub: [null,
+    { f: "ans", t: T_ANS, e: "9 − 7 = 2" },
+    { f: "ans", t: T_ANS, e: "30 − 4 = 26" },
+    { f: "ans", t: T_ANS, e: "15 − 2 = 13" },
+    { f: "part", t: "1のくらいだけを答えなさい。", e: "32 − 4 ⇒ 8" },
+    { f: "ans", t: T_ANS, e: "32 − 4 = 28" },
+    { f: "part", t: "1のくらいだけを答えなさい。", e: "56 − 28 ⇒ 8" },
+    { f: "mid", t: "まず10のくらいをひいて、そのあと1のくらいをひいて、答えをもとめなさい。", e: "67 − 28 = 47 − 8 = 39" },
+    { f: "ans", t: T_TOP, e: "51 − 24 = 27", r: "67 − 28 = 47 − 8 = 39" },
+    { f: "mid", t: T_S3, e: "437 − 54 = 387 − 4 = 383" },
+    { f: "ans", t: T_TOP, e: "437 − 54 = 383", r: "437 − 54 = 387 − 4 = 383" },
+    { f: "mid", t: T_S3, e: "628 − 157 = 478 − 7 = 471" },
+    { f: "ans", t: T_TOP, e: "328 − 157 = 171", r: "628 − 157 = 478 − 7 = 471" }],
+  mul: [null,
+    { f: "ans", t: T_ANS, e: "3 × 5 = 15" },
+    { f: "ans", t: T_ANS, e: "20 × 6 = 120" },
+    { f: "mid", t: T_M, e: "17 × 5 = 50 + 35 = 85" },
+    { f: "mid", t: T_M, e: "6 × 13 = 60 + 18 = 78" },
+    { f: "ans", t: T_TOP, e: "13 × 4 = 52", r: "17 × 5 = 50 + 35 = 85" },
+    { f: "mid", t: T_M, e: "34 × 3 = 90 + 12 = 102" },
+    { f: "mid", t: T_M, e: "4 × 28 = 80 + 32 = 112" },
+    { f: "ans", t: T_TOP, e: "32 × 6 = 192", r: "34 × 3 = 90 + 12 = 102" }],
+  div: [null,
+    { f: "ans", t: T_ANS, e: "15 ÷ 3 = 5" },
+    { f: "qr", t: T_R, e: "17 ÷ 3 = 5 あまり 2" },
+    { f: "ans", t: T_ANS, e: "150 ÷ 3 = 50" },
+    { f: "ans", t: T_ANS, e: "36 ÷ 3 = 12" },
+    { f: "qr", t: T_R, e: "65 ÷ 3 = 21 あまり 2" },
+    { f: "ans", t: T_ANS, e: "3600 ÷ 30 = 120" },
+    { f: "ans", t: T_ANS, e: "351 ÷ 3 = 117" },
+    { f: "qr", t: T_R, e: "325 ÷ 3 = 108 あまり 1" },
+    { f: "qr", t: T_R, e: "3568 ÷ 3 = 1189 あまり 1" },
+    { f: "qr", t: T_R, e: "3568 ÷ 30 = 118 あまり 28" }],
+};
+function ri(rng, a, b) { return a + Math.floor(rng() * (b - a + 1)); }
+function pick(rng, arr) { return arr[Math.floor(rng() * arr.length)]; }
+function tens(n) { return Math.floor(n / 10); }
+// 1問を作る。返り: {op, lv, f, q（式）, b（箱の正解の列）, mid（3箱の正解。分解が無ければ null）}
+function gen(op, lv, rng) {
+  rng = rng || Math.random;
+  const f = LV[op][lv].f;
+  let a, b, x, mid = null, q;
+  const out = bx => ({ op, lv, f, q, b: bx, mid });
+  if (op === "add") {
+    if (lv === 1) { a = ri(rng, 1, 9); b = ri(rng, 0, 9); q = `${a} + ${b}`; return out([a + b]); }
+    if (lv === 2) { a = ri(rng, 11, 99); b = ri(rng, 1, 9); q = `${a} + ${b}`; return out([a + b]); }
+    if (lv <= 7) {
+      const want = lv === 5 ? 0 : lv === 6 ? 1 : -1;   // 5＝くり上がりなし、6＝1のくらいがくり上がる
+      for (;;) {
+        a = ri(rng, 11, 99); b = ri(rng, 11, 99);
+        const o = a % 10 + b % 10, t = tens(a) + tens(b);
+        if (want === 0 && (o > 9 || t > 9)) continue;
+        if (want === 1 && o < 10) continue;
+        if (lv !== 4 && o === 0) continue;   // 1のくらいの和が 0 の問は出さない（途中の箱が 0 になる）
+        break;
+      }
+    } else do {
+      a = ri(rng, 101, 999); b = lv <= 9 ? ri(rng, 11, 99) : ri(rng, 101, 999);
+    } while (a % 10 + b % 10 === 0);
+    q = `${a} + ${b}`;
+    const m = [(tens(a) + tens(b)) * 10, a % 10 + b % 10, a + b];
+    if (lv === 3) return out([m[1]]);
+    if (lv === 4) return out([m[0]]);
+    mid = m;
+    return out(f === "mid" ? m : [a + b]);
+  }
+  if (op === "sub") {
+    if (lv === 1) { a = ri(rng, 2, 9); b = ri(rng, 1, a); q = `${a} − ${b}`; return out([a - b]); }
+    if (lv === 2) { a = ri(rng, 1, 9) * 10; b = ri(rng, 1, 9); q = `${a} − ${b}`; return out([a - b]); }
+    if (lv === 3) { a = ri(rng, 10, 19); b = ri(rng, 1, 9); q = `${a} − ${b}`; return out([a - b]); }
+    if (lv <= 5) { a = ri(rng, 12, 99); b = ri(rng, 1, 9); q = `${a} − ${b}`; return out([lv === 4 ? (a - b) % 10 : a - b]); }
+    for (;;) {
+      if (lv <= 8) { a = ri(rng, 22, 99); b = ri(rng, 11, a - 1); }
+      else if (lv <= 10) { a = ri(rng, 101, 999); b = ri(rng, 11, 99); }
+      else { a = ri(rng, 202, 999); b = ri(rng, 101, a - 1); }
+      if (b % 10 !== 0) break;   // 1のくらいをひく一手が残る問だけ
+    }
+    q = `${a} − ${b}`;
+    if (lv === 6) return out([(a - b) % 10]);
+    mid = [a - tens(b) * 10, b % 10, a - b];
+    return out(f === "mid" ? mid : [a - b]);
+  }
+  if (op === "mul") {
+    if (lv === 1) { a = ri(rng, 1, 9); b = ri(rng, 1, 9); q = `${a} × ${b}`; return out([a * b]); }
+    if (lv === 2) {
+      a = ri(rng, 1, 9); b = ri(rng, 2, 9);
+      const k = pick(rng, [[10, 1], [1, 10], [10, 1], [1, 10], [100, 1], [1, 100], [10, 10]]);
+      a *= k[0]; b *= k[1]; q = `${a} × ${b}`; return out([a * b]);
+    }
+    const n = lv <= 5 ? ri(rng, 11, 19) : (() => { let v; do { v = ri(rng, 21, 99); } while (v % 10 === 0); return v; })();
+    const d = ri(rng, 2, 9);
+    const front = (lv === 3 || lv === 6) ? true : (lv === 4 || lv === 7) ? false : rng() < 0.5;   // front＝2けたが前
+    q = front ? `${n} × ${d}` : `${d} × ${n}`;
+    mid = [tens(n) * 10 * d, (n % 10) * d, n * d];
+    return out(f === "mid" ? mid : [n * d]);
+  }
+  // div
+  if (lv === 1) { b = ri(rng, 2, 9); x = ri(rng, 1, 9); q = `${x * b} ÷ ${b}`; return out([x]); }
+  if (lv === 2) { b = ri(rng, 2, 9); x = ri(rng, 1, 9); const r = rng() < 0.2 ? 0 : ri(rng, 1, b - 1); q = `${x * b + r} ÷ ${b}`; return out([x, r]); }
+  if (lv === 3) {
+    b = ri(rng, 2, 9); x = ri(rng, 2, 9);
+    const k = pick(rng, [[10, 1], [100, 1], [10, 10], [100, 10], [100, 100], [10, 1]]);   // [わられる数にかける, わる数にかける]
+    q = `${x * b * k[0]} ÷ ${b * k[1]}`; return out([x * k[0] / k[1]]);
+  }
+  if (lv === 4) { for (;;) { b = ri(rng, 2, 9); x = ri(rng, 2, 49); if (x * b >= 10 && x * b <= 99) break; } q = `${x * b} ÷ ${b}`; return out([x]); }
+  if (lv === 5) { a = ri(rng, 20, 99); b = ri(rng, 2, 9); q = `${a} ÷ ${b}`; return out([Math.floor(a / b), a % b]); }
+  if (lv === 6) {
+    for (;;) { b = ri(rng, 2, 9); x = ri(rng, 2, 49); if (x * b >= 10 && x * b <= 99) break; }
+    const k = pick(rng, [[10, 1], [100, 1], [100, 10], [10, 1], [100, 1]]);
+    q = `${x * b * k[0]} ÷ ${b * k[1]}`; return out([x * k[0] / k[1]]);
+  }
+  if (lv === 7) { for (;;) { b = ri(rng, 2, 9); x = ri(rng, 12, 499); if (x * b >= 100 && x * b <= 999) break; } q = `${x * b} ÷ ${b}`; return out([x]); }
+  if (lv === 8) { a = ri(rng, 100, 999); b = ri(rng, 2, 9); q = `${a} ÷ ${b}`; return out([Math.floor(a / b), a % b]); }
+  if (lv === 9) { a = ri(rng, 1000, 9999); b = ri(rng, 2, 9); q = `${a} ÷ ${b}`; return out([Math.floor(a / b), a % b]); }
+  a = ri(rng, 1000, 9999); b = ri(rng, 2, 9) * (rng() < 0.75 ? 10 : 100); q = `${a} ÷ ${b}`; return out([Math.floor(a / b), a % b]);
+}
+// 診断で出す形: 答えだけで分解がある段は3箱で出す
+function diagForm(p) { return (p.f === "ans" && p.mid) ? Object.assign({}, p, { f: "mid", b: p.mid }) : p; }
+function newState() {
+  return { v: 1, phase: "new", cur: { add: 1, sub: 1, mul: 1, div: 1 }, last: { add: null, sub: null, mul: null, div: null },
+           opi: 0, diag: { opi: 0, lv: 1, miss: 0 }, set: null, streak: 0, sets: 0, p: null };
+}
+// 診断の1問の結果を入れる。2回つづけて×なら、その1つ目のレベルを現在地にして次の種目へ
+function diagStep(S, ok) {
+  const d = S.diag, op = OPS[d.opi];
+  d.miss = ok ? 0 : d.miss + 1;
+  let done = false;
+  if (d.miss >= 2) { S.cur[op] = d.lv - 1; done = true; }
+  else if (d.lv >= MAX[op]) { S.cur[op] = MAX[op]; done = true; }
+  else d.lv++;
+  if (done) { d.opi++; d.lv = 1; d.miss = 0; if (d.opi >= OPS.length) { S.phase = "run"; S.opi = 0; } }
+  return S;
+}
+function diagNow(S) { return { op: OPS[S.diag.opi], lv: S.diag.lv }; }
+// セットを始める。前回が PASS 問以上なら1つ上のレベルへ
+function startSet(S) {
+  const op = OPS[S.opi];
+  let up = false;
+  if (S.last[op] != null && S.last[op] >= PASS && S.cur[op] < MAX[op]) { S.cur[op]++; up = true; }
+  S.last[op] = null;
+  S.set = { op, lv: S.cur[op], i: 0, ok: 0, up, marks: [] };
+  return S;
+}
+function endSet(S) {
+  S.last[S.set.op] = S.set.ok;
+  S.opi = (S.opi + 1) % OPS.length; S.set = null; S.sets++;
+  return S;
+}
+// CORE-END
+</script>
+<script>
+const params = new URLSearchParams(location.search);
+const DEPLOY = params.get("d") || "";
+const API = DEPLOY ? `https://script.google.com/macros/s/${encodeURIComponent(DEPLOY)}/exec` : "";
+const SID = /^[0-9A-Za-z_-]{16,80}$/.test(params.get("s") || "") ? params.get("s") : "";
+const TRY = params.get("try") === "1", OYA = params.get("oya") === "1";
+const SKEY = TRY ? "anzan.try" : "anzan.v1", LKEY = TRY ? "anzan.log.try" : "anzan.log", QKEY = TRY ? "anzan.q.try" : "anzan.q", DKEY = "nendai.dev";
+const MODE = TRY ? "anzan_try" : "anzan";
+const $app = document.getElementById("app"), $banner = document.getElementById("banner"), $fx = document.getElementById("fx");
+const ls = { get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+             set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} } };
+let DEV = TRY ? "テスト-パパ" : ls.get(DKEY, "");
+if (!DEV) { DEV = "n" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); ls.set(DKEY, DEV); }
+function ts() {
+  const d = new Date(), p = n => String(n).padStart(2, "0"), o = -d.getTimezoneOffset();
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}${o >= 0 ? "+" : "-"}${p(Math.floor(Math.abs(o) / 60))}:${p(Math.abs(o) % 60)}`;
+}
+// 記録: 端末に全部残す（LKEY。新しい 3000 行）。中継の合言葉 k が来ていれば nendai の log へも送る（列に積んで、通ったら消す）
+let LOGK = "", flushing = false;
+function rec(row) {
+  const r = Object.assign({ ts: ts(), dev: DEV, mode: MODE }, row);
+  const all = ls.get(LKEY, []); all.push(r); if (all.length > 3000) all.splice(0, all.length - 3000); ls.set(LKEY, all);
+  if (!API) return;
+  const q = ls.get(QKEY, []);
+  q.push({ dev: DEV, ts: r.ts, mode: MODE, stage: OPN[r.op], bundle: `L${r.lv}|${r.kind}|${r.f}|${r.q}`, year: r.ms, aEra: `${r.ok ? "○" : "×"}|${r.a}`, aYear: r.c });
+  if (q.length > 2000) q.splice(0, q.length - 2000);
+  ls.set(QKEY, q); flush();
+}
+async function flush() {
+  if (!API || !LOGK || flushing) return;
+  flushing = true;
+  try {
+    for (;;) {
+      const q = ls.get(QKEY, []); if (!q.length) break;
+      const r = await fetch(API, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, credentials: "omit",
+                                   body: JSON.stringify({ app: "nendai", op: "log", args: Object.assign({ k: LOGK }, q[0]) }) });
+      if (!r.ok) break;
+      const rj = await r.json().catch(() => null); if (!rj || rj.ok === false) break;
+      const q2 = ls.get(QKEY, []); q2.shift(); ls.set(QKEY, q2);
+    }
+  } catch (e) { /* 次の機会に */ }
+  flushing = false;
+}
+async function getKey() {   // 合言葉 s を中継が確かめてから、記録の合言葉 k を返す（直しページと同じ口）
+  if (!API || !SID) return;
+  try {
+    const r = await fetch(API, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, credentials: "omit",
+                                 body: JSON.stringify({ app: "naoshi", op: "session", args: { s: SID } }) });
+    const j = await r.json();
+    if (!j.error) { LOGK = (JSON.parse(j.items[0].text).k) || ""; flush(); }
+  } catch (e) { /* 記録は端末に残る。次に開いたとき送る */ }
+}
+window.addEventListener("online", () => { LOGK ? flush() : getKey(); });
+document.addEventListener("visibilitychange", () => { if (document.hidden) hid = true; else flush(); });
+
+let S = ls.get(SKEY, null);
+if (!S || S.v !== 1) S = newState();
+const save = () => ls.set(SKEY, S);
+// いまの1問の、画面だけの状態
+let P = null, kind = "", bi = 0, vals = [], buf = "", mode = "first", firstTry = true, firstIn = "", hint = null, t0 = 0, ms1 = 0, hid = false, lock = false, msg = "", msgCls = "";
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+function next() {
+  if (S.phase === "new") return intro();
+  if (S.phase === "diag") {
+    if (!S.p || S.p.kind !== "diag") { const d = diagNow(S); S.p = { kind: "diag", p: diagForm(gen(d.op, d.lv)) }; save(); }
+    return show();
+  }
+  if (!S.set) {
+    startSet(S); S.p = null; save();
+    return banner(`${OPN[S.set.op]} レベル${S.set.lv}`, LV[S.set.op][S.set.lv].t, S.set.up ? "レベルアップ！" : "", 1500, next);
+  }
+  if (!S.p || S.p.kind === "diag") { S.p = { kind: S.set.i >= SET_N ? "extra" : "set", p: gen(S.set.op, S.set.lv) }; save(); }
+  show();
+}
+function intro() {
+  $app.innerHTML = `<div class="center"><h1>あんざん</h1><p>上のくらいから計算する練習だよ。</p><p>さいしょに、いまの場所をしらべるね。</p><p>数字をおして「OK」。</p><button class="big" id="go">はじめる</button></div>`;
+  document.getElementById("go").onclick = () => { S.phase = "diag"; save(); next(); };
+}
+function show() {
+  P = S.p.p; kind = S.p.kind; bi = 0; vals = []; buf = ""; mode = "first"; firstTry = true; firstIn = ""; hint = null; msg = ""; msgCls = ""; lock = false; hid = false;
+  t0 = performance.now(); ms1 = 0;
+  render();
+}
+function boxesHtml() {
+  const b = (i) => {
+    const cls = i < bi ? "box done" : i === bi ? ("box now" + (hint != null ? " bad" : "")) : "box";
+    const v = i < bi ? vals[i] : i === bi ? (buf || "&nbsp;") : "&nbsp;";
+    return `<span class="${cls}">${v}</span>`;
+  };
+  const f = P.f, j = P.op === "sub" ? "−" : "+";
+  if (f === "mid") return `<span class="t">${esc(P.q)} =</span> <span class="t">${b(0)} ${j} ${b(1)}</span> <span class="t">= ${b(2)}</span>`;
+  if (f === "qr") return `<span class="t">${esc(P.q)} =</span> <span class="t">${b(0)} あまり ${b(1)}</span>`;
+  if (f === "part") return `<span class="t">${esc(P.q)} ⇒ ${b(0)}</span>`;
+  return `<span class="t">${esc(P.q)} = ${b(0)}</span>`;
+}
+function render() {
+  const L = LV[P.op][P.lv];
+  let headR = "", dots = "";
+  if (kind === "diag") headR = "しらべているよ";
+  else {
+    const st = S.set;
+    headR = kind === "extra" ? "さいごの1問" : `${Math.min(st.i + 1, SET_N)}／${SET_N}`;
+    dots = `<div class="dots">${Array.from({ length: SET_N }, (_, i) => `<i class="${i < st.marks.length ? (st.marks[i] ? "o" : "x") : i === st.i ? "now" : ""}"></i>`).join("")}</div>`;
+  }
+  const inst = mode === "redo" ? "上のくらいから、分けてやってみよう。" : L.t;
+  const ex = mode === "redo" ? L.r : (kind === "diag" && P.f === "mid" && L.f === "ans") ? L.r : L.e;
+  const instD = (kind === "diag" && P.f === "mid" && L.f === "ans") ? "上のくらいから分けて、答えをもとめなさい。" : inst;
+  $app.innerHTML = `
+    <div class="head"><b>${OPN[P.op]} レベル${P.lv}</b><span>${headR}</span></div>${dots}
+    <div class="streak">${S.streak >= 2 ? `🔥 ${S.streak}問れんぞく正解` : ""}</div>
+    <div class="main">
+      <div class="inst">${esc(instD)}</div><div class="ex">（例）${esc(ex)}</div>
+      <div class="q${(P.f === "mid" || P.f === "qr") ? " s" : ""}">${boxesHtml()}</div>
+      <div class="msg ${msgCls}">${msg}</div>
+    </div>
+    <div class="pad">${[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => `<button data-k="${n}">${n}</button>`).join("")}<button class="del" data-k="del">けす</button><button data-k="0">0</button><button class="okb" data-k="ok">OK</button></div>`;
+}
+function key(k) {
+  if (lock || !P) return;
+  if (k === "del") buf = buf.slice(0, -1);
+  else if (k === "ok") return submit();
+  else if (buf.length < 6) buf = (buf === "0" ? "" : buf) + k;
+  render();
+}
+$app.addEventListener("click", e => { const b = e.target.closest("button[data-k]"); if (b) key(b.dataset.k); });
+document.addEventListener("keydown", e => {
+  if (/^[0-9]$/.test(e.key)) key(e.key); else if (e.key === "Backspace") key("del"); else if (e.key === "Enter") key("ok");
+});
+function submit() {
+  if (buf === "") return;
+  const v = parseInt(buf, 10), want = P.b[bi];
+  if (mode === "first" && firstTry) firstIn += (firstIn ? "," : "") + v;
+  if (v === want) {
+    vals[bi] = v; bi++; buf = ""; hint = null; msg = ""; msgCls = "";
+    if (bi >= P.b.length) return complete();
+    return render();
+  }
+  // まちがい
+  if (firstTry) { firstTry = false; ms1 = Math.round(performance.now() - t0); }
+  buf = "";
+  if (kind === "diag") return complete();
+  if (mode === "first" && P.f === "ans" && P.mid) {   // 答えだけの問 → 同じ問を3箱で
+    mode = "redo"; P = Object.assign({}, P, { f: "mid", b: P.mid }); bi = 0; vals = []; hint = null;
+    msg = "ちがうよ。分けてやってみよう。"; msgCls = "ng";
+    return render();
+  }
+  hint = want; msg = `ここは ${want}。入れてすすもう。`; msgCls = "ng";
+  render();
+}
+function complete() {
+  lock = true;
+  const total = Math.round(performance.now() - t0);
+  if (firstTry) ms1 = total;
+  const orig = S.p.p;
+  rec({ kind, op: orig.op, lv: orig.lv, f: orig.f, q: orig.q, a: firstIn, c: orig.b.join(","), ok: firstTry ? 1 : 0, ms: ms1, ms2: total, n: S.set ? S.set.i + 1 : S.diag.lv, hid: hid ? 1 : 0 });
+  msg = firstTry ? "○ せいかい" : (kind === "diag" ? "×" : "できた。つぎへ"); msgCls = firstTry ? "ok" : (kind === "diag" ? "ng" : "");
+  render();
+  setTimeout(after, firstTry ? 380 : 700);
+}
+function after() {
+  S.p = null;
+  if (kind === "diag") {
+    diagStep(S, firstTry); save();
+    if (S.phase === "run") return banner("しらべおわり", "ここからスタート", OPS.map(o => `${OPN[o]} ${S.cur[o]}`).join("　"), 2600, next);
+    return next();
+  }
+  S.streak = firstTry ? S.streak + 1 : 0;
+  const st = S.set;
+  if (kind === "set") { st.marks.push(firstTry ? 1 : 0); if (firstTry) st.ok++; st.i++; }
+  const needExtra = (kind === "set" && st.i >= SET_N && !firstTry) || (kind === "extra" && !firstTry);
+  if (st.i < SET_N || needExtra) { save(); return next(); }
+  const score = st.ok, name = `${OPN[st.op]} レベル${st.lv}`;
+  endSet(S); save();
+  fireworks(); banner("クリア！", `${name}　${SET_N}問中 ${score}問`, score >= PASS ? "つぎは レベルアップ" : "", 2200, next);
+}
+function banner(a, b, c, ms, cb) {
+  $banner.querySelector(".a").textContent = a; $banner.querySelector(".b").textContent = b; $banner.querySelector(".c").textContent = c || "";
+  $banner.style.display = "flex"; $app.innerHTML = "";
+  setTimeout(() => { $banner.style.display = "none"; cb(); }, ms);
+}
+function fireworks() {
+  const c = $fx, x = c.getContext("2d"), W = c.width = innerWidth, H = c.height = innerHeight;
+  c.style.display = "block";
+  const cols = ["#e11d48", "#f59e0b", "#10b981", "#3b82f6", "#a855f7", "#f97316"], ps = [];
+  const burst = () => { const bx = W * (0.2 + Math.random() * 0.6), by = H * (0.15 + Math.random() * 0.35), col = cols[Math.floor(Math.random() * cols.length)];
+    for (let i = 0; i < 46; i++) { const an = Math.PI * 2 * i / 46, sp = 2 + Math.random() * 4; ps.push({ x: bx, y: by, vx: Math.cos(an) * sp, vy: Math.sin(an) * sp, l: 1, col }); } };
+  burst(); const tm = [setTimeout(burst, 300), setTimeout(burst, 650), setTimeout(burst, 1000), setTimeout(burst, 1350)];
+  const start = performance.now();
+  (function step() {
+    x.clearRect(0, 0, W, H);
+    for (const p of ps) { p.x += p.vx; p.y += p.vy; p.vy += 0.07; p.vx *= 0.985; p.l -= 0.014; if (p.l > 0) { x.globalAlpha = p.l; x.fillStyle = p.col; x.beginPath(); x.arc(p.x, p.y, 3.2, 0, 7); x.fill(); } }
+    x.globalAlpha = 1;
+    if (performance.now() - start < 2200) requestAnimationFrame(step); else { c.style.display = "none"; tm.forEach(clearTimeout); }
+  })();
+}
+function oya() {   // パパ用（?oya=1）。この端末に残っている記録と現在地
+  const all = ls.get(LKEY, []), by = {};
+  for (const r of all) { if (r.kind === "diag") continue; const k = `${OPN[r.op]} L${r.lv} ${r.f}`; const o = by[k] || (by[k] = { n: 0, ok: 0, ms: 0 }); o.n++; o.ok += r.ok; o.ms += r.ms; }
+  const rows = Object.keys(by).sort().map(k => `<tr><td>${k}</td><td>${by[k].n}</td><td>${by[k].ok}</td><td>${(by[k].ms / by[k].n / 1000).toFixed(1)}</td></tr>`).join("");
+  const tail = all.slice(-40).reverse().map(r => `<tr><td>${r.ts.slice(5, 16)}</td><td>${r.kind}</td><td>${OPN[r.op]}${r.lv}</td><td>${esc(r.q)}</td><td>${r.ok ? "○" : "×"} ${esc(r.a)}</td><td>${esc(r.c)}</td><td>${(r.ms / 1000).toFixed(1)}</td></tr>`).join("");
+  $app.innerHTML = `<div class="oya"><p><b>現在地</b>（${S.phase}・${S.sets}セット済）: ${OPS.map(o => `${OPN[o]} ${S.cur[o]}`).join("／")}　送り待ち ${ls.get(QKEY, []).length}行</p>
+    <table><tr><th>レベル・形</th><th>問</th><th>○</th><th>平均秒</th></tr>${rows}</table><p><b>新しい40問</b></p>
+    <table><tr><th>時刻</th><th>種類</th><th>段</th><th>式</th><th>入力</th><th>正解</th><th>秒</th></tr>${tail}</table>
+    <p><button id="rs">診断からやり直す（2回おす）</button></p></div>`;
+  let n = 0; document.getElementById("rs").onclick = () => { if (++n >= 2) { S = newState(); save(); location.search = location.search.replace(/[?&]oya=1/, ""); } };
+}
+getKey();
+if (OYA) oya(); else next();
+</script>
+</body>
+</html>
