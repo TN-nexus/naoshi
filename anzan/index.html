@@ -23,7 +23,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:"Hiragino Sans",
 .q{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 8px;text-align:center;font-size:30px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.9}
 .q.s{font-size:24px}
 .q .t{white-space:nowrap}
-.box{display:inline-block;min-width:62px;height:46px;line-height:42px;border:2px solid var(--line);border-radius:8px;padding:0 6px;margin:0 2px;vertical-align:middle;background:#fff;font-size:26px}
+.box{display:inline-block;cursor:pointer;min-width:62px;height:46px;line-height:42px;border:2px solid var(--line);border-radius:8px;padding:0 6px;margin:0 2px;vertical-align:middle;background:#fff;font-size:26px}
 .q.s .box{min-width:54px;font-size:22px}
 .box.now{border-color:var(--sel);background:var(--selbg)}
 .box.done{border-color:var(--ok);background:var(--okbg);color:var(--ok)}
@@ -251,7 +251,8 @@ function rec(row) {
   const all = ls.get(LKEY, []); all.push(r); if (all.length > 3000) all.splice(0, all.length - 3000); ls.set(LKEY, all);
   if (!API) return;
   const q = ls.get(QKEY, []);
-  q.push({ dev: DEV, ts: r.ts, mode: MODE, stage: OPN[r.op], bundle: `L${r.lv}|${r.kind}|${r.f}|${r.q}`, year: r.ms, aEra: `${r.ok ? "○" : "×"}|${r.a}`, aYear: r.c });
+  q.push({ dev: DEV, ts: r.ts, mode: MODE, stage: OPN[r.op], bundle: `v2|L${r.lv}|${r.kind}|${r.f}|t${r.ms2}|h${r.hid}`, year: String(r.n), event: r.q,
+           aEra: r.a, aYear: r.c, ok: r.ok, sec: (r.ms / 1000).toFixed(1) });
   if (q.length > 2000) q.splice(0, q.length - 2000);
   ls.set(QKEY, q); flush();
 }
@@ -315,7 +316,7 @@ function boxesHtml() {
   const b = (i) => {
     const cls = i < bi ? "box done" : i === bi ? ("box now" + (hint != null ? " bad" : "")) : "box";
     const v = i < bi ? vals[i] : i === bi ? (buf || "&nbsp;") : "&nbsp;";
-    return `<span class="${cls}">${v}</span>`;
+    return `<span class="${cls}" data-i="${i}">${v}</span>`;
   };
   const f = P.f, j = P.op === "sub" ? "−" : "+";
   if (f === "mid") return `<span class="t">${esc(P.q)} =</span> <span class="t">${b(0)} ${j} ${b(1)}</span> <span class="t">= ${b(2)}</span>`;
@@ -341,9 +342,9 @@ function render() {
     <div class="main">
       <div class="inst">${esc(instD)}</div><div class="ex">（例）${esc(ex)}</div>
       <div class="q${(P.f === "mid" || P.f === "qr") ? " s" : ""}">${boxesHtml()}</div>
-      <div class="msg ${msgCls}">${msg}</div>
+      <div class="msg ${msgCls}">${msg || (P.b.length > 1 && bi < P.b.length - 1 ? "入れたら「つぎ」で、となりの箱へ" : "")}</div>
     </div>
-    <div class="pad">${[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => `<button data-k="${n}">${n}</button>`).join("")}<button class="del" data-k="del">けす</button><button data-k="0">0</button><button class="okb" data-k="ok">OK</button></div>`;
+    <div class="pad">${[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => `<button data-k="${n}">${n}</button>`).join("")}<button class="del" data-k="del">けす</button><button data-k="0">0</button><button class="okb" data-k="ok">${bi < P.b.length - 1 ? "つぎ ▶" : "OK"}</button></div>`;
 }
 function key(k) {
   if (lock || !P) return;
@@ -352,7 +353,11 @@ function key(k) {
   else if (buf.length < 6) buf = (buf === "0" ? "" : buf) + k;
   render();
 }
-$app.addEventListener("click", e => { const b = e.target.closest("button[data-k]"); if (b) key(b.dataset.k); });
+$app.addEventListener("click", e => {
+  const b = e.target.closest("button[data-k]"); if (b) return key(b.dataset.k);
+  const x = e.target.closest(".box[data-i]");   // 先の箱をタップ＝いまの箱を決定して進む（空なら案内だけ）
+  if (x && !lock && P && +x.dataset.i > bi) { if (buf !== "") submit(); else { msg = "さきに、青い箱に数字を入れてね"; msgCls = ""; render(); } }
+});
 document.addEventListener("keydown", e => {
   if (/^[0-9]$/.test(e.key)) key(e.key); else if (e.key === "Backspace") key("del"); else if (e.key === "Enter") key("ok");
 });
