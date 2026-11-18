@@ -90,6 +90,14 @@ input.blank::placeholder{font-size:14px}
 .rb{font-size:20px;font-weight:800;color:var(--ng);margin-bottom:4px}
 .rbt{font-size:19px;font-weight:700}
 .lab2{font-weight:700;color:var(--sub);font-size:15px}
+/* 筋（2026-11-11 パパ）: 理由 → 段ごとに予想して開く → だから答えは → 伝わったか → 掘り下げ。講評は並べるだけ */
+.sj{border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin:6px 0;font-size:17px}
+.sj .nm{font-weight:700}
+.sj.hid{color:var(--sub);border-style:dashed}
+.sj .gs{font-size:14px;color:var(--sub)}
+.sj .gs b.ok{color:var(--ok)} .sj .gs b.ng{color:var(--ng)}
+.fork{border-left:4px solid var(--sel);padding:6px 10px;margin:10px 0;font-size:17px;background:var(--selbg);border-radius:6px}
+.print{display:block;width:100%;margin-top:14px;font:inherit;padding:16px;border-radius:10px;border:2px solid var(--ok);background:var(--okbg);color:var(--ok);font-weight:800;cursor:pointer;font-size:20px}
 </style>
 </head>
 <body>
@@ -135,8 +143,16 @@ let S;          // セッション（問題の一覧。正解は○と開いた�
 let todo = [];  // 直す問題の順番
 let cur = 0;
 
+// 同じ図の小問は2問目から "same:<id>" で最初の問の図を指す（worker が重複を外す。11/18 理科で 117 万字になり直しページが出せなかった）
+function imgSrc(q) {
+  const m = /^same:(.+)$/.exec(q.image || "");
+  if (!m) return q.image;
+  const o = (S && S.items || []).find(x => x.id === m[1]);
+  return o ? o.image : "";
+}
 function img(q) {
-  if (q.image) return `<img class="img" src="${esc(q.image)}" alt="${esc(q.imageAlt || "")}">`;
+  const src = imgSrc(q);
+  if (src) return `<img class="img" src="${esc(src)}" alt="${esc(q.imageAlt || "")}">`;
   if (q.imageNote) return `<div class="imgslot">${esc(q.imageNote)}</div>`;
   return "";
 }
@@ -149,7 +165,7 @@ const bar = right => `<div class="bar"><h1>${esc(S.title)}</h1><span class="cnt"
 function list() {
   const ng = S.items.filter(q => !q.first.ok);
   // なぜの問は○でも直す（○ → なぜ）。なぜの無い問は今までどおり ×で開いていないもの
-  todo = S.items.filter(q => q.why ? q.state !== "open" : (!q.first.ok && q.state !== "open"));
+  todo = S.items.filter(q => q.suji ? !sujiDone(q) : q.why ? q.state !== "open" : (!q.first.ok && q.state !== "open"));
   const rows = S.items.map(q => {
     const open = q.first.ok || q.state === "open";
     const tail = q.first.ok ? "　正解" : open ? `　→ 正解 ${esc(q.answer)}` : "　→ 直す";
@@ -157,7 +173,7 @@ function list() {
     <div class="row">
       <span class="mk ${q.first.ok ? "ok" : "ng"}">${q.first.ok ? "○" : "×"}</span>
       <span class="n">${esc(q.no)}</span>
-      <span class="a">てみ回答: ${mineAns(q)}${tail}${q.why ? `<span class="wtag">${q.first.ok ? "○ → なぜ" : "なぜ"}</span>` : ""}
+      <span class="a">てみ回答: ${mineAns(q)}${tail}${q.suji ? `<span class="wtag">${q.suji.mode === "講評" ? "講評" : q.suji.mode === "見直し" ? "○ → 筋" : "筋"}</span>` : ""}${q.why ? `<span class="wtag">${q.first.ok ? "○ → なぜ" : "なぜ"}</span>` : ""}
         ${q.first.ok && q.note ? `<div class="note"><b>ひとこと</b>　${esc(q.note)}</div>` : ""}
         ${open && q.explain ? `<details><summary>解説</summary>${esc(q.explain)}${yoshiri(q)}</details>` : ""}
       </span>
@@ -178,6 +194,7 @@ function list() {
 function step() {
   if (cur >= todo.length) return done();
   const q = todo[cur];
+  if (q.suji) return sujiStep(q);   // 筋の問（11/11）
   if (q.why) return whyStep(q);   // なぜの問は鍵・回数の上限・端末の回数を通らない
   $app.innerHTML = `
     ${bar(`直し ${cur + 1}/${todo.length}`)}
@@ -479,6 +496,143 @@ function akasu(q, r, conf, chosen) {
   toTop();
 }
 
+
+// ---------------------------------------------------------------- 筋（2026-11-11 パパ。knowledge/解き直し_当日の質_2026-11-11.md §0.5）
+// ×・見直し: 理由を選ぶ → 左 てみーの筋／右 この問題の筋（段ごとに伏せる。次に出すものを打ってから開く）→ だから答えは →
+//   伝わったかの1問 → ×なら掘り下げ1問。どの段も1回だけ。講評: 並べて講評だけ。判定はサーバ（op suji_*）
+const sujiDone = q => {
+  const j = q.suji;
+  if (j.mode === "講評") return j.kouhyouSeen;
+  if (j.shown.length < j.n) return false;
+  if (!j.check) return true;
+  return !!(j.checkDone && (j.checkDone.ok || j.digDone || !j.dig));
+};
+
+function sujiStep(q) {
+  const j = q.suji;
+  const ok1 = q.first.ok;
+  $app.innerHTML = `
+    ${bar(`直し ${cur + 1}/${todo.length}`)}
+    <div class="card" id="card">
+      <div class="tag">${esc(q.no)}<span class="wtag">${j.mode === "講評" ? "講評" : j.mode === "見直し" ? "○ → 筋" : "筋"}</span></div>
+      <div class="q">${esc(q.text)}</div>
+      ${img(q)}
+      <div class="mine">てみーの答え: <b style="color:${ok1 ? "var(--ok)" : "var(--ng)"}">${mineAns(q)}</b>　${ok1 ? "正解" : q.first.unread ? "読めなかった" : "不正解"}</div>
+      <div id="work"></div>
+    </div>
+    <button class="next" id="next" style="display:none">${cur + 1 < todo.length ? "次の問題へ" : "おわり"}</button>`;
+  document.getElementById("next").onclick = () => { cur++; step(); };
+  sujiRender(q);
+}
+
+const sujiCall = (q, op, args) => call(op, Object.assign({ s: SID, id: q.id }, args)).then(r => {
+  if (r.error) throw new Error(r.error);
+  q.suji = r.suji;
+  if (r.answer !== undefined) { q.answer = r.answer; q.state = "open"; }
+  sujiRender(q);
+});
+
+function sujiRender(q) {
+  const j = q.suji;
+  const mineCol = `<div class="col"><div class="h">てみーはこう考えた</div>
+      ${j.reason ? `<div><b>${esc(j.reason)}</b></div>` : ""}
+      ${j.mine.length ? `<ol>${j.mine.map(m => `<li>${esc(m)}</li>`).join("")}</ol>` : `<div class="small">（途中の式なし）</div>`}
+      <div>答え: ${mineAns(q)}</div></div>`;
+  // 講評: 並べるだけ
+  if (j.mode === "講評") {
+    if (!j.kouhyouSeen) return sujiCall(q, "suji_講評", { answer: "見た" }).catch(fail);
+    setWork(`<div class="narabe">${mineCol}${sujiRight(q, j)}</div>
+      ${j.kouhyou ? `<div class="box ok"><div class="lab2">講評</div><div class="rbt">${esc(j.kouhyou)}</div></div>` : ""}`);
+    return showNext();
+  }
+  // 1) 理由
+  if (!j.reason && j.reasons.length) {
+    setWork(`<div class="ask">${q.first.ok ? "どう考えてこの答えを出した？" : "どうしてこう答えた？"}</div>
+      <div class="wopts">${j.reasons.map((o, i) => `<button class="opt wide" data-i="${i}">${esc(o)}</button>`).join("")}</div>`);
+    const bs = [...document.querySelectorAll("#work .opt")];
+    bs.forEach(b => b.onclick = () => {
+      bs.forEach(x => x.disabled = true); b.classList.add("sel");
+      sujiCall(q, "suji_理由", { answer: j.reasons[+b.dataset.i] }).catch(e => { bs.forEach(x => x.disabled = false); fail(e); });
+    });
+    return;
+  }
+  // 2) 並べる（右は段ごとに伏せる）
+  let html = `<div class="narabe">${mineCol}${sujiRight(q, j)}</div>`;
+  if (j.shown.length < j.n) {
+    const i = j.shown.length;
+    html += `<div class="ask">${i === 0 ? "この問題は、まず何を出す？" : `${esc(j.shown[i - 1].name)}を出した。次に何を出す？`}</div>
+      <div class="small">名前と単位で（例: 1日にする仕事の量）。数はいらない。</div>
+      <input class="txt" id="gs" autocomplete="off" autocapitalize="off" placeholder="次に出すもの">
+      <div class="commit" style="grid-template-columns:1fr"><button class="go c-sure" id="gsgo" disabled>ひらく</button></div>`;
+    setWork(html);
+    const t = document.getElementById("gs"), g = document.getElementById("gsgo");
+    t.oninput = () => { g.disabled = !t.value.trim(); };
+    t.onkeydown = e => { if (e.key === "Enter" && !e.isComposing && !g.disabled) g.click(); };
+    g.onclick = () => { g.disabled = true; t.disabled = true; sujiCall(q, "suji_予想", { i, answer: t.value.trim() }).catch(e => { g.disabled = false; t.disabled = false; fail(e); }); };
+    t.focus();
+    return;
+  }
+  // だから答えは
+  html += `${j.fork ? `<div class="fork">${esc(j.fork)}</div>` : ""}
+    <div class="box ${q.first.ok ? "ok" : "ng"}"><div class="big">だから答えは ${esc(j.answer)}。つまり${q.first.ok ? "正解" : "不正解"}</div>
+      ${j.kouhyou ? `<div>${esc(j.kouhyou)}</div>` : ""}</div>`;
+  if (!j.check) { setWork(html); return showNext(); }
+  // 3) 伝わったか
+  if (!j.checkDone) {
+    setWork(html + `<div class="ask">確かめ: ${esc(j.check.q)}</div>`);
+    return sujiForm(q, j.check, "suji_確認");
+  }
+  html += `<div class="mine">確かめ: <b style="color:${j.checkDone.ok ? "var(--ok)" : "var(--ng)"}">${esc(j.checkDone.answer)}</b>　${okx(j.checkDone.ok)}${j.checkDone.ok ? "" : `　（正しくは ${esc(j.checkDone.right)}）`}</div>`;
+  if (j.checkDone.ok) { setWork(html + `<div class="box ok"><div class="big">伝わった</div></div>`); return showNext(); }
+  // 4) 掘り下げ（1回だけ）
+  if (!j.dig) { setWork(html); return showNext(); }
+  if (!j.digDone) {
+    setWork(html + `<div class="ask">もう一歩: ${esc(j.dig.q)}</div>`);
+    return sujiForm(q, j.dig, "suji_掘り下げ");
+  }
+  html += `<div class="mine">もう一歩: <b style="color:${j.digDone.ok ? "var(--ok)" : "var(--ng)"}">${esc(j.digDone.answer)}</b>　${okx(j.digDone.ok)}</div>
+    <div class="box ${j.digDone.ok ? "ok" : "hint"}"><div class="lab2">${j.digDone.ok ? "そう" : `正しくは ${esc(j.digDone.right)}`}</div>${esc(j.digDone.explain)}</div>
+    ${j.digDone.ok ? "" : `<p class="small">ここはパパと見よう。</p>`}`;
+  setWork(html);
+  showNext();
+}
+
+// 右の列: この問題の筋（開いた段だけ。伏せた段は点線）
+function sujiRight(q, j) {
+  const rows = [];
+  for (let i = 0; i < j.n; i++) {
+    const s = j.shown[i];
+    rows.push(s
+      ? `<div class="sj"><div class="nm">${i + 1}. ${esc(s.name)}</div>${s.body ? `<div>${esc(s.body)}</div>` : ""}${s.guess ? `<div class="gs">てみー: 「${esc(s.guess)}」 <b class="${s.ok ? "ok" : "ng"}">${okx(s.ok)}</b></div>` : ""}</div>`
+      : `<div class="sj hid">${i + 1}. ？</div>`);
+  }
+  return `<div class="col"><div class="h">この問題はこう考えて解く</div>${rows.join("")}
+    ${j.kobetsuba && j.shown.length >= j.n ? `<a class="kb" href="https://www.youtube.com/watch?v=${encodeURIComponent(j.kobetsuba)}" target="_blank" rel="noopener">▶ コベツバの解説</a>` : ""}</div>`;
+}
+
+function sujiForm(q, spec, op) {
+  form("", spec.type || "text", spec.options, false, "答え", val => sujiCall(q, op, { answer: val }));
+}
+
+// 類題の印刷（11/11 パパ）。押すと Mac がプリンターで刷る
+function printBox() {
+  if (!S || !S.ruidai) return "";
+  if (S.ruidai.printed) return `<div class="box ok"><div class="big">類題は印刷した</div>プリンターの紙で解いて、LINE で送ろう。分からないところは空けておいていい。</div>`;
+  return `<button class="print" id="prt">🖨 ${esc(S.ruidai.title)}を印刷する</button>`;
+}
+function bindPrint() {
+  const b = document.getElementById("prt");
+  if (!b) return;
+  b.onclick = () => {
+    b.disabled = true;
+    call("print", { s: SID }).then(r => {
+      if (r.error) throw new Error(r.error);
+      S.ruidai.printed = true;
+      b.outerHTML = printBox();
+    }).catch(e => { b.disabled = false; fail(e); });
+  };
+}
+
 function done() {
   call("done", { s: SID }).catch(() => {});
   summary();
@@ -498,7 +652,7 @@ function summary() {
       <tr><td>${esc(x.no)}</td><td>${x.first ? esc(x.first) : "（空欄）"}</td>
         <td class="m ${x.mark === "○" ? "ok" : "ng"}">${esc(x.mark)}</td>
         <td>${x.open ? esc(x.answer) : `<span class="re">まだ</span>`}</td>
-        <td class="re">${x.second ? `${x.second.ok ? "○" : "×"} ${esc(x.second.answer)}` : ""}</td>${hasWhy ? `<td class="m ${whyMark(x.why) === "○" ? "ok" : whyMark(x.why) === "×" ? "ng" : ""}">${whyMark(x.why)}</td>` : ""}</tr>`).join("");
+        <td class="re">${x.second ? `${x.second.ok ? "○" : "×"} ${esc(x.second.answer)}` : ""}${x.suji ? `筋 ${esc(x.suji)}` : ""}</td>${hasWhy ? `<td class="m ${whyMark(x.why) === "○" ? "ok" : whyMark(x.why) === "×" ? "ng" : ""}">${whyMark(x.why)}</td>` : ""}</tr>`).join("");
     $app.innerHTML = `
       ${bar("おわり")}
       <div class="card">
@@ -508,7 +662,9 @@ function summary() {
         ${r.skipped && r.skipped.length ? `<p class="small">このページに無い問題（寸評シートを見てね）: ${r.skipped.map(esc).join("・")}</p>` : ""}
         ${S.later ? `<p class="small">${esc(S.later)}</p>` : ""}
       </div>
+      ${printBox()}
       ${left ? `<button class="next" id="back">まだの問題を直す（${left}問）</button>` : ""}`;
+    bindPrint();
     const b = document.getElementById("back");
     if (b) b.onclick = () => reload(() => { list(); cur = 0; step(); });
   }).catch(fail);
