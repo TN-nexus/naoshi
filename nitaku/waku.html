@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>きょうの骨組み</title>
+<link rel="icon" href="data:,">
+<style>
+/* 帰りのバス（2026-11-23 パパ合意「きょうの授業の骨組みを、枠ごと自分で出す最初の1回」）。殻だけ: 表・正解は中継（合言葉つき）から受け取る。
+   作りは kumi.html（取り違えた組）を写した: ふつうのキーボード・判定・iOS の focus・visualViewport・合言葉つきの読み込み・記録の送りと再送・途中再開 */
+:root{ --bg:#f5f3ee; --card:#fff; --ink:#22262b; --sub:#6c7077; --faint:#9a9da2; --line:#dedad2; --ok:#1d7a4c; --okbg:#e5f3ea; --ng:#b4322a; --ngbg:#fbebe8;
+  --acc:#2f5fb3; --accbg:#e8effb; --hl:#fff4c2; --s-社会:#a0521a; --sbg-社会:#fbeadb; --s-理科:#2d6e37; --sbg-理科:#e0f0e1; }
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;font-size:17px;line-height:1.55;-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
+button{font:inherit;color:inherit;cursor:pointer;-webkit-user-select:none;user-select:none;touch-action:manipulation}
+#app{max-width:520px;margin:0 auto;height:calc(var(--vh,100dvh) - var(--top,0px));display:flex;flex-direction:column;overflow:hidden;padding:0 12px}
+.bar{flex:none;display:flex;align-items:center;gap:7px;height:38px;border-bottom:1px solid var(--line)}
+.tag{font-size:12px;font-weight:700;padding:2px 9px;border-radius:999px;white-space:nowrap}
+.tag.社会{background:var(--sbg-社会);color:var(--s-社会)} .tag.理科{background:var(--sbg-理科);color:var(--s-理科)}
+.cname{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.sp{flex:1}
+.pos{font-size:12px;color:var(--sub);white-space:nowrap;font-variant-numeric:tabular-nums}
+.menu{border:none;background:none;font-size:18px;color:var(--sub);padding:4px 2px 4px 6px}
+.mn{position:absolute;right:16px;top:40px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:8px;z-index:30;display:flex;flex-direction:column;gap:6px;box-shadow:0 6px 18px rgba(0,0,0,.08)}
+.mn button{border:1.5px solid var(--ink);background:#fff;border-radius:10px;padding:8px 14px;font-size:15px}
+.mn button.danger{border-color:var(--ng);color:var(--ng)}
+/* 中の欄 */
+.pane{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:6px 0 6px;position:relative}
+.pane.look{overflow:hidden}
+.phase{font-size:12px;color:var(--sub);margin:2px 2px 4px;letter-spacing:.04em}
+.phase b{color:var(--ink)}
+/* 社会: 年と出来事の流れ（家の幹の表と同じ列: 年号・名前・人・目玉・どうなった） */
+.fr{display:flex;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:5px 8px;align-items:flex-start}
+.fr .yr{flex:none;width:64px;font-size:12.5px;font-weight:700;color:#37474f;background:#eceff1;border-radius:6px;padding:2px 4px;text-align:center;line-height:1.3}
+.fr .bd{flex:1;min-width:0}
+.fr .nm{font-size:13px;font-weight:700;color:#00695c;line-height:1.3}
+.fr .tx{font-size:14.5px;line-height:1.5}
+.fr .tx .who{font-weight:700}
+.fr .tx .res{color:#bf360c}
+.fr.ctx{opacity:.5;background:transparent}
+.fr.mini{padding:3px 8px;opacity:.5;background:transparent}
+.fr.mini .nm{font-weight:400;color:var(--sub)}
+.fr.now{border-color:var(--acc);box-shadow:0 0 0 1.5px var(--acc) inset}
+.cj{font-size:11.5px;line-height:1;margin:3px 0 3px 74px;color:#6d5a00}
+.cj span{display:inline-block;background:#ffe082;border-radius:999px;padding:3px 10px;font-weight:700}
+.cj span.fx{background:#eceff1;color:#546e7a;font-weight:400}
+.gap{height:6px}
+.brk{border-top:3px double #b0bec5;margin:7px 0}
+.pane.t1 .fr{padding:3px 7px}.pane.t1 .fr .tx{font-size:13.5px;line-height:1.42}.pane.t1 .cj{margin:2px 0 2px 74px}.pane.t1 .cj span{padding:2px 9px}
+.pane.t1 td{font-size:12.5px;padding:3px 4px;line-height:1.35}
+.pane.t2 .nx{display:none}
+.pane.t3 .fr .nm{display:inline;margin-right:6px}.pane.t3 .fr .tx{font-size:13px}.pane.t3 td{font-size:12px;line-height:1.3}
+.more{font-size:11.5px;color:var(--faint);margin:4px 2px 0 74px}
+/* 穴 */
+.hw{font-weight:700;background:var(--hl);border-bottom:2px solid #d9b100;border-radius:3px;padding:0 1px}
+.bl{display:inline-block;min-width:3.6em;height:1.15em;vertical-align:-.15em;border-bottom:2px solid var(--faint);margin:0 1px}
+.bl.cur{border-bottom-color:var(--acc);background:var(--accbg);border-radius:3px 3px 0 0;min-width:4.4em}
+.got{font-weight:700;color:var(--ok)}
+.fix{font-weight:700;color:var(--ng)}
+.mask{color:var(--faint);letter-spacing:-.05em}
+/* 理科: 家の表 */
+.tname{font-size:12px;color:var(--sub);margin:4px 2px 3px}
+table{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:8px}
+th{font-size:11px;font-weight:700;color:#455a64;background:#eef1f2;text-align:left;padding:3px 5px;line-height:1.25;border-bottom:1px solid var(--line);vertical-align:bottom}
+td{font-size:13px;line-height:1.4;padding:4px 5px;border-top:1px solid #eee9df;vertical-align:middle;word-break:break-all}
+td+td,th+th{border-left:1px solid #eee9df}
+tr:first-child td{border-top:none}
+td.rh{font-weight:700;background:#fbfaf7}
+td.sent{font-size:13.5px}
+.pane.typ{padding-top:0}.typ thead th{position:sticky;top:0;z-index:2}
+.typ table{overflow:visible}
+td.now{box-shadow:0 0 0 2px var(--acc) inset}
+/* 下の欄 */
+.dock{flex:none;padding:6px 0 calc(8px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:var(--bg)}
+.prompt{font-size:12.5px;color:var(--sub);height:18px;line-height:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prompt .fl{color:var(--ok);font-weight:700;margin-right:8px}
+.prompt .re{color:var(--ng);font-weight:700;margin-right:6px}
+.inrow{display:flex;gap:8px;margin-top:4px}
+.inrow input{flex:1;min-width:0;height:44px;font-size:20px;padding:0 12px;border:1.5px solid var(--acc);border-radius:12px;background:var(--card);color:var(--ink);font-family:inherit}
+.inrow .go{flex:none;width:84px;height:44px;border:none;border-radius:12px;background:var(--ink);color:#fff;font-size:17px;font-weight:700}
+.inrow .go:disabled{opacity:.25}
+.inrow .go:active{transform:scale(.97)}
+.note{font-size:12px;color:var(--acc);margin-top:3px;height:16px;line-height:16px}
+.fb{margin-top:6px;border-radius:12px;padding:6px 10px;background:var(--ngbg);max-height:118px;overflow-y:auto}
+.fb .h{font-size:16px;font-weight:700;color:var(--ng);line-height:1.35}
+.fb .h small{font-weight:400;color:var(--sub);font-size:13px;margin-left:4px}
+.fb .mine{font-size:12px;font-weight:400;color:var(--sub);margin-left:6px;white-space:nowrap}
+.ksh{font-size:12.5px;line-height:1.5;color:var(--ink);margin-top:3px}
+.ksh .km{color:var(--faint);font-size:10.5px;margin-right:4px}
+.act{display:block;width:100%;height:50px;border-radius:14px;border:none;background:var(--ink);color:#fff;font-size:18px;font-weight:700;letter-spacing:.06em;transition:transform .05s}
+.act:active{transform:scale(.98)}
+/* 始まりと終わり */
+.home{flex:1;min-height:0;overflow-y:auto;padding:16px 2px 8px}
+.home h1{font-size:23px;margin:0;letter-spacing:.02em;line-height:1.35}
+.home .bin{font-size:13px;color:var(--sub);margin-top:2px}
+.big{display:flex;align-items:baseline;gap:8px;margin:16px 0 6px}
+.big b{font-size:44px;line-height:1;font-variant-numeric:tabular-nums}
+.big span{font-size:15px;color:var(--sub)}
+.cards{display:flex;flex-direction:column;gap:6px}
+.card{font-size:12.5px;line-height:1.4;padding:5px 9px;border-radius:10px;background:var(--card);border:1px solid var(--line)}
+.card.p{background:var(--okbg);border-color:#bfe0cb}
+.card .cn{font-weight:700;font-size:12px}.home.fin .big{margin:10px 0 6px}.home.fin .big b{font-size:38px}.home.fin .cards{gap:4px}
+.card .cn i{font-style:normal;font-size:11px;margin-right:5px;opacity:.75}
+.card .ws{color:var(--ok)}
+.list{display:flex;flex-direction:column;gap:4px;margin-top:10px}
+.list div{font-size:14px;display:flex;gap:8px;align-items:baseline}
+.list i{font-style:normal;font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px}
+.left{font-size:13px;color:var(--sub);margin-top:12px;line-height:1.5}
+.rules{font-size:13px;line-height:1.6;color:var(--sub);margin-top:14px;padding:10px 12px;border-radius:12px;background:var(--card);border:1px solid var(--line);overflow-wrap:anywhere}
+.rules p{margin:2px 0}
+.homedock{flex:none;padding:8px 0 calc(12px + env(safe-area-inset-bottom))}
+#err{position:fixed;left:0;right:0;bottom:0;background:#fff3f2;color:var(--ng);font-size:12px;white-space:pre-wrap;padding:4px 8px;z-index:60;display:none}
+#norec{position:fixed;top:1px;right:6px;font-size:10px;line-height:1.2;color:var(--faint);z-index:50}
+</style>
+</head>
+<body>
+<div id="app"><p class="left">よみこみ中…</p></div>
+<div id="err"></div>
+<script>
+window.onerror = (m, s, l, c) => { const e = document.getElementById("err"); e.style.display = "block"; e.textContent += `${m} (${l}:${c})\n`; };
+</script>
+<script>
+// 読み込み（kumi.html・flow.html の合言葉つきと同じ口）: ?s=<合言葉> があれば中継（GAS）が合言葉を確かめてから便のデータを返す（置くのは put_secure.py --waku）。
+// ?dev=1 はローカルの確かめ用（同じフォルダの waku_data.js を読む。公開には waku_data.js を置かない）
+const PQ = new URLSearchParams(location.search);
+const SID = (/^[0-9A-Za-z_-]{16,80}$/.test(PQ.get("s") || "") ? PQ.get("s") : "");
+var WAKU_ERR = "";
+if (SID) {
+  try {
+    const x = new XMLHttpRequest();
+    x.open("POST", `https://script.google.com/macros/s/${encodeURIComponent(PQ.get("d") || "")}/exec`, false);
+    x.setRequestHeader("Content-Type", "text/plain;charset=utf-8");
+    x.send(JSON.stringify({ app: "naoshi", op: "session", args: { s: SID } }));
+    const r = JSON.parse(x.responseText);
+    if (r.error) WAKU_ERR = r.error; else window.WAKU = JSON.parse(r.items[0].text);
+  } catch (e) { WAKU_ERR = "よみこめなかった。電波のあるところで、もう一度ひらいてね"; }
+} else if (PQ.get("dev") === "1") document.write('<script src="waku_data.js"><\/script>');
+</script>
+<script>
+// CORE-BEGIN 進みの規則（純粋関数。node で単体: tests/test_waku_bus.py）
+// まとまり（chunks）を順に: 見ておぼえる（look）→ 伏せて打つ（type）。type の列 queue は そのまとまりの穴（r=0）。
+// 外した穴は、そのまとまりの列の末尾に「もう1回」（r=1）を1つ足す（1回だけ。もう1回で外しても、打ち直して先へ）。
+// 続けては出さない: 次に出る穴が いま出した穴と同じなら、後ろの別の穴と入れ替える。入れ替える相手が無ければ、次のまとまりの GAP 個目に回す
+// （最後のまとまりなら、そのまま出す）。×は正解を打ち直すまで先へ進めない（phase retype）。○で次の穴へ（押し直しは要らない）。
+const GAP = 2;
+function hira(s) { return String(s || "").replace(/[ァ-ヶ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x60)); }
+function norm(v) { return hira(String(v || "").normalize("NFKC").toLowerCase()).replace(/[\s　]/g, ""); }
+function sig(K) { return K.bin + "#" + K.chunks.map(c => c.id + ":" + c.holes.join(",")).join(";"); }
+function newState(K) { return { v: 1, sig: sig(K), ci: 0, ph: "look", queue: [], qi: 0, cur: null, cnt: {}, res: {}, carry: [], last: null }; }
+// 判定: ok／short（頭が足りない・ほかの語と同じ頭。記録しない）／ng
+function judge(K, hid, v) {
+  const h = K.holes[hid];
+  if (h.t === "num") { const x = norm(v).replace(/,/g, ""); if (x === "") return "short"; return /^\d+(\.\d+)?$/.test(x) && Number(x) === Number(h.a) ? "ok" : "ng"; }
+  const n = norm(v), mine = h.as.concat(h.ys).map(norm);
+  if (!n) return "short";
+  if (mine.includes(n)) return "ok";
+  if (n.length < 2) return "short";
+  if (!mine.some(c => c.startsWith(n))) return "ng";
+  const other = (K.pool[h.s] || []).map(p => p.map(norm)).filter(p => !p.some(x => mine.includes(x)));
+  return other.some(p => p.some(x => x.startsWith(n))) ? "short" : "ok";
+}
+function chunk(S, K) { return K.chunks[S.ci] || null; }
+function startType(S, K) {
+  const c = chunk(S, K); if (!c || S.ph !== "look") return false;
+  S.queue = c.holes.map(h => ({ h, r: 0 }));
+  for (const it of S.carry) S.queue.splice(Math.min(GAP, S.queue.length), 0, it);
+  S.carry = []; S.qi = 0; S.cur = null; S.ph = "type";
+  return true;
+}
+function current(S, K) {
+  if (S.ph !== "type") return null;
+  const it = S.queue[S.qi]; if (!it) return null;
+  if (!S.cur || S.cur.k !== it.h || S.cur.r !== it.r) {
+    S.cnt[it.h] = (S.cnt[it.h] || 0) + 1;
+    S.cur = { k: it.h, r: it.r, n: S.cnt[it.h], phase: "ask", first: null, ans: "" };
+  }
+  return { it, h: K.holes[it.h], e: S.cur };
+}
+// 打った答え → {res: ok/ng/short, phase: 打つ前の段, hid, r, n}。ok なら次の穴へ進む
+function submit(S, K, v) {
+  const c = current(S, K); if (!c) return null;
+  const res = judge(K, c.it.h, v), e = c.e, out = { res, phase: e.phase, hid: c.it.h, r: c.it.r, n: e.n };
+  if (res === "short") return out;
+  if (e.phase === "ask") { e.first = res === "ok"; e.ans = v; }
+  if (res === "ok") advance(S, K); else e.phase = "retype";
+  return out;
+}
+function advance(S, K) {
+  const it = S.queue[S.qi], e = S.cur, r = S.res[it.h] || (S.res[it.h] = {});
+  if (it.r === 0) { r.first = e.first; if (e.first === false) S.queue.push({ h: it.h, r: 1 }); }
+  else r.re = e.first;
+  S.last = it.h; S.cur = null; S.qi++;
+  const nx = S.queue[S.qi];
+  if (nx && nx.h === S.last) {
+    const j = S.queue.findIndex((x, i) => i > S.qi && x.h !== S.last);
+    if (j > 0) { S.queue[S.qi] = S.queue[j]; S.queue[j] = nx; }
+    else if (S.ci + 1 < K.chunks.length) S.carry.push(S.queue.splice(S.qi, 1)[0]);
+  }
+  if (S.qi >= S.queue.length) { S.ci++; S.ph = S.ci < K.chunks.length ? "look" : "end"; S.queue = []; S.qi = 0; }
+}
+// きょう出せた所＝最初に○、か もう1回で○
+function tally(S, K) {
+  const all = K.chunks.flatMap(c => c.holes), got = all.filter(h => S.res[h] && (S.res[h].first === true || S.res[h].re === true));
+  return { all, got, left: all.filter(h => !got.includes(h)) };
+}
+function isEnd(S) { return S.ph === "end"; }
+if (typeof module !== "undefined") module.exports = { GAP, norm, judge, newState, startType, current, submit, advance, tally, isEnd, sig };
+// CORE-END
+</script>
+<script>
+const K = (typeof WAKU !== "undefined" && WAKU) || { chunks: [], holes: {}, flow: [], pool: {}, bin: "" };
+const TRY = PQ.get("try") === "1", DEVMODE = PQ.get("dev") === "1";
+const DEPLOY = PQ.get("d") || "";
+const API = DEPLOY ? `https://script.google.com/macros/s/${encodeURIComponent(DEPLOY)}/exec` : "";
+const SKEY = (TRY ? "nitaku.waku.try1." : "nitaku.waku.v1.") + (K.bin || ""), QKEY = TRY ? "nitaku.wakuq.try" : "nitaku.wakuq.v1", DKEY = "nendai.dev";
+const MODE = TRY ? "nitaku_waku_try" : "nitaku_waku";
+const $app = document.getElementById("app");
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const ls = { get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+             set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} } };
+let DEV = TRY ? "テスト-パパ" : ls.get(DKEY, "");
+if (!DEV) { DEV = "n" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); ls.set(DKEY, DEV); }
+function ts() {
+  const d = new Date(), p = n => String(n).padStart(2, "0"), o = -d.getTimezoneOffset();
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}${o >= 0 ? "+" : "-"}${p(Math.floor(Math.abs(o) / 60))}:${p(Math.abs(o) % 60)}`;
+}
+// 記録: kumi.html と同じ送り先（nendai の log）・同じ形。1打1行。端末にためて、送れたら消す（電波が無ければ次に開いたとき）
+let flushing = false;
+function log(args) {
+  if (!API && !DEVMODE) return;   // ?dev=1 は端末の列にためるだけ（送らない。確かめ用）
+  const q = ls.get(QKEY, []); q.push(Object.assign({ dev: DEV, ts: ts(), mode: MODE }, args)); ls.set(QKEY, q); flush();
+}
+async function flush() {
+  if (!API || flushing) return;
+  flushing = true;
+  try {
+    for (;;) {
+      const q = ls.get(QKEY, []); if (!q.length) break;
+      const r = await fetch(API, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, credentials: "omit",
+                                   body: JSON.stringify({ app: "nendai", op: "log", args: Object.assign({ k: K.k || "" }, q[0]) }) });
+      if (!r.ok) break;
+      const rj = await r.json().catch(() => null); if (!rj || rj.ok === false) break;
+      const q2 = ls.get(QKEY, []); q2.shift(); ls.set(QKEY, q2);
+    }
+  } catch (e) { /* 次の機会に */ }
+  flushing = false;
+}
+window.addEventListener("online", flush);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) flush(); });
+
+let S = ls.get(SKEY, null);
+if (!S || S.v !== 1 || S.sig !== sig(K)) S = newState(K);
+const save = () => ls.set(SKEY, S);
+let onTop = true, menuOpen = 0, t0 = Date.now(), flash = "", note = "";
+const sec = () => Math.round((Date.now() - t0) / 100) / 10;
+function rec(o, typed) {
+  const h = K.holes[o.hid], suf = (o.r === 1 ? "|もう1回" : "") + (o.phase === "retype" ? "|打ち直し" : "");
+  log({ stage: h.s, bundle: `枠_${K.kai}|${o.hid}${suf}`, year: String(o.n), event: String(h.q).slice(0, 300), aEra: typed, aYear: h.a, ok: o.res === "ok" ? 1 : 0, sec: sec() });
+}
+
+const RULE = [
+  "まとまりごとに、見ておぼえる → 伏せて打つ",
+  "ふつうのキーボードで打つ。頭の2文字から（ひらがな・漢字どちらでも。ほかの語と同じ頭なら、もう少し）。数は数字で",
+  "まちがえたら、正解を打ち直して進む。外した所は、そのまとまりの終わりにもう1回出る",
+];
+function bar(c, pos) {
+  return `<div class="bar"><span class="tag ${esc(c.s)}">${esc(c.s)}</span><span class="cname">${esc(c.name)}</span><span class="sp"></span>` +
+    `<span class="pos">${pos}</span><button class="menu" id="mb" aria-label="メニュー">…</button></div>` + menuHtml();
+}
+function menuHtml() {
+  return menuOpen ? `<div class="mn">${menuOpen === 1 ? `<button id="m1">最初から</button>` : `<button class="danger" id="m2">ほんとうに最初から</button>`}<button id="m0">もどる</button></div>` : "";
+}
+function bindMenu() {
+  const on = (id, f) => { const el = document.getElementById(id); if (el) el.onclick = f; };
+  on("mb", () => { menuOpen = menuOpen ? 0 : 1; render(); });
+  on("m0", () => { menuOpen = 0; render(); });
+  on("m1", () => { menuOpen = 2; render(); });
+  on("m2", () => { menuOpen = 0; S = newState(K); onTop = true; QV = null; save(); render(); });
+}
+
+// ---- 穴と字の描き方 ----
+// mode: look（答えを黄で見せる）／type（まだの穴は空き・いまの穴は青・出した穴は開いたまま）
+// type のあいだ、そのまとまりのまだ出していない語（数でない・2字以上）は、ほかの所の字では ◯◯ に伏せる（家の表と同じ）
+let PEND = [];
+function pending(c) {
+  if (S.ph !== "type") return [];
+  const ids = S.queue.slice(S.qi).map(x => x.h);
+  const ws = [];
+  for (const h of ids) { const x = K.holes[h]; if (x.t !== "num") for (const w of x.as) if (w.length >= 2 && !/^[ぁ-ゖー]+$/.test(w)) ws.push(w); }
+  return [...new Set(ws)].sort((a, b) => b.length - a.length);
+}
+function maskT(t) {
+  let s = esc(t);
+  for (const w of PEND) s = s.split(esc(w)).join(`<span class="mask">◯◯</span>`);
+  return s;
+}
+function hole(hid, mode) {
+  const h = K.holes[hid];
+  if (mode === "look") return `<span class="hw">${esc(h.a)}</span>`;
+  if (S.ph === "type" && S.cur && S.cur.k === hid) return `<span class="bl cur" id="cur"></span>`;
+  if (S.ph === "type" && S.queue.slice(S.qi).some(x => x.h === hid)) return `<span class="bl"></span>`;   // まだ・もう1回を待つ穴は空き
+  const r = S.res[hid];
+  if (r && r.first != null) return `<span class="${r.first || r.re ? "got" : "fix"}">${esc(h.a)}</span>`;   // 出した穴は開いたまま
+  return `<span class="bl"></span>`;
+}
+const segsH = (segs, mode) => segs.map(s => s.h ? hole(s.h, mode) : maskT(s.t)).join("");
+function flowRow(r, mode, cls) {
+  const tx = [r.who.length ? `<span class="who">${segsH(r.who, mode)}</span>` : "", r.act.length ? segsH(r.act, mode) : "",
+              r.res.length ? `<span class="res">→ ${segsH(r.res, mode)}</span>` : ""].filter(Boolean);
+  return `<div class="fr ${cls || ""}"><div class="yr">${esc(r.y)}</div><div class="bd"><div class="nm">${maskT(r.nm)}</div>` +
+    `<div class="tx">${tx.join("　")}</div></div></div>`;
+}
+const miniRow = r => `<div class="fr mini"><div class="yr">${esc(r.y)}</div><div class="bd"><div class="nm">${esc(r.nm)}</div></div></div>`;
+const joint = (r, first) => first ? "" : r.brk ? `<div class="brk"></div>` : r.cj ? `<div class="cj"><span class="${r.cj === "それとは関係なく" ? "fx" : ""}">⤵ ${esc(r.cj)}</span></div>` : `<div class="gap"></div>`;
+function drawFlow(c, mode) {
+  const F = K.flow, a = c.rows[0], b = c.rows[c.rows.length - 1];
+  const curRow = S.cur ? F.findIndex(r => ["who", "act", "res"].some(f => r[f].some(s => s.h === S.cur.k))) : -1;
+  let h = "";
+  if (a > 0) h += (a > 1 ? `<div class="more">${esc(F[0].y)} から …</div>` : "") + flowRow(F[a - 1], "type", "ctx");   // 前のまとまりの最後の行（出した字のまま）
+  for (let i = a; i <= b; i++) h += joint(F[i], i === a && a === 0) + flowRow(F[i], mode, i === curRow ? "now" : "");
+  if (curRow >= 0 && (curRow < a || curRow > b)) h += `<div class="brk"></div>` + flowRow(F[curRow], mode, "now");   // 前のまとまりから回ってきたもう1回
+  if (b + 1 < F.length) h += `<div class="nx">` + joint(F[b + 1], false) + miniRow(F[b + 1]) + (b + 2 < F.length ? `<div class="more">… ${esc(F[F.length - 1].y)} まで</div>` : "") + `</div>`;
+  return h;
+}
+function drawTables(c, mode) {
+  let h = "";
+  for (const tb of c.tables) {
+    const hasHead = tb.head.length > 0;
+    h += tb.cap ? `<div class="tname">${esc(tb.cap)}</div>` : "";
+    h += `<table>` + (hasHead ? `<thead><tr>${tb.head.map(x => `<th${x.w ? ` style="width:${esc(x.w)}"` : ""}>${esc(x.t)}</th>`).join("")}</tr></thead>` : "") + `<tbody>`;
+    for (const row of tb.rows) {
+      h += `<tr>` + row.cells.map((cl, i) => {
+        const now = S.cur && cl.segs.some(s => s.h === S.cur.k);
+        const cls = [hasHead && i === 0 && tb.ncol > 1 ? "rh" : "", !hasHead ? "sent" : "", now ? "now" : ""].filter(Boolean).join(" ");
+        const keepPend = PEND; if (cl.keep) PEND = [];
+        const inner = segsH(cl.segs, mode); PEND = keepPend;
+        return `<td${cl.span > 1 ? ` colspan="${cl.span}"` : ""}${cls ? ` class="${cls}"` : ""}>${inner}</td>`;
+      }).join("") + `</tr>`;
+    }
+    h += `</tbody></table>`;
+  }
+  return h;
+}
+function body(c, mode) {
+  PEND = mode === "type" ? pending(c) : [];
+  // もう1回が前のまとまりから回ってきたとき: その穴のあるまとまりを出す
+  const cc = (mode === "type" && S.cur && K.chunks.find(x => x.holes.includes(S.cur.k))) || c;
+  return cc.kind === "flow" ? drawFlow(cc, mode) : drawTables(cc, mode);
+}
+
+function render() {
+  save();
+  if (!K.chunks.length) { $app.innerHTML = `<div class="home"><p class="left">${esc(WAKU_ERR || "データがありません")}</p></div>`; return; }
+  if (onTop) { QV = null; return drawHome(false); }
+  if (isEnd(S)) { QV = null; return drawHome(true); }
+  if (S.ph === "look") { QV = null; return drawLook(chunk(S, K)); }
+  drawType();
+}
+const subLine = () => Object.entries(K.sub || {}).map(([s, t]) => `${s} ${t}`).join("・");
+
+// 始まりと終わり。終わりは きょう出せた所を多く、のこりは短く
+function drawHome(end) {
+  const T = tally(S, K), fresh = S.ci === 0 && S.ph === "look" && !Object.keys(S.res).length;
+  let h = `<div class="home${end ? " fin" : ""}"><h1>${end ? "きょうの骨組み、ぜんぶ打った" : "きょうの授業の骨組み"}</h1><div class="bin">${esc(K.kai)}　${esc(subLine())}</div>`;
+  if (end || !fresh) {
+    h += `<div class="big"><b>${T.got.length}</b><span>か所 きょう出せた</span></div><div class="cards">`;
+    for (const c of K.chunks) {
+      const g = c.holes.filter(x => T.got.includes(x));
+      if (!g.length) continue;
+      h += `<div class="card p"><div class="cn"><i>${esc(c.s)}</i>${esc(c.name)}</div><div class="ws">${[...new Set(g.map(x => K.holes[x].a))].map(esc).join("・")}</div></div>`;
+    }
+    h += `</div>`;
+    if (end && T.left.length) h += `<div class="left">のこり ${T.left.length}${T.left.length <= 10 ? "：" + [...new Set(T.left.map(x => K.holes[x].a))].map(esc).join("・") : ""}</div>`;   // のこりは短く
+    if (!end) h += `<div class="left">つづきは ${S.ci + 1} つ目のまとまりから</div>`;
+  } else {
+    const ns = K.chunks.filter(c => c.s === "社会"), nr = K.chunks.filter(c => c.s === "理科");
+    h += `<div class="big"><b>${T.all.length}</b><span>か所を打つ・まとまり ${K.chunks.length}</span></div><div class="list">` +
+      ns.concat(nr).map(c => `<div><i class="tag ${esc(c.s)}">${esc(c.s)}</i>${esc(c.name)}</div>`).join("") + `</div>` +
+      `<div class="rules">${RULE.map(r => `<p>${esc(r)}</p>`).join("")}</div>`;
+  }
+  h += `</div>`;
+  $app.innerHTML = `<div class="bar"><span class="sp"></span><button class="menu" id="mb" aria-label="メニュー">…</button></div>${menuHtml()}` + h +
+    (end ? "" : `<div class="homedock"><button class="act" id="go">${fresh ? "はじめる" : "つづきから"}</button></div>`);
+  bindMenu();
+  const go = document.getElementById("go");
+  if (go) go.onclick = () => { onTop = false; t0 = Date.now(); render(); if (QV && S.ph === "type") QV.inp.focus(); };
+}
+
+// 見ておぼえる: そのまとまりだけ（社会は前の行と次の行も薄く）。キーボードなしで 660px に収める
+function drawLook(c) {
+  $app.innerHTML = bar(c, `${S.ci + 1}／${K.chunks.length}`) +
+    `<div class="pane look" id="pane"><div class="phase"><b>見ておぼえる</b>　黄色の ${c.holes.length} か所を、このあと伏せて打つ</div>${body(c, "look")}</div>` +
+    `<div class="homedock"><button class="act" id="go">伏せて打つ</button></div>`;
+  bindMenu();
+  const p = document.getElementById("pane");   // 収まらなければ詰める（字を小さく → 次の行を省く → 名前を行の頭に）
+  for (const t of ["t1", "t2", "t3"]) if (p.scrollHeight > p.clientHeight + 1) p.classList.add(t);
+  document.getElementById("go").onclick = () => { startType(S, K); t0 = Date.now(); flash = ""; note = ""; render(); if (QV) QV.inp.focus(); };
+}
+
+// 伏せて打つ: 表（流れ）のいまの穴のまわり・入力欄・返しを、見える高さ（visualViewport）に収める。入力欄は作り直さず使い回す（iOS の focus）
+let QV = null;
+function skeleton() {
+  if (QV && document.body.contains(QV.inp)) return QV;
+  $app.innerHTML = `<div id="qbar"></div><div class="pane typ" id="pane"></div><div class="dock"><div class="prompt" id="pr"></div>` +
+    `<div class="inrow"><input id="inp" type="text" lang="ja" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="done"><button class="go" id="btn">決定</button></div>` +
+    `<div class="note" id="note"></div><div id="fbx"></div></div>`;
+  QV = { pane: document.getElementById("pane"), inp: document.getElementById("inp"), btn: document.getElementById("btn") };
+  QV.inp.addEventListener("input", () => { note = ""; document.getElementById("note").textContent = ""; setBtn(); });
+  QV.inp.addEventListener("keydown", ev => { if (ev.key === "Enter" && !ev.isComposing && ev.keyCode !== 229) { ev.preventDefault(); press(); } });
+  QV.btn.addEventListener("click", press);
+  return QV;
+}
+function setBtn() { QV.btn.disabled = norm(QV.inp.value) === ""; }
+function press() {
+  const c = current(S, K); if (!c || QV.btn.disabled) return;
+  const typed = QV.inp.value, before = S.ci;
+  const o = submit(S, K, typed);
+  if (!o) return;
+  if (o.res === "short") { note = K.holes[o.hid].t === "num" ? "数字で打つ" : "もう少し打つ（ほかの語と同じ頭）"; document.getElementById("note").textContent = note; return; }
+  rec(o, typed);
+  t0 = Date.now(); QV.inp.value = ""; note = "";
+  flash = o.res === "ok" ? `○ ${K.holes[o.hid].a}` : "";
+  if (S.ci !== before || S.ph !== "type") { QV.inp.blur(); QV = null; render(); return; }   // まとまりの終わり → 次の 見ておぼえる（キーボードを閉じる）
+  render(); QV.inp.focus();
+}
+function drawType() {
+  const c = chunk(S, K), cu = current(S, K);
+  skeleton();
+  const done = S.queue.slice(0, S.qi).length, tot = S.queue.length;
+  document.getElementById("qbar").innerHTML = bar(c, `${S.ci + 1}／${K.chunks.length}　${Math.min(done + 1, tot)}／${tot}`);
+  bindMenu();
+  QV.pane.innerHTML = body(c, "type");
+  const h = cu.h, e = cu.e;
+  const im = h.t === "num" ? "numeric" : "text";
+  if (QV.inp.inputMode !== im) QV.inp.inputMode = im;
+  QV.inp.placeholder = e.phase === "retype" ? "正解を打ち直す" : h.t === "num" ? "数字" : "頭の2文字から";
+  document.getElementById("pr").innerHTML = (flash ? `<span class="fl">${esc(flash)}</span>` : "") + (cu.it.r === 1 ? `<span class="re">もう1回</span>` : "") + maskT(h.q);
+  document.getElementById("note").textContent = note;
+  let fb = "";
+  if (e.phase === "retype") {
+    PEND = pending(c).filter(w => !h.as.includes(w));
+    fb = `<div class="fb"><div class="h">× 正解は ${esc(h.a)}<small>${h.t === "num" || h.ys[0] === h.a ? "" : "（" + esc(h.ys[0]) + "）"}</small>${e.ans ? `<span class="mine">打った ${esc(e.ans)}</span>` : ""}</div>` +
+      (h.k ? `<div class="ksh"><span class="km">${esc(h.km)}</span>${maskT(h.k)}</div>` : "") + `</div>`;
+  }
+  document.getElementById("fbx").innerHTML = fb;
+  setBtn();
+  fit();
+}
+// いまの穴を欄の真ん中に
+function fit() {
+  if (!QV || !QV.pane) return;
+  const cur = document.getElementById("cur"); if (!cur) return;
+  const p = QV.pane, pr = p.getBoundingClientRect(), cr = cur.getBoundingClientRect();
+  p.scrollTop += (cr.top - pr.top) - (p.clientHeight - cr.height) / 2;
+}
+function setVH() { const h = window.visualViewport ? window.visualViewport.height : innerHeight; document.documentElement.style.setProperty("--vh", h + "px"); fit(); }
+if (window.visualViewport) { visualViewport.addEventListener("resize", setVH); visualViewport.addEventListener("scroll", () => scrollTo(0, 0)); }
+addEventListener("resize", setVH);
+if (TRY) {
+  document.body.insertAdjacentHTML("afterbegin", '<div style="position:fixed;top:0;left:0;right:0;z-index:55;background:var(--accbg);color:var(--acc);border-bottom:1px solid var(--line);font-size:12px;text-align:center;padding:1px 8px">試し（娘の記録に混ざらない）</div>');
+  document.documentElement.style.setProperty("--top", "20px"); document.body.style.paddingTop = "20px";
+}
+if (!API) { const t = document.createElement("div"); t.id = "norec"; t.textContent = DEVMODE ? "確かめ（送らない）" : "きろくなし"; document.body.appendChild(t); }
+setVH();
+render();
+flush();
+</script>
+</body>
+</html>
