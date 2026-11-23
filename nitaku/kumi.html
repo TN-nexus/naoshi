@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>取り違えた組</title>
+<link rel="icon" href="data:,">
+<style>
+/* 取り違えた組（バス。器 #27 の役目の置き換え 2026-11-23）。殻だけ: 問い・正解は中継（合言葉つき）から受け取る */
+:root{ --bg:#f5f3ee; --card:#fff; --ink:#22262b; --sub:#6c7077; --faint:#9a9da2; --line:#dedad2; --ok:#1d7a4c; --okbg:#e5f3ea; --ng:#b4322a; --ngbg:#fbebe8;
+  --acc:#2f5fb3; --accbg:#e8effb; --s-社会:#a0521a; --sbg-社会:#fbeadb; --s-理科:#2d6e37; --sbg-理科:#e0f0e1; }
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;font-size:17px;line-height:1.55;-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
+button{font:inherit;color:inherit;cursor:pointer;-webkit-user-select:none;user-select:none;touch-action:manipulation}
+#app{max-width:520px;margin:0 auto;height:calc(100dvh - var(--top,0px));display:flex;flex-direction:column;overflow:hidden;padding:0 14px}
+.bar{flex:none;display:flex;align-items:center;gap:8px;height:38px;border-bottom:1px solid var(--line)}
+.tag{font-size:12px;font-weight:700;padding:2px 9px;border-radius:999px;white-space:nowrap}
+.tag.社会{background:var(--sbg-社会);color:var(--s-社会)} .tag.理科{background:var(--sbg-理科);color:var(--s-理科)}
+.round{font-size:13px;color:var(--sub);white-space:nowrap}
+.round b{color:var(--ink);font-weight:700}
+.round.re b{color:var(--ng)}
+.sp{flex:1}
+.dots{display:flex;gap:5px}
+.dots i{width:8px;height:8px;border-radius:50%;background:var(--line);display:block}
+.dots i.on{background:var(--ink)} .dots i.now{background:none;box-shadow:0 0 0 2px var(--ink) inset}
+.menu{border:none;background:none;font-size:18px;color:var(--sub);padding:4px 2px 4px 8px}
+.mn{position:absolute;right:16px;top:40px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:8px;z-index:30;display:flex;flex-direction:column;gap:6px;box-shadow:0 6px 18px rgba(0,0,0,.08)}
+.mn button{border:1.5px solid var(--ink);background:#fff;border-radius:10px;padding:8px 14px;font-size:15px}
+.mn button.danger{border-color:var(--ng);color:var(--ng)}
+/* 上の欄: 組・問い・返し（基本はスクロールなし。はみ出すときだけこの欄の中で） */
+.pane{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:8px 0 6px}
+.grp{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:7px 10px 8px}
+.gname{font-size:12px;color:var(--sub);margin-bottom:5px;line-height:1.3}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chip{font-size:14px;line-height:1.2;padding:3px 9px;border-radius:999px;border:1px solid var(--line);background:var(--bg);white-space:nowrap}
+.chip.hit{border-color:var(--ok);background:var(--okbg);color:var(--ok);font-weight:700}
+.chip.miss{border-color:var(--ng);background:var(--ngbg);color:var(--ng)}
+.qlbl{font-size:12px;color:var(--faint);margin:9px 2px 1px;letter-spacing:.04em}
+.q{font-size:18px;font-weight:600;line-height:1.5;margin:0 2px}
+.q.small{font-size:15px;font-weight:400;color:var(--sub);line-height:1.45}
+.sent{font-size:17px;line-height:1.6;margin:0 2px}
+.sent.small{font-size:15px;line-height:1.5}
+.sent span.badtile{color:var(--ng);text-decoration:line-through;text-decoration-thickness:2px}
+.sent span.picked{background:var(--accbg);border-radius:4px}
+.fb{margin-top:8px;border-radius:12px;padding:7px 10px;background:var(--ngbg)}
+.fb .h{font-size:16px;font-weight:700;color:var(--ng);line-height:1.4}
+.fb .mine{font-size:12px;font-weight:400;color:var(--sub);margin-left:6px;white-space:nowrap}
+.fb .h small{font-weight:400;color:var(--sub);font-size:13px;margin-left:4px}
+.ksh{font-size:13px;line-height:1.5;color:var(--ink);margin-top:4px}
+.ksh .km{color:var(--faint);font-size:11px;margin-right:4px}
+.chip.blank{width:64px;height:25px;background:var(--line);border-color:var(--line)}
+.src{font-size:10.5px;color:var(--faint);margin-top:2px;line-height:1.3}
+/* 下の固定欄: 高さを決めておき、決定・次へ の位置を動かさない */
+.dock{flex:none;padding:8px 0 calc(10px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:var(--bg)}
+.prompt{font-size:13px;color:var(--sub);height:18px;line-height:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.typed{height:34px;display:flex;align-items:center;justify-content:center;gap:6px;margin:2px 0 6px}
+.typed .box{width:36px;height:34px;border-radius:10px;background:var(--card);border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700}
+.typed .box.cur{border-color:var(--acc)}
+.typed .num{min-width:110px;height:34px;border-radius:10px;background:var(--card);border:1.5px solid var(--acc);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;padding:0 10px}
+.typed .post{font-size:15px;color:var(--sub)}
+.area{height:214px;display:flex;flex-direction:column}
+.area.tall{height:256px}
+.kb{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:4px}
+.kb2{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:4px;margin-top:6px}
+.k{height:32px;min-width:0;font-size:16px;border:1px solid var(--line);border-radius:8px;background:var(--card);padding:0;transition:transform .05s,background .05s}
+.k:active,.k.pr{transform:scale(.92);background:var(--accbg)}
+.k.fn{font-size:13px;color:var(--sub)}
+.kb span{display:block}
+.area.off .k{opacity:.35;pointer-events:none}
+.np{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;height:100%}
+.np .k{height:auto;font-size:21px}
+.tiles{display:flex;flex-direction:column;gap:7px;height:100%;justify-content:center}
+.tile{min-height:42px;padding:6px 12px;border:1.5px solid var(--line);border-radius:12px;background:var(--card);font-size:16px;line-height:1.35;text-align:left;transition:transform .05s}
+.tile:active{transform:scale(.98);background:var(--accbg)}
+.tile.badtile{border-color:var(--ng);background:var(--ngbg)}
+.tile.picked{border-color:var(--acc);background:var(--accbg)}
+.tile:disabled{cursor:default}
+.okc{height:100%;border-radius:14px;background:var(--okbg);padding:12px 14px;display:flex;flex-direction:column;justify-content:center;overflow-y:auto}
+.okc .h{font-size:22px;font-weight:800;color:var(--ok);display:flex;align-items:baseline;gap:10px}
+.okc .h small{font-size:14px;font-weight:400;color:var(--sub)}
+.okc .ksh{font-size:14px;margin-top:8px}
+.okc.re{background:var(--card);border:1px solid var(--line)}
+.okc.re .h{font-size:18px}
+.act{display:block;width:100%;height:50px;margin-top:8px;border-radius:14px;border:none;background:var(--ink);color:#fff;font-size:18px;font-weight:700;letter-spacing:.06em;transition:transform .05s,opacity .1s}
+.act:active{transform:scale(.98)}
+.act:disabled{opacity:.25;cursor:default}
+.act.sub{background:var(--card);color:var(--ink);border:1.5px solid var(--ink)}
+/* 始まりと終わり */
+.home{flex:1;min-height:0;overflow-y:auto;padding:18px 2px 8px}
+.home h1{font-size:24px;margin:0;letter-spacing:.02em}
+.home .bin{font-size:13px;color:var(--sub);margin-top:2px}
+.big{display:flex;align-items:baseline;gap:8px;margin:18px 0 8px}
+.big b{font-size:44px;line-height:1;font-variant-numeric:tabular-nums}
+.big span{font-size:15px;color:var(--sub)}
+.cards{display:flex;flex-wrap:wrap;gap:6px}
+.card{font-size:13.5px;line-height:1.3;padding:7px 10px;border-radius:10px;background:var(--card);border:1px solid var(--line)}
+.card.p{background:var(--okbg);border-color:#bfe0cb}
+.card.sumi{background:var(--ink);color:#fff;border-color:var(--ink)}
+.card i{font-style:normal;font-size:11px;margin-right:5px;opacity:.75}
+.sec{font-size:12px;color:var(--sub);margin:16px 0 6px;letter-spacing:.05em}
+.left{font-size:15px;color:var(--sub);margin-top:14px}
+.left b{color:var(--ink);font-size:17px}
+.rules{font-size:13px;line-height:1.6;color:var(--sub);margin-top:16px;padding:10px 12px;border-radius:12px;background:var(--card);border:1px solid var(--line)}
+.rules p{margin:2px 0}
+.homedock{flex:none;padding:8px 0 calc(12px + env(safe-area-inset-bottom))}
+#err{position:fixed;left:0;right:0;bottom:0;background:#fff3f2;color:var(--ng);font-size:12px;white-space:pre-wrap;padding:4px 8px;z-index:60;display:none}
+#norec{position:fixed;top:1px;right:6px;font-size:10px;line-height:1.2;color:var(--faint);z-index:50}
+</style>
+</head>
+<body>
+<div id="app"><p class="lead">よみこみ中…</p></div>
+<div id="err"></div>
+<script>
+window.onerror = (m, s, l, c) => { const e = document.getElementById("err"); e.style.display = "block"; e.textContent += `${m} (${l}:${c})\n`; };
+</script>
+<script>
+// 読み込み（flow.html の合言葉つきと同じ口）: ?s=<合言葉> があれば中継（GAS）が合言葉を確かめてから便のデータを返す（置くのは put_secure.py --kumi）。
+// ?dev=1 はローカルの確かめ用（同じフォルダの kumi_data.js を読む。公開には kumi_data.js を置かない）
+const PQ = new URLSearchParams(location.search);
+const SID = (/^[0-9A-Za-z_-]{16,80}$/.test(PQ.get("s") || "") ? PQ.get("s") : "");
+var KUMI_ERR = "";
+if (SID) {
+  try {
+    const x = new XMLHttpRequest();
+    x.open("POST", `https://script.google.com/macros/s/${encodeURIComponent(PQ.get("d") || "")}/exec`, false);
+    x.setRequestHeader("Content-Type", "text/plain;charset=utf-8");
+    x.send(JSON.stringify({ app: "naoshi", op: "session", args: { s: SID } }));
+    const r = JSON.parse(x.responseText);
+    if (r.error) KUMI_ERR = r.error; else window.KUMI = JSON.parse(r.items[0].text);
+  } catch (e) { KUMI_ERR = "よみこめなかった。電波のあるところで、もう一度ひらいてね"; }
+} else if (PQ.get("dev") === "1") document.write('<script src="kumi_data.js"><\/script>');
+</script>
+<script>
+// CORE-BEGIN 進みの規則（純粋関数。node で単体: tests/test_kumi.py）
+// 列 queue: 1周目（各組 向き A）→ 2周目（各組 向き B と正誤）。1つの訪れ＝1組の画面で、その周の問を1つずつ。
+// 外した問は need=2（2回正解するまで消えない）。その組の訪れの終わりに「もう一度」の訪れを、ほかの組を GAP 個はさんだ所へ差し込む
+// （同じ組を続けて出さない。後ろが足りなければ末尾）。もう一度で正解なら need を1つ減らす（外しても減らない）。
+// ×は正解を打ち直すまで先へ進めない（phase retype）。文の正誤は 違う所を押す（正しい文は ぜんぶ正しい＝0）→ 違う所なら正しい語を打つ
+const GAP = 2;
+function hira(s) { return String(s || "").replace(/[ァ-ヶ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x60)).replace(/\s/g, ""); }
+function gOf(K, id) { return K.groups.find(g => g.id === id); }
+function qOf(K, qid) { for (const g of K.groups) for (const q of g.A.concat(g.B)) if (q.id === qid) return q; return null; }
+function sig(K) { return K.bin + "#" + K.groups.map(g => g.id + ":" + g.A.concat(g.B).map(q => q.id).join(",")).join(";"); }
+function newState(K) {
+  const ids = K.groups.map(g => g.id);
+  return { v: 1, sig: sig(K), queue: ids.map(g => ({ g, r: 1 })).concat(ids.map(g => ({ g, r: 2 }))), qi: 0, si: 0,
+           need: {}, miss: {}, cnt: {}, cur: null, passed: [] };
+}
+function visit(S) { return S.queue[S.qi] || null; }
+function visitQs(S, K) {
+  const it = visit(S); if (!it) return [];
+  if (!it.qs) {
+    const g = gOf(K, it.g);
+    it.qs = it.r === 1 ? g.A.map(q => q.id) : it.r === 2 ? g.B.map(q => q.id) : g.A.concat(g.B).map(q => q.id).filter(id => (S.need[id] || 0) > 0);
+  }
+  return it.qs;
+}
+// いまの問（無ければ null＝おわり）。entry は1回だけ作る（出た回数を数える）
+function current(S, K) {
+  while (S.qi < S.queue.length && visitQs(S, K).length === 0) { S.qi++; S.si = 0; }   // 中身の無い訪れは飛ばす
+  const it = visit(S); if (!it) return null;
+  const qid = visitQs(S, K)[S.si], q = qOf(K, qid);
+  if (!S.cur || S.cur.k !== qid) {
+    S.cnt[qid] = (S.cnt[qid] || 0) + 1;
+    S.cur = { k: qid, n: S.cnt[qid], phase: q.t === "sei" ? "where" : "ask", first: null, ty: "", tile: null };
+  }
+  return { it, q, e: S.cur, g: gOf(K, it.g) };
+}
+function match(q, v) {
+  if (q.t === "num") { const x = String(v || "").replace(/[０-９．]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).trim(); return x !== "" && Number(x) === Number(q.a); }
+  return (q.ys || []).includes(hira(v));
+}
+// 打った答え（ask・fix・retype）→ ○なら true
+function submit(S, K, v) {
+  const c = current(S, K); if (!c) return null;
+  const { q, e } = c;
+  if (!["ask", "fix", "retype"].includes(e.phase)) return null;
+  const ok = match(q, v);
+  if (e.phase !== "retype") { if (e.first == null) e.first = ok; e.ans = v; }
+  e.phase = ok ? "done" : "retype";
+  e.ty = "";
+  return ok;
+}
+// 文の正誤: 札を押す（0＝ぜんぶ正しい）。where で 違う所 → fix（語を打つ）。外したら first=false
+function pickTile(S, K, i) {
+  const c = current(S, K); if (!c || c.q.t !== "sei") return null;
+  const { q, e } = c;
+  if (e.phase === "retile") { if (i !== 0) return false; e.phase = "done"; return true; }   // 正しい文で外したあと: ぜんぶ正しい を押し直す
+  if (e.phase !== "where") return null;
+  e.tile = i;
+  if (q.bad === 0) { e.first = i === 0; e.phase = i === 0 ? "done" : "retile"; return i === 0; }
+  if (i === q.bad) { e.phase = "fix"; return true; }
+  e.first = false; e.phase = "retype"; return false;   // 違う所を外した: 違う所と正しい語を見せて、語を打ち直す
+}
+// 次へ（done のときだけ）。訪れの終わりで、外した問が残る組に「もう一度」を差し込み、通った組を数える
+function next(S, K) {
+  const c = current(S, K); if (!c || c.e.phase !== "done") return false;
+  const { it, e } = c, qid = e.k;
+  if (e.first === false) S.miss[it.g] = 1;
+  if (it.r !== "re") { if (e.first === false) S.need[qid] = 2; }
+  else if (e.first === true) S.need[qid] = Math.max(0, (S.need[qid] || 0) - 1);
+  S.si++; S.cur = null;
+  if (S.si >= visitQs(S, K).length) endVisit(S, K);
+  return true;
+}
+function endVisit(S, K) {
+  const g = visit(S).g, gq = gOf(K, g), ids = gq.A.concat(gq.B).map(q => q.id);
+  const rest = () => S.queue.slice(S.qi + 1);
+  if (ids.some(id => (S.need[id] || 0) > 0) && !rest().some(x => x.g === g && x.r === "re")) insertRe(S, g);
+  S.qi++; S.si = 0;
+  if (!S.queue.slice(S.qi).some(x => x.g === g) && !ids.some(id => (S.need[id] || 0) > 0) && !S.passed.includes(g)) S.passed.push(g);
+}
+function insertRe(S, g) {
+  const L = S.queue.length;
+  let p = Math.min(S.qi + 1 + GAP, L);
+  while (p <= L && !((S.queue[p - 1] || {}).g !== g && (p === L || S.queue[p].g !== g))) p++;
+  S.queue.splice(Math.min(p, L), 0, { g, r: "re" });
+}
+function isEnd(S, K) { return current(S, K) === null; }
+if (typeof module !== "undefined") module.exports = { GAP, hira, newState, visitQs, current, match, submit, pickTile, next, insertRe, isEnd, sig };
+// CORE-END
+</script>
+<script>
+const K = (typeof KUMI !== "undefined" && KUMI) || { groups: [], sumi: [], bin: "" };
+const TRY = PQ.get("try") === "1", DEVMODE = PQ.get("dev") === "1";
+const DEPLOY = PQ.get("d") || "";
+const API = DEPLOY ? `https://script.google.com/macros/s/${encodeURIComponent(DEPLOY)}/exec` : "";
+const SKEY = (TRY ? "nitaku.kumi.try1." : "nitaku.kumi.v1.") + (K.bin || ""), QKEY = TRY ? "nitaku.kumiq.try" : "nitaku.kumiq.v1", DKEY = "nendai.dev";
+const MODE = TRY ? "nitaku_kumi_try" : "nitaku_kumi";
+const $app = document.getElementById("app");
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const ls = { get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+             set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} } };
+let DEV = TRY ? "テスト-パパ" : ls.get(DKEY, "");
+if (!DEV) { DEV = "n" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); ls.set(DKEY, DEV); }
+function ts() {
+  const d = new Date(), p = n => String(n).padStart(2, "0"), o = -d.getTimezoneOffset();
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}${o >= 0 ? "+" : "-"}${p(Math.floor(Math.abs(o) / 60))}:${p(Math.abs(o) % 60)}`;
+}
+// 記録: flow.html と同じ送り先（nendai の log）・同じ形。1打1行。端末にためて、送れたら消す（電波が無ければ次に開いたとき）
+let flushing = false;
+function log(args) {
+  if (!API && !DEVMODE) return;   // ?dev=1 は端末の列にためるだけ（送らない。確かめ用）
+  const q = ls.get(QKEY, []); q.push(Object.assign({ dev: DEV, ts: ts(), mode: MODE }, args)); ls.set(QKEY, q); flush();
+}
+async function flush() {
+  if (!API || flushing) return;
+  flushing = true;
+  try {
+    for (;;) {
+      const q = ls.get(QKEY, []); if (!q.length) break;
+      const r = await fetch(API, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, credentials: "omit",
+                                   body: JSON.stringify({ app: "nendai", op: "log", args: Object.assign({ k: K.k || "" }, q[0]) }) });
+      if (!r.ok) break;
+      const rj = await r.json().catch(() => null); if (!rj || rj.ok === false) break;
+      const q2 = ls.get(QKEY, []); q2.shift(); ls.set(QKEY, q2);
+    }
+  } catch (e) { /* 次の機会に */ }
+  flushing = false;
+}
+window.addEventListener("online", flush);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) flush(); });
+
+let S = ls.get(SKEY, null);
+if (!S || S.v !== 1 || S.sig !== sig(K)) S = newState(K);
+const save = () => ls.set(SKEY, S);
+let onTop = true, menuOpen = 0, t0 = Date.now();
+const sec = () => Math.round((Date.now() - t0) / 100) / 10;
+const bundle = (g, qid, suf = "") => `組_${g.kai}|${qid}${suf}`;
+function rec(c, suf, typed, right, ok) {
+  log({ stage: c.g.s, bundle: bundle(c.g, c.q.id, suf), year: String(c.e.n), event: String(c.q.q).slice(0, 300), aEra: typed, aYear: right, ok: ok ? 1 : 0, sec: sec() });
+}
+
+const RULE = [
+  "ことば: ひらがなで頭の2文字（小さい ゃ ゅ ょ っ も1文字。のばす音は ー。が・ぱ は か・は のあとに ゛゜）",
+  "数: 数字だけ（単位は書いてある）",
+  "文: 違う所を押して、正しいことばを打つ。正しい文なら「ぜんぶ正しい」",
+  "まちがえたら、正解を打ち直してから次へ。その問は、ほかの組をはさんで、2回正解するまで出る",
+];
+function bar(c) {
+  const lab = c.it.r === "re" ? "もう一度" : c.it.r === 1 ? "1周目" : "2周目";
+  const qs = visitQs(S, K), dots = qs.map((id, i) => `<i class="${i < S.si || (i === S.si && c.e.phase === "done") ? "on" : i === S.si ? "now" : ""}"></i>`).join("");
+  return `<div class="bar"><span class="tag ${esc(c.g.s)}">${esc(c.g.s)}</span><span class="round${c.it.r === "re" ? " re" : ""}"><b>${lab}</b></span>` +
+    `<span class="sp"></span><span class="dots">${dots}</span><button class="menu" id="mb" aria-label="メニュー">…</button></div>` + menuHtml();
+}
+function menuHtml() {
+  return menuOpen ? `<div class="mn">${menuOpen === 1 ? `<button id="m1">最初から</button>` : `<button class="danger" id="m2">ほんとうに最初から</button>`}<button id="m0">もどる</button></div>` : "";
+}
+function bindMenu() {
+  const on = (id, f) => { const el = document.getElementById(id); if (el) el.onclick = f; };
+  on("mb", () => { menuOpen = menuOpen ? 0 : 1; render(); });
+  on("m0", () => { menuOpen = 0; render(); });
+  on("m1", () => { menuOpen = 2; render(); });
+  on("m2", () => { menuOpen = 0; S = newState(K); onTop = true; save(); render(); });
+}
+
+function render() {
+  save();
+  if (!K.groups.length) { $app.innerHTML = `<div class="home"><p class="left">${esc(KUMI_ERR || "データがありません")}</p></div>`; return; }
+  if (onTop) return drawHome(false);
+  const c = current(S, K);
+  if (!c) return drawHome(true);
+  drawQ(c);
+}
+
+// 始まりと終わり: きょう通った組・済（日を空けて出せた組）を札で多く、のこりは数だけ
+function drawHome(end) {
+  const passed = S.passed.map(id => gOf(K, id)).filter(Boolean);
+  const left = K.groups.length - passed.length;
+  const fresh = S.qi === 0 && S.si === 0 && !S.cur;
+  const card = (g, cls, mark) => `<span class="card ${cls}"><i>${esc(g.s)}</i>${esc(g.name)}${mark || ""}</span>`;
+  const md = String(K.bin).slice(5).replace("-", "/").replace(/^0/, "");
+  let h = `<div class="home"><h1>${end ? "きょうの便、ぜんぶ通った" : "取り違えた組"}</h1><div class="bin">${esc((K.kai || []).join("・"))}　${esc(md)} の便</div>`;
+  if (passed.length || end) h += `<div class="big"><b>${passed.length}</b><span>組 きょう通った</span></div><div class="cards">${passed.map(g => card(g, "p")).join("")}</div>`;
+  else h += `<div class="big"><b>${K.groups.length}</b><span>組 きょうの便</span></div>`;
+  if ((K.sumi || []).length) h += `<div class="sec">済（日を空けて出せた組）${K.sumi.length}</div><div class="cards">${K.sumi.map(g => card(g, "sumi")).join("")}</div>`;
+  if (!end && passed.length) h += `<div class="left">のこり <b>${left}</b> 組</div>`;
+  if (end) {
+    const again = passed.filter(g => S.miss[g.id]).length;
+    h += `<div class="left">${again ? `外した問があった ${again}組は、次の便にも出る。` : ""}外さず通った組は、3日あけてまた出る。</div>`;
+  } else if (fresh) h += `<div class="rules">${RULE.map(r => `<p>${esc(r)}</p>`).join("")}</div>`;
+  h += `</div>`;
+  $app.innerHTML = `<div class="bar"><span class="sp"></span><button class="menu" id="mb" aria-label="メニュー">…</button></div>${menuHtml()}` + h +
+    (end ? "" : `<div class="homedock"><button class="act" id="go">${fresh ? "はじめる" : "つづきから"}</button></div>`);
+  bindMenu();
+  const go = document.getElementById("go"); if (go) go.onclick = () => { onTop = false; t0 = Date.now(); render(); };
+}
+
+const COLS = ["あいうえお", "かきくけこ", "さしすせそ", "たちつてと", "なにぬねの", "はひふへほ", "まみむめも", "や ゆ よ", "らりるれろ", "わ を ん"];
+const DK = { か: "が", き: "ぎ", く: "ぐ", け: "げ", こ: "ご", さ: "ざ", し: "じ", す: "ず", せ: "ぜ", そ: "ぞ", た: "だ", ち: "ぢ", つ: "づ", て: "で", と: "ど", は: "ば", ひ: "び", ふ: "ぶ", へ: "べ", ほ: "ぼ", う: "ゔ" };
+const HD = { は: "ぱ", ひ: "ぴ", ふ: "ぷ", へ: "ぺ", ほ: "ぽ" };
+function kanaPad(off) {
+  const cell = ch => ch === " " ? `<span></span>` : `<button class="k" data-c="${ch}">${ch}</button>`;
+  return `<div class="area${off ? " off" : ""}"><div class="kb">${[0, 1, 2, 3, 4].map(r => COLS.map(col => cell(col[r] || " ")).join("")).join("")}</div>` +
+    `<div class="kb2">${["゛", "゜", "ゃ", "ゅ", "ょ", "っ", "ー"].map(ch => `<button class="k" data-c="${ch}">${ch}</button>`).join("")}<button class="k fn" data-c="BS">消す</button></div></div>`;
+}
+function numPad() {
+  return `<div class="area"><div class="np">${["1", "2", "3", "4", "5", "6", "7", "8", "9", "BS", "0", "."].map(ch =>
+    ch === "BS" ? `<button class="k fn" data-c="BS">消す</button>` : ch === "." ? `<span></span>` : `<button class="k" data-c="${ch}">${ch}</button>`).join("")}</div></div>`;
+}
+function typedBox(q, e) {
+  if (q.t === "num") return `<div class="typed"><span class="num">${esc(e.ty) || "&nbsp;"}</span>${q.post ? `<span class="post">${esc(q.post)}</span>` : ""}</div>`;
+  const t = e.ty || "";
+  return `<div class="typed"><span class="box${t.length === 0 ? " cur" : ""}">${esc(t[0] || "")}</span><span class="box${t.length === 1 ? " cur" : ""}">${esc(t[1] || "")}</span></div>`;
+}
+const answerText = q => q.t === "num" ? `${q.a}${q.post || ""}` : q.a;
+const yomiText = q => q.t === "num" || !q.y || q.y === q.a ? "" : `（${q.y}）`;
+const km = q => q.km ? `<span class="km">${esc(q.km)}</span>` : "";   // 返しの出どころ（本／錬成の解説／カリテの解説／演問の解説。kumi_build.py が出典から付ける）
+const kaeshi = q => `<div class="ksh">${km(q)}${esc(q.k)}</div><div class="src">${esc(q.src)}</div>`;
+
+// 1組＝1画面のまとまり: 上に組の名前と並べる語、その下に問い。下の欄は 打つ盤／札 と 決定・次へ（位置は動かない）
+function drawQ(c) {
+  const { q, e, g } = c;
+  const word = q.t === "sei" ? (q.bad ? q.a : "") : q.a;
+  const chips = g.words.map(w => `<span class="chip${e.phase === "done" && e.first && w === word ? " hit" : (e.phase === "retype" || (e.phase === "done" && e.first === false)) && w === word ? " miss" : ""}">${esc(w)}</span>`).join("");
+  const missed = e.phase === "retype" || e.phase === "retile" || (e.phase === "done" && e.first === false);
+  // 答えが組の語のどれかになる問いは、答える前は札を伏せる（数だけ見せ、組の名前も語を含まない呼び名に）。答えたあと（○・×）で開ける
+  const hide = g.words.includes(q.a) && !(missed || e.phase === "done");
+  const chipsHtml = hide ? g.words.map(() => `<span class="chip blank"></span>`).join("") : chips;
+  let body = `<div class="grp">${missed ? "" : `<div class="gname">${esc(hide ? (g.label || "") : g.name)}</div>`}<div class="chips">${chipsHtml}</div></div>`;   // ×の画面は組の名前を省いて、並べる語と返しを残す
+  let prompt = "", area = "", act = "";
+  if (q.t === "sei") {
+    const showBad = missed || e.phase === "fix" || (e.phase === "done" && q.bad);
+    const sent = q.tiles.map((t, i) => `<span class="${showBad && q.bad === i + 1 ? "badtile" : e.tile === i + 1 && !showBad ? "picked" : ""}">${esc(t)}</span>`).join("");
+    body += `<div class="qlbl">文の正誤　${e.phase === "where" ? "違う所は？" : "違う所"}</div>` + (e.phase === "retile" ? "" : `<div class="sent${missed ? " small" : ""}">${sent}</div>`);   // 押し直し（retile）は返しを見せるため文を省く（札が下にある）
+    if (e.phase === "fix") body += `<div class="qlbl">${esc(q.fixq || "正しいことばは？")}</div>`;
+  } else {
+    body += `<div class="qlbl">${q.t === "num" ? "数で" : "ことばの頭の2文字で"}</div><div class="q${missed ? " small" : ""}">${esc(q.q)}</div>`;
+  }
+  if (missed) {
+    const right = q.t === "sei" && !q.bad ? "この文は、ぜんぶ正しい" : `正解は ${esc(answerText(q))}<small>${esc(yomiText(q))}</small>`;
+    const mine = q.t === "sei" && e.tile != null && !(q.bad && e.tile === q.bad) ? (e.tile === 0 ? "ぜんぶ正しい" : q.tiles[e.tile - 1]) : e.ans;
+    const how = q.t === "sei" && e.tile != null && !(q.bad && e.tile === q.bad) ? "押した" : "打った";
+    body += `<div class="fb"><div class="h">× ${right}${mine ? `<span class="mine">${how} ${esc(mine)}</span>` : ""}</div><div class="ksh">${km(q)}${esc(q.k)}</div></div>`;
+  }
+  // 下の欄
+  if (e.phase === "where" || e.phase === "retile") {
+    prompt = e.phase === "retile" ? "「ぜんぶ正しい」を押す" : "違う所の札を押す。正しい文なら「ぜんぶ正しい」";
+    area = `<div class="area tall"><div class="tiles">${q.tiles.map((t, i) => `<button class="tile${e.phase === "retile" && e.tile === i + 1 ? " picked" : ""}" data-t="${i + 1}"${e.phase === "retile" ? " disabled" : ""}>${esc(t)}</button>`).join("")}</div></div>`;
+    act = `<button class="act sub" id="all">ぜんぶ正しい</button>`;
+  } else if (e.phase === "done") {
+    area = e.first === false ? `<div class="area tall"><div class="okc re"><div class="h">打てた。次へ</div><div class="src">この問は、ほかの組をはさんで、また出る</div></div></div>`
+      : `<div class="area tall"><div class="okc"><div class="h">○ ${esc(q.t === "sei" && !q.bad ? "ぜんぶ正しい" : answerText(q))}<small>${esc(yomiText(q))}</small></div>${kaeshi(q)}</div></div>`;
+    prompt = "";
+    act = `<button class="act" id="nx">次へ</button>`;
+  } else {
+    const n = q.t === "num", re = e.phase === "retype";
+    prompt = re ? (n ? "正解の数を打ち直す" : "正解の頭の2文字を打ち直す") : n ? "数字を打って「決定」" : e.phase === "fix" ? "正しいことばの頭の2文字" : "頭の2文字を打って「決定」";
+    area = (n ? numPad() : kanaPad(false));
+    const ready = n ? String(e.ty || "").length > 0 : (e.ty || "").length === 2;
+    act = `<button class="act" id="ok"${ready ? "" : " disabled"}>決定</button>`;
+  }
+  const typed = e.phase === "where" || e.phase === "retile" || e.phase === "done" ? "" : typedBox(q, e);   // 札・○の欄は背の高い area（typed 行のぶん）で、下の欄の高さは同じ
+  $app.innerHTML = bar(c) + `<div class="pane" id="pane">${body}</div><div class="dock"><div class="prompt">${esc(prompt)}</div>${typed}${area}${act}</div>`;
+  bindMenu();
+  const pn = document.getElementById("pane"); if (missed && pn && pn.scrollHeight > pn.clientHeight) pn.scrollTop = pn.scrollHeight;   // 返しが下で切れるときは、返しが見える所まで
+  $app.querySelectorAll(".k[data-c]").forEach(el => el.onclick = () => {
+    const ch = el.dataset.c; let ty = e.ty || ""; const last = ty.slice(-1);
+    if (ch === "BS") ty = ty.slice(0, -1);
+    else if (q.t === "num") { if (ty.length < 6) ty += ch; }
+    else if (ch === "゛") { if (DK[last]) ty = ty.slice(0, -1) + DK[last]; }
+    else if (ch === "゜") { if (HD[last]) ty = ty.slice(0, -1) + HD[last]; }
+    else if (ty.length < 2) ty += ch;
+    e.ty = ty; render();
+  });
+  const ok = document.getElementById("ok");
+  if (ok) ok.onclick = () => {
+    const ph = e.phase, typed = e.ty || "";
+    const good = submit(S, K, typed);
+    if (good == null) return;
+    const suf = ph === "retype" ? "|打ち直し" : "";
+    rec(c, suf, typed, answerText(q), good);
+    t0 = Date.now(); render();
+  };
+  $app.querySelectorAll(".tile[data-t]").forEach(el => el.onclick = () => tile(c, +el.dataset.t));
+  const all = document.getElementById("all"); if (all) all.onclick = () => tile(c, 0);
+  const nx = document.getElementById("nx");
+  if (nx) nx.onclick = () => { next(S, K); t0 = Date.now(); render(); document.getElementById("pane") && (document.getElementById("pane").scrollTop = 0); };
+}
+function tile(c, i) {
+  const { q, e } = c, ph = e.phase;
+  const r = pickTile(S, K, i); if (r == null) return;
+  const name = i === 0 ? "ぜんぶ正しい" : q.tiles[i - 1], right = q.bad ? q.tiles[q.bad - 1] : "ぜんぶ正しい";
+  rec(c, ph === "retile" ? "|打ち直し" : "|どこ", name, right, r);
+  t0 = Date.now(); render();
+}
+if (TRY) {
+  document.body.insertAdjacentHTML("afterbegin", '<div style="position:fixed;top:0;left:0;right:0;z-index:55;background:var(--accbg);color:var(--acc);border-bottom:1px solid var(--line);font-size:12px;text-align:center;padding:1px 8px">試し（娘の記録に混ざらない）</div>');
+  document.documentElement.style.setProperty("--top", "20px"); document.body.style.paddingTop = "20px";
+}
+if (!API) { const t = document.createElement("div"); t.id = "norec"; t.textContent = DEVMODE ? "確かめ（送らない）" : "きろくなし"; document.body.appendChild(t); }
+render();
+flush();
+</script>
+</body>
+</html>
