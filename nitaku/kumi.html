@@ -13,7 +13,8 @@
 html,body{height:100%;margin:0}
 body{background:var(--bg);color:var(--ink);font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;font-size:17px;line-height:1.55;-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
 button{font:inherit;color:inherit;cursor:pointer;-webkit-user-select:none;user-select:none;touch-action:manipulation}
-#app{max-width:520px;margin:0 auto;height:calc(var(--vh,100dvh) - var(--top,0px));display:flex;flex-direction:column;overflow:hidden;padding:0 14px}
+#app{position:fixed;left:0;right:0;top:calc(var(--vt,0px) + var(--top,0px));max-width:520px;margin:0 auto;height:calc(var(--vh,100dvh) - var(--top,0px));display:flex;flex-direction:column;overflow:hidden;padding:0 14px}
+/* 11/23 夕 iPhone で止まった件の直し: 画面は見える高さ（visualViewport）にぴったり貼る（iOS がキーボードで画面をずらしても追う。scrollTo で戻さない） */
 .bar{flex:none;display:flex;align-items:center;gap:8px;height:38px;border-bottom:1px solid var(--line)}
 .tag{font-size:12px;font-weight:700;padding:2px 9px;border-radius:999px;white-space:nowrap}
 .tag.社会{background:var(--sbg-社会);color:var(--s-社会)} .tag.理科{background:var(--sbg-理科);color:var(--s-理科)}
@@ -108,7 +109,14 @@ button{font:inherit;color:inherit;cursor:pointer;-webkit-user-select:none;user-s
 #norec{position:fixed;top:1px;right:6px;font-size:10px;line-height:1.2;color:var(--faint);z-index:50}
 
 /* ふつうのキーボード（11/23 夕）: 見える高さの中に 札・問い・入力欄・返し */
-.qv{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:6px 0 8px}
+.qv{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;padding:6px 0 8px}
+/* 問いの段（上・はみ出せば自分の中で送る）→ 入力欄の行（動かない・隠れない）→ 返し（下・自分の中で送る） */
+#qtop{flex:none;max-height:60%;overflow-y:auto;-webkit-overflow-scrolling:touch}
+#fbx{flex:1 1 0;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.qv .chips{flex-wrap:nowrap;overflow:hidden}
+.qv .inrow{flex:none}
+.tapk{display:none;flex:none;margin-top:8px;width:100%;height:46px;border:2px dashed var(--acc);border-radius:12px;background:var(--accbg);color:var(--acc);font-size:17px;font-weight:700}
+.tapk.on{display:block}
 .qv .grp{padding:5px 8px 6px;border-radius:12px}
 .qv .gname{font-size:11.5px;margin-bottom:3px}
 .qv .chips{gap:4px}
@@ -128,7 +136,6 @@ button{font:inherit;color:inherit;cursor:pointer;-webkit-user-select:none;user-s
 .qv .sent{font-size:16px;line-height:1.5}
 .inrow{display:flex;gap:8px;margin-top:8px}
 .inrow input{flex:1;min-width:0;height:44px;font-size:20px;padding:0 12px;border:1.5px solid var(--acc);border-radius:12px;background:var(--card);color:var(--ink);font-family:inherit}
-.inrow input[readonly]{border-color:var(--line);color:var(--sub)}
 .inrow .go{flex:none;width:92px;height:44px;border:none;border-radius:12px;background:var(--ink);color:#fff;font-size:17px;font-weight:700}
 .inrow .go:disabled{opacity:.25}
 .inrow .go:active{transform:scale(.97)}
@@ -169,7 +176,7 @@ if (SID) {
 <script>
 // CORE-BEGIN 進みの規則（純粋関数。node で単体: tests/test_kumi.py）
 // 列 queue: 1周目（各組 向き A）→ 2周目（各組 向き B と正誤）。1つの訪れ＝1組の画面で、その周の問を1つずつ。
-// 外した問は need=2（2回正解するまで消えない）。その組の訪れの終わりに「もう一度」の訪れを、ほかの組を GAP 個はさんだ所へ差し込む
+// 外した問は need=1（11/23 16:4x パパ: 戻すのは1回。戻った所で正解すれば消える。また外したら打ち直して、もう1回だけ戻る＝正解するまで1回ずつ。前の版の need=2 の進みは、戻りで正解すれば 0 になる）。その組の訪れの終わりに「もう一度」の訪れを、ほかの組を GAP 個はさんだ所へ差し込む
 // （同じ組を続けて出さない。後ろが足りなければ末尾）。もう一度で正解なら need を1つ減らす（外しても減らない）。
 // ×は正解を打ち直すまで先へ進めない（phase retype）。文の正誤は 違う所を押す（正しい文は ぜんぶ正しい＝0）→ 違う所なら正しい語を打つ
 const GAP = 2;
@@ -239,8 +246,8 @@ function next(S, K) {
   const c = current(S, K); if (!c || c.e.phase !== "done") return false;
   const { it, e } = c, qid = e.k;
   if (e.first === false) S.miss[it.g] = 1;
-  if (it.r !== "re") { if (e.first === false) S.need[qid] = 2; }
-  else if (e.first === true) S.need[qid] = Math.max(0, (S.need[qid] || 0) - 1);
+  if (it.r !== "re") { if (e.first === false) S.need[qid] = 1; }
+  else if (e.first === true) S.need[qid] = 0;
   S.si++; S.cur = null;
   if (S.si >= visitQs(S, K).length) endVisit(S, K);
   return true;
@@ -259,7 +266,14 @@ function insertRe(S, g) {
   S.queue.splice(Math.min(p, L), 0, { g, r: "re" });
 }
 function isEnd(S, K) { return current(S, K) === null; }
-if (typeof module !== "undefined") module.exports = { GAP, hira, norm, newState, visitQs, current, match, submit, pickTile, next, insertRe, isEnd, sig };
+// 進みを端末の外にも（ハイブリッド。2026-11-23 パパ。waku.html と同じ）: 中継の進みが端末より新しければ（at）中継の方で続ける。便の違う進みは使わない
+function stamp(S) { const o = Object.assign({}, S); delete o.at; return JSON.stringify(o); }
+function pickState(local, remote, sg) {
+  const okL = !!(local && local.v === 1 && local.sig === sg), okR = !!(remote && remote.v === 1 && remote.sig === sg);
+  if (okR && (!okL || (remote.at || 0) > (local.at || 0))) return remote;
+  return okL ? local : null;
+}
+if (typeof module !== "undefined") module.exports = { GAP, hira, norm, newState, visitQs, current, match, submit, pickTile, next, insertRe, isEnd, sig, stamp, pickState };
 // CORE-END
 </script>
 <script>
@@ -303,9 +317,42 @@ async function flush() {
 window.addEventListener("online", flush);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) flush(); });
 
-let S = ls.get(SKEY, null);
-if (!S || S.v !== 1 || S.sig !== sig(K)) S = newState(K);
-const save = () => ls.set(SKEY, S);
+// 進みの置き場（ハイブリッド。2026-11-23 パパ「続きや2回目を mac でも」）: 端末（localStorage）と中継（Bus.gs の bus_state。合言葉 s と保存キーで1行）の両方。
+// 開くとき中継の進みを1回読み、新しい方で続ける。進みが変わるたびに at を付けて中継へ（まとめて 1.5 秒後・画面を離れるときはすぐ）。
+// 中継に Bus.gs がまだ無い・電波が無いときは、いままでどおり端末だけで動く（失敗は黙って、次に変わったとき・戻ったときに送り直す）
+const SYNC = !!(SID && API);
+let syncOn = SYNC;
+// 開いたときの読み込みは画面を待たせない（同期にしない・5秒で打ち切る）。届いたとき、まだ始まりの画面にいて中継の方が新しければ、それに替えて描き直す
+function syncGet() {
+  if (!syncOn) return;
+  const ac = typeof AbortController !== "undefined" ? new AbortController() : null, tm = setTimeout(() => ac && ac.abort(), 5000);
+  fetch(API, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, credentials: "omit", signal: ac ? ac.signal : undefined,
+               body: JSON.stringify({ app: "bus", op: "get", args: { s: SID, key: SKEY } }) })
+    .then(r => r.json()).then(r => {
+      clearTimeout(tm);
+      if (!r || r.ok !== true) { syncOn = false; return; }   // 中継に Bus.gs がまだ無い（forbidden）・リンクの期限 → このあいだは端末だけ
+      const R = r.state ? JSON.parse(r.state) : null;
+      if (R && onTop && pickState(S, R, sig(K)) === R) { S = R; lastStamp = stamp(S); dirty = false; render(); return; }
+      if (S.at && (!R || (R.at || 0) < S.at)) { dirty = true; syncSend(); }   // 端末の方が新しい → 中継へ
+    }).catch(() => clearTimeout(tm));   // 電波が無い・時間切れ → 端末の進みのまま。戻ったら送る
+}
+let S = pickState(ls.get(SKEY, null), null, sig(K)) || newState(K);
+let lastStamp = stamp(S), dirty = false, syncT = 0;
+function syncSend() {
+  clearTimeout(syncT);
+  if (!syncOn || !dirty) return;
+  const body = JSON.stringify({ app: "bus", op: "put", args: { s: SID, key: SKEY, state: JSON.stringify(S), at: S.at || 0 } }), at = S.at;
+  fetch(API, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, credentials: "omit", keepalive: body.length < 60000, body })
+    .then(r => r.json()).then(rj => { if (rj && rj.ok === false) syncOn = false; else if (rj && rj.ok && S.at === at) dirty = false; }).catch(() => {});
+}
+const save = () => {
+  const st = stamp(S);
+  if (st !== lastStamp) { lastStamp = st; S.at = Date.now(); dirty = true; clearTimeout(syncT); syncT = setTimeout(syncSend, 1500); }
+  ls.set(SKEY, S);
+};
+document.addEventListener("visibilitychange", () => { if (document.hidden) syncSend(); });
+addEventListener("pagehide", syncSend);
+addEventListener("online", syncSend);
 let onTop = true, menuOpen = 0, t0 = Date.now();
 const sec = () => Math.round((Date.now() - t0) / 100) / 10;
 const bundle = (g, qid, suf = "") => `組_${g.kai}|${qid}${suf}`;
@@ -364,7 +411,7 @@ function drawHome(end) {
   $app.innerHTML = `<div class="bar"><span class="sp"></span><button class="menu" id="mb" aria-label="メニュー">…</button></div>${menuHtml()}` + h +
     (end ? "" : `<div class="homedock"><button class="act" id="go">${fresh ? "はじめる" : "つづきから"}</button></div>`);
   bindMenu();
-  const go = document.getElementById("go"); if (go) go.onclick = () => { onTop = false; t0 = Date.now(); render(); const c = current(S, K); if (QV && c && usesInput(c.e)) QV.inp.focus(); };
+  const go = document.getElementById("go"); if (go) go.onclick = () => { onTop = false; t0 = Date.now(); render(); const c = current(S, K); if (QV && c && usesInput(c.e)) wake(); };
 }
 
 // 問の画面（11/23 夕: 50音盤をやめ、スマホのふつうのキーボード）。入力欄は1つを作り直さずに使い回す（iOS は押した処理の中でしか focus が効かない）。
@@ -372,14 +419,38 @@ function drawHome(end) {
 let QV = null;   // 問の画面の骨組み（作ったら使い回す）
 function skeleton() {
   if (QV && document.body.contains(QV.inp)) return QV;
-  $app.innerHTML = `<div id="qbar"></div><div class="qv" id="qv"><div id="grp"></div><div id="qq"></div><div id="sei"></div>` +
+  $app.innerHTML = `<div id="qbar"></div><div class="qv" id="qv"><div id="qtop"><div id="grp"></div><div id="qq"></div><div id="sei"></div></div>` +
     `<div class="inrow" id="inrow"><input id="inp" type="text" lang="ja" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="done"><button class="go" id="btn">決定</button></div>` +
-    `<div id="fbx"></div></div>`;
-  QV = { qv: document.getElementById("qv"), inp: document.getElementById("inp"), btn: document.getElementById("btn"), inrow: document.getElementById("inrow") };
-  QV.inp.addEventListener("input", () => { const c = current(S, K); if (!c) return; c.e.ty = QV.inp.value; save(); setBtn(c); });
+    `<button class="tapk" id="tapk">ここを押して打つ</button><div id="fbx"></div></div>`;
+  QV = { qv: document.getElementById("qv"), top: document.getElementById("qtop"), fbx: document.getElementById("fbx"), inp: document.getElementById("inp"),
+         btn: document.getElementById("btn"), inrow: document.getElementById("inrow"), tap: document.getElementById("tapk"), foldKey: "", composing: false, pend: false };
+  QV.inp.addEventListener("input", () => { const c = current(S, K); if (!c) return; if (c.e.phase !== "done") c.e.ty = QV.inp.value; save(); setBtn(c); });
   QV.inp.addEventListener("keydown", ev => { if (ev.key === "Enter" && !ev.isComposing && ev.keyCode !== 229) { ev.preventDefault(); press(); } });
-  QV.btn.addEventListener("click", press);
+  // 変換中（未確定）に決定を押したとき: 確定（compositionend）を待ってから判定する（待ちすぎない: 0.4 秒で今の値で判定）
+  QV.inp.addEventListener("compositionstart", () => { QV.composing = true; });
+  QV.inp.addEventListener("compositionend", () => { QV.composing = false; const c = current(S, K); if (c) setBtn(c); if (QV.pend) { QV.pend = false; press(); } });
+  QV.btn.addEventListener("click", () => { if (QV.composing) { QV.pend = true; setTimeout(() => { if (QV && QV.pend) { QV.pend = false; QV.composing = false; press(); } }, 400); return; } press(); });
+  // キーボードが出ていないのに focus だけ残っている（iOS）: 入力欄を押す・「ここを押して打つ」を押す → 同じ操作の中で blur → focus（必ず開く）
+  QV.inp.addEventListener("touchend", () => { if (document.activeElement === QV.inp && !kbOpen()) { QV.inp.blur(); QV.inp.focus(); } });
+  QV.tap.addEventListener("click", () => { wake(); });
+  QV.inp.addEventListener("focus", tapHint); QV.inp.addEventListener("blur", tapHint);
   return QV;
+}
+// キーボードが出ているか（iOS・Android: 見える高さが画面の高さより 120px 以上低い）。指で触る端末でないとき（Mac）は focus の有無だけで見る
+const TOUCH = !!(window.matchMedia && matchMedia("(pointer: coarse)").matches);
+function kbOpen() { return !TOUCH || !window.visualViewport || innerHeight - visualViewport.height > 120; }
+// 押した操作の中でだけ呼ぶ: 入力欄にキーボードを出す（focus 済みでキーボードが無ければ、いったん外してから入れ直す）
+function wake() {
+  if (!QV || QV.inrow.style.display === "none") return;
+  if (document.activeElement === QV.inp && !kbOpen()) QV.inp.blur();
+  QV.inp.focus();
+  tapHint();
+}
+// 「ここを押して打つ」: 打つ段なのに入力欄に focus が無い・（指の端末で）キーボードが出ていないとき、入力欄の下に出す
+function tapHint() {
+  if (!QV || onTop || !document.body.contains(QV.inp)) return;
+  const show = !!(S.cur && usesInput(S.cur) && QV.inrow.style.display !== "none" && (document.activeElement !== QV.inp || !kbOpen()));
+  QV.tap.classList.toggle("on", show);
 }
 const usesInput = e => ["ask", "fix", "retype", "done"].includes(e.phase);
 function setBtn(c) {
@@ -396,7 +467,7 @@ function press() {
   if (e.phase === "done") {
     next(S, K); t0 = Date.now(); QV.inp.value = ""; render();
     const c2 = current(S, K);
-    if (c2 && usesInput(c2.e) && QV && document.body.contains(QV.inp)) QV.inp.focus(); else if (QV) QV.inp.blur();
+    if (c2 && usesInput(c2.e) && QV && document.body.contains(QV.inp)) wake(); else if (QV) QV.inp.blur();   // 文の正誤の札の段（入力欄なし）だけキーボードを閉じる
     return;
   }
   if (!usesInput(e) || QV.btn.disabled) return;
@@ -404,7 +475,7 @@ function press() {
   const good = submit(S, K, typed);
   if (good == null) return;
   rec(c, ph === "retype" ? "|打ち直し" : "", typed, answerText(q), good);
-  t0 = Date.now(); QV.inp.value = ""; render(); QV.inp.focus();
+  t0 = Date.now(); QV.inp.value = ""; render(); wake();
 }
 const answerText = q => q.t === "num" ? `${q.a}${q.post || ""}` : q.a;
 const yomiText = q => q.t === "num" || !q.y || q.y === q.a ? "" : `（${q.y}）`;
@@ -440,9 +511,10 @@ function drawQ(c) {
   QV.inrow.style.display = usesInput(e) ? "" : "none";
   const im = q.t === "num" ? "numeric" : "text";
   if (QV.inp.inputMode !== im) QV.inp.inputMode = im;
-  QV.inp.placeholder = e.phase === "retype" ? "正解を打ち直す" : q.t === "num" ? "数字" + (q.post ? `（${q.post}）` : "") : "頭の2文字";
-  QV.inp.readOnly = e.phase === "done";
-  if (e.phase !== "done" && QV.inp.value !== (e.ty || "")) QV.inp.value = e.ty || "";
+  QV.inp.placeholder = e.phase === "done" ? "Enter か 次へ" : e.phase === "retype" ? "正解を打ち直す" : q.t === "num" ? "数字" + (q.post ? `（${q.post}）` : "") : "頭の2文字";
+  // readOnly にしない（11/23 夕 iPhone: 次へ の段で readOnly にした入力欄は focus が残ったままキーボードが閉じ、次の問いで focus() が効かず止まった）
+  if (QV.inp.readOnly) QV.inp.readOnly = false;
+  if (e.phase === "done") { if (QV.inp.value) QV.inp.value = ""; } else if (QV.inp.value !== (e.ty || "")) QV.inp.value = e.ty || "";
   setBtn(c);
   let fb = "";
   if (missed) {
@@ -453,20 +525,30 @@ function drawQ(c) {
   } else if (e.phase === "done") {
     fb = `<div class="okc"><div class="h">○ ${esc(q.t === "sei" && !q.bad ? "ぜんぶ正しい" : answerText(q))}<small>${esc(yomiText(q))}</small></div>${kaeshi(q)}</div>`;
   }
-  document.getElementById("fbx").innerHTML = fb;
-  fit();
+  if (QV.fbx.innerHTML !== fb) { QV.fbx.innerHTML = fb; QV.fbx.scrollTop = 0; }   // 返しは頭（正解は…）から
+  fit(c);
+  tapHint();
 }
-// 見える高さに収める: はみ出すときは札の段を畳む（呼び名だけ残す）
-function fit() {
-  if (!QV) return;
+// 見える高さに収める: 問いが替わったとき（と 札の段⇔打つ段が替わったとき）だけ、はみ出すなら札の段を畳む。
+// キーボードの開閉（resize）では畳み直さない・送らない（入力欄の位置を動かさない）。返し・問いの段は それぞれの中で送る
+function fit(c) {
+  if (!QV || !c) return;
+  const key = c.e.k + "|" + (usesInput(c.e) ? "t" : "w");
+  if (QV.foldKey === key) return;
+  QV.foldKey = key;
   QV.qv.classList.remove("fold", "fold2");
-  if (QV.qv.scrollHeight > QV.qv.clientHeight + 1) QV.qv.classList.add("fold");
-  if (QV.qv.scrollHeight > QV.qv.clientHeight + 1) QV.qv.classList.add("fold2");   // まだはみ出す: 問いを小さく・見出しを省く
-  QV.qv.scrollTop = 0;
-  if (QV.qv.scrollHeight > QV.qv.clientHeight + 1) { const f = document.getElementById("fbx"); if (f && f.lastElementChild) f.lastElementChild.scrollIntoView({ block: "end" }); }
+  const room = () => QV.qv.clientHeight - (QV.inrow.style.display === "none" ? 0 : QV.inrow.offsetHeight + 96);   // 返しの場所を 96px は残す
+  if (QV.top.scrollHeight > room()) QV.qv.classList.add("fold");
+  if (QV.top.scrollHeight > room()) QV.qv.classList.add("fold2");   // まだはみ出す: 問いを小さく・見出しを省く（それでも長ければ問いの段の中で送る）
+  QV.top.scrollTop = 0;
 }
-function setVH() { const h = window.visualViewport ? window.visualViewport.height : innerHeight; document.documentElement.style.setProperty("--vh", h + "px"); fit(); }
-if (window.visualViewport) { visualViewport.addEventListener("resize", setVH); visualViewport.addEventListener("scroll", () => scrollTo(0, 0)); }
+function setVH() {
+  const v = window.visualViewport, h = v ? v.height : innerHeight;
+  document.documentElement.style.setProperty("--vh", h + "px");
+  document.documentElement.style.setProperty("--vt", (v ? Math.max(0, v.offsetTop) : 0) + "px");
+  tapHint();
+}
+if (window.visualViewport) { visualViewport.addEventListener("resize", setVH); visualViewport.addEventListener("scroll", setVH); }
 addEventListener("resize", setVH);
 function tile(c, i) {
   const { q, e } = c, ph = e.phase;
@@ -475,7 +557,7 @@ function tile(c, i) {
   rec(c, ph === "retile" ? "|打ち直し" : "|どこ", name, right, r);
   t0 = Date.now(); render();
   const c2 = current(S, K);
-  if (c2 && c2.e.phase !== "done" && usesInput(c2.e)) QV.inp.focus(); else if (QV) QV.inp.blur();   // 正しい語を打つ段でキーボードを開く
+  if (c2 && c2.e.phase !== "done" && usesInput(c2.e)) wake(); else if (QV) QV.inp.blur();   // 正しい語を打つ段でキーボードを開く
 }
 if (TRY) {
   document.body.insertAdjacentHTML("afterbegin", '<div style="position:fixed;top:0;left:0;right:0;z-index:55;background:var(--accbg);color:var(--acc);border-bottom:1px solid var(--line);font-size:12px;text-align:center;padding:1px 8px">試し（娘の記録に混ざらない）</div>');
@@ -485,6 +567,7 @@ if (!API) { const t = document.createElement("div"); t.id = "norec"; t.textConte
 setVH();
 render();
 flush();
+syncGet();
 </script>
 </body>
 </html>

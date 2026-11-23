@@ -14,7 +14,7 @@
 html,body{height:100%;margin:0}
 body{background:var(--bg);color:var(--ink);font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;font-size:17px;line-height:1.55;-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
 button{font:inherit;color:inherit;cursor:pointer;-webkit-user-select:none;user-select:none;touch-action:manipulation}
-#app{max-width:520px;margin:0 auto;height:calc(var(--vh,100dvh) - var(--top,0px));display:flex;flex-direction:column;overflow:hidden;padding:0 12px}
+#app{position:fixed;left:0;right:0;top:calc(var(--vt,0px) + var(--top,0px));max-width:520px;margin:0 auto;height:calc(var(--vh,100dvh) - var(--top,0px));display:flex;flex-direction:column;overflow:hidden;padding:0 12px}
 .bar{flex:none;display:flex;align-items:center;gap:7px;height:38px;border-bottom:1px solid var(--line)}
 .tag{font-size:12px;font-weight:700;padding:2px 9px;border-radius:999px;white-space:nowrap}
 .tag.社会{background:var(--sbg-社会);color:var(--s-社会)} .tag.理科{background:var(--sbg-理科);color:var(--s-理科)}
@@ -82,7 +82,12 @@ td.now{box-shadow:0 0 0 2px var(--acc) inset}
 .inrow .go:disabled{opacity:.25}
 .inrow .go:active{transform:scale(.97)}
 .note{font-size:12px;color:var(--acc);margin-top:3px;height:16px;line-height:16px}
-.fb{margin-top:6px;border-radius:12px;padding:6px 10px;background:var(--ngbg);max-height:118px;overflow-y:auto}
+.fb{border-radius:12px;padding:6px 10px;background:var(--ngbg)}
+/* 11/23 夕 iPhone で止まった件の直し: 画面は見える高さに貼る（scrollTo で戻さない）。返しの場所は いつも取っておく（返しが出ても入力欄は動かない） */
+.dock #fbx{height:84px;margin-top:4px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.tapk{display:none;width:100%;height:44px;margin-top:4px;border:2px dashed var(--acc);border-radius:12px;background:var(--accbg);color:var(--acc);font-size:17px;font-weight:700}
+.tapk.on{display:block}
+.tapk.on + #fbx{height:36px}
 .fb .h{font-size:16px;font-weight:700;color:var(--ng);line-height:1.35}
 .fb .h small{font-weight:400;color:var(--sub);font-size:13px;margin-left:4px}
 .fb .mine{font-size:12px;font-weight:400;color:var(--sub);margin-left:6px;white-space:nowrap}
@@ -122,7 +127,7 @@ window.onerror = (m, s, l, c) => { const e = document.getElementById("err"); e.s
 </script>
 <script>
 // 読み込み（kumi.html・flow.html の合言葉つきと同じ口）: ?s=<合言葉> があれば中継（GAS）が合言葉を確かめてから便のデータを返す（置くのは put_secure.py --waku）。
-// ?dev=1 はローカルの確かめ用（同じフォルダの waku_data.js を読む。公開には waku_data.js を置かない）
+// ?dev=1 はローカルの確かめ用（同じフォルダの waku_data.js を読む。公開には waku_data.js・waku2_data.js を置かない）
 const PQ = new URLSearchParams(location.search);
 const SID = (/^[0-9A-Za-z_-]{16,80}$/.test(PQ.get("s") || "") ? PQ.get("s") : "");
 var WAKU_ERR = "";
@@ -135,7 +140,7 @@ if (SID) {
     const r = JSON.parse(x.responseText);
     if (r.error) WAKU_ERR = r.error; else window.WAKU = JSON.parse(r.items[0].text);
   } catch (e) { WAKU_ERR = "よみこめなかった。電波のあるところで、もう一度ひらいてね"; }
-} else if (PQ.get("dev") === "1") document.write('<script src="waku_data.js"><\/script>');
+} else if (PQ.get("dev") === "1") document.write(`<script src="${PQ.get("r") === "2" ? "waku2_data.js" : "waku_data.js"}"><\/script>`);   // ?dev=1&r=2 は2回目の便（waku2_data.js）
 </script>
 <script>
 // CORE-BEGIN 進みの規則（純粋関数。node で単体: tests/test_waku_bus.py）
@@ -147,7 +152,9 @@ const GAP = 2;
 function hira(s) { return String(s || "").replace(/[ァ-ヶ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x60)); }
 function norm(v) { return hira(String(v || "").normalize("NFKC").toLowerCase()).replace(/[\s　]/g, ""); }
 function sig(K) { return K.bin + "#" + K.chunks.map(c => c.id + ":" + c.holes.join(",")).join(";"); }
-function newState(K) { return { v: 1, sig: sig(K), ci: 0, ph: "look", queue: [], qi: 0, cur: null, cnt: {}, res: {}, carry: [], last: null }; }
+// 2回目の便（K.see === false。waku_build.py --round2。日を空けてヒントなしで出せるか）: 見ておぼえるを出さず、まとまりの始まりからいきなり伏せて打つ
+function newState(K) { const S = { v: 1, sig: sig(K), ci: 0, ph: "look", queue: [], qi: 0, cur: null, cnt: {}, res: {}, carry: [], last: null }; noLook(S, K); return S; }
+function noLook(S, K) { if (K.see === false && S.ph === "look") startType(S, K); }
 // 判定: ok／short（頭が足りない・ほかの語と同じ頭。記録しない）／ng
 function judge(K, hid, v) {
   const h = K.holes[hid];
@@ -197,7 +204,7 @@ function advance(S, K) {
     if (j > 0) { S.queue[S.qi] = S.queue[j]; S.queue[j] = nx; }
     else if (S.ci + 1 < K.chunks.length) S.carry.push(S.queue.splice(S.qi, 1)[0]);
   }
-  if (S.qi >= S.queue.length) { S.ci++; S.ph = S.ci < K.chunks.length ? "look" : "end"; S.queue = []; S.qi = 0; }
+  if (S.qi >= S.queue.length) { S.ci++; S.ph = S.ci < K.chunks.length ? "look" : "end"; S.queue = []; S.qi = 0; noLook(S, K); }
 }
 // きょう出せた所＝最初に○、か もう1回で○
 function tally(S, K) {
@@ -205,7 +212,15 @@ function tally(S, K) {
   return { all, got, left: all.filter(h => !got.includes(h)) };
 }
 function isEnd(S) { return S.ph === "end"; }
-if (typeof module !== "undefined") module.exports = { GAP, norm, judge, newState, startType, current, submit, advance, tally, isEnd, sig };
+// 進みを端末の外にも（ハイブリッド。2026-11-23 パパ）: 開いたとき、中継の進み（remote）が端末の進み（local）より新しければ（at）中継の方で続ける。
+// 便が変わった（sig が違う）進みは使わない。stamp は at を除いた進み（変わったときだけ at を付け直す＝開いただけでは新しくならない）
+function stamp(S) { const o = Object.assign({}, S); delete o.at; return JSON.stringify(o); }
+function pickState(local, remote, sg) {
+  const okL = !!(local && local.v === 1 && local.sig === sg), okR = !!(remote && remote.v === 1 && remote.sig === sg);
+  if (okR && (!okL || (remote.at || 0) > (local.at || 0))) return remote;
+  return okL ? local : null;
+}
+if (typeof module !== "undefined") module.exports = { GAP, norm, judge, newState, startType, current, submit, advance, tally, isEnd, sig, stamp, pickState };
 // CORE-END
 </script>
 <script>
@@ -213,8 +228,9 @@ const K = (typeof WAKU !== "undefined" && WAKU) || { chunks: [], holes: {}, flow
 const TRY = PQ.get("try") === "1", DEVMODE = PQ.get("dev") === "1";
 const DEPLOY = PQ.get("d") || "";
 const API = DEPLOY ? `https://script.google.com/macros/s/${encodeURIComponent(DEPLOY)}/exec` : "";
-const SKEY = (TRY ? "nitaku.waku.try1." : "nitaku.waku.v1.") + (K.bin || ""), QKEY = TRY ? "nitaku.wakuq.try" : "nitaku.wakuq.v1", DKEY = "nendai.dev";
-const MODE = TRY ? "nitaku_waku_try" : "nitaku_waku";
+const R2 = K.round === 2;   // 2回目の便（waku_build.py --round2）。記録は mode nitaku_waku2（pull.py が 場＝2回目 で写す）
+const SKEY = (TRY ? "nitaku.waku.try1." : "nitaku.waku.v1.") + (K.bin || "") + (R2 ? ".r2" : ""), QKEY = TRY ? "nitaku.wakuq.try" : "nitaku.wakuq.v1", DKEY = "nendai.dev";
+const MODE = (R2 ? "nitaku_waku2" : "nitaku_waku") + (TRY ? "_try" : "");
 const $app = document.getElementById("app");
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const ls = { get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
@@ -249,9 +265,42 @@ async function flush() {
 window.addEventListener("online", flush);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) flush(); });
 
-let S = ls.get(SKEY, null);
-if (!S || S.v !== 1 || S.sig !== sig(K)) S = newState(K);
-const save = () => ls.set(SKEY, S);
+// 進みの置き場（ハイブリッド。2026-11-23 パパ「続きや2回目を mac でも」）: 端末（localStorage）と中継（Bus.gs の bus_state。合言葉 s と保存キーで1行）の両方。
+// 開くとき中継の進みを1回読み、新しい方で続ける。進みが変わるたびに at を付けて中継へ（まとめて 1.5 秒後・画面を離れるときはすぐ）。
+// 中継に Bus.gs がまだ無い・電波が無いときは、いままでどおり端末だけで動く（失敗は黙って、次に変わったとき・戻ったときに送り直す）
+const SYNC = !!(SID && API);
+let syncOn = SYNC;
+// 開いたときの読み込みは画面を待たせない（同期にしない・5秒で打ち切る）。届いたとき、まだ始まりの画面にいて中継の方が新しければ、それに替えて描き直す
+function syncGet() {
+  if (!syncOn) return;
+  const ac = typeof AbortController !== "undefined" ? new AbortController() : null, tm = setTimeout(() => ac && ac.abort(), 5000);
+  fetch(API, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, credentials: "omit", signal: ac ? ac.signal : undefined,
+               body: JSON.stringify({ app: "bus", op: "get", args: { s: SID, key: SKEY } }) })
+    .then(r => r.json()).then(r => {
+      clearTimeout(tm);
+      if (!r || r.ok !== true) { syncOn = false; return; }   // 中継に Bus.gs がまだ無い（forbidden）・リンクの期限 → このあいだは端末だけ
+      const R = r.state ? JSON.parse(r.state) : null;
+      if (R && onTop && pickState(S, R, sig(K)) === R) { S = R; lastStamp = stamp(S); dirty = false; render(); return; }
+      if (S.at && (!R || (R.at || 0) < S.at)) { dirty = true; syncSend(); }   // 端末の方が新しい → 中継へ
+    }).catch(() => clearTimeout(tm));   // 電波が無い・時間切れ → 端末の進みのまま。戻ったら送る
+}
+let S = pickState(ls.get(SKEY, null), null, sig(K)) || newState(K);
+let lastStamp = stamp(S), dirty = false, syncT = 0;
+function syncSend() {
+  clearTimeout(syncT);
+  if (!syncOn || !dirty) return;
+  const body = JSON.stringify({ app: "bus", op: "put", args: { s: SID, key: SKEY, state: JSON.stringify(S), at: S.at || 0 } }), at = S.at;
+  fetch(API, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, credentials: "omit", keepalive: body.length < 60000, body })
+    .then(r => r.json()).then(rj => { if (rj && rj.ok === false) syncOn = false; else if (rj && rj.ok && S.at === at) dirty = false; }).catch(() => {});
+}
+const save = () => {
+  const st = stamp(S);
+  if (st !== lastStamp) { lastStamp = st; S.at = Date.now(); dirty = true; clearTimeout(syncT); syncT = setTimeout(syncSend, 1500); }
+  ls.set(SKEY, S);
+};
+document.addEventListener("visibilitychange", () => { if (document.hidden) syncSend(); });
+addEventListener("pagehide", syncSend);
+addEventListener("online", syncSend);
 let onTop = true, menuOpen = 0, t0 = Date.now(), flash = "", note = "";
 const sec = () => Math.round((Date.now() - t0) / 100) / 10;
 function rec(o, typed) {
@@ -259,7 +308,11 @@ function rec(o, typed) {
   log({ stage: h.s, bundle: `枠_${K.kai}|${o.hid}${suf}`, year: String(o.n), event: String(h.q).slice(0, 300), aEra: typed, aYear: h.a, ok: o.res === "ok" ? 1 : 0, sec: sec() });
 }
 
-const RULE = [
+const RULE = R2 ? [
+  "2回目。見ないで打つ（見ておぼえるは無し）。前に外した所のあるまとまりから",
+  "ふつうのキーボードで打つ。頭の2文字から（ひらがな・漢字どちらでも。ほかの語と同じ頭なら、もう少し）。数は数字で",
+  "まちがえたら、正解を打ち直して進む。外した所は、そのまとまりの終わりにもう1回出る",
+] : [
   "まとまりごとに、見ておぼえる → 伏せて打つ",
   "ふつうのキーボードで打つ。頭の2文字から（ひらがな・漢字どちらでも。ほかの語と同じ頭なら、もう少し）。数は数字で",
   "まちがえたら、正解を打ち直して進む。外した所は、そのまとまりの終わりにもう1回出る",
@@ -361,8 +414,9 @@ const subLine = () => Object.entries(K.sub || {}).map(([s, t]) => `${s} ${t}`).j
 
 // 始まりと終わり。終わりは きょう出せた所を多く、のこりは短く
 function drawHome(end) {
-  const T = tally(S, K), fresh = S.ci === 0 && S.ph === "look" && !Object.keys(S.res).length;
-  let h = `<div class="home${end ? " fin" : ""}"><h1>${end ? "きょうの骨組み、ぜんぶ打った" : "きょうの授業の骨組み"}</h1><div class="bin">${esc(K.kai)}　${esc(subLine())}</div>`;
+  const T = tally(S, K), fresh = S.ci === 0 && (S.ph === "look" || (R2 && S.qi === 0 && !S.cur)) && !Object.keys(S.res).length;
+  const h1 = R2 ? (end ? "2回目、ぜんぶ打った" : `${esc(K.kai)} の骨組み 2回目`) : (end ? "きょうの骨組み、ぜんぶ打った" : "きょうの授業の骨組み");
+  let h = `<div class="home${end ? " fin" : ""}"><h1>${h1}</h1><div class="bin">${esc(K.kai)}　${esc(subLine())}</div>`;
   if (end || !fresh) {
     h += `<div class="big"><b>${T.got.length}</b><span>か所 きょう出せた</span></div><div class="cards">`;
     for (const c of K.chunks) {
@@ -375,7 +429,8 @@ function drawHome(end) {
     if (!end) h += `<div class="left">つづきは ${S.ci + 1} つ目のまとまりから</div>`;
   } else {
     const ns = K.chunks.filter(c => c.s === "社会"), nr = K.chunks.filter(c => c.s === "理科");
-    h += `<div class="big"><b>${T.all.length}</b><span>か所を打つ・まとまり ${K.chunks.length}</span></div><div class="list">` +
+    h += `<div class="big"><b>${T.all.length}</b><span>か所を打つ・まとまり ${K.chunks.length}</span></div>` +
+      (R2 && K.miss && K.miss.length ? `<div class="left">前に外した所 ${K.miss.length} か所</div>` : "") + `<div class="list">` +
       ns.concat(nr).map(c => `<div><i class="tag ${esc(c.s)}">${esc(c.s)}</i>${esc(c.name)}</div>`).join("") + `</div>` +
       `<div class="rules">${RULE.map(r => `<p>${esc(r)}</p>`).join("")}</div>`;
   }
@@ -384,7 +439,7 @@ function drawHome(end) {
     (end ? "" : `<div class="homedock"><button class="act" id="go">${fresh ? "はじめる" : "つづきから"}</button></div>`);
   bindMenu();
   const go = document.getElementById("go");
-  if (go) go.onclick = () => { onTop = false; t0 = Date.now(); render(); if (QV && S.ph === "type") QV.inp.focus(); };
+  if (go) go.onclick = () => { onTop = false; t0 = Date.now(); render(); if (QV && S.ph === "type") wake(); };
 }
 
 // 見ておぼえる: そのまとまりだけ（社会は前の行と次の行も薄く）。キーボードなしで 660px に収める
@@ -395,7 +450,7 @@ function drawLook(c) {
   bindMenu();
   const p = document.getElementById("pane");   // 収まらなければ詰める（字を小さく → 次の行を省く → 名前を行の頭に）
   for (const t of ["t1", "t2", "t3"]) if (p.scrollHeight > p.clientHeight + 1) p.classList.add(t);
-  document.getElementById("go").onclick = () => { startType(S, K); t0 = Date.now(); flash = ""; note = ""; render(); if (QV) QV.inp.focus(); };
+  document.getElementById("go").onclick = () => { startType(S, K); t0 = Date.now(); flash = ""; note = ""; render(); if (QV) wake(); };
 }
 
 // 伏せて打つ: 表（流れ）のいまの穴のまわり・入力欄・返しを、見える高さ（visualViewport）に収める。入力欄は作り直さず使い回す（iOS の focus）
@@ -404,12 +459,33 @@ function skeleton() {
   if (QV && document.body.contains(QV.inp)) return QV;
   $app.innerHTML = `<div id="qbar"></div><div class="pane typ" id="pane"></div><div class="dock"><div class="prompt" id="pr"></div>` +
     `<div class="inrow"><input id="inp" type="text" lang="ja" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="done"><button class="go" id="btn">決定</button></div>` +
-    `<div class="note" id="note"></div><div id="fbx"></div></div>`;
-  QV = { pane: document.getElementById("pane"), inp: document.getElementById("inp"), btn: document.getElementById("btn") };
+    `<div class="note" id="note"></div><button class="tapk" id="tapk">ここを押して打つ</button><div id="fbx"></div></div>`;
+  QV = { pane: document.getElementById("pane"), inp: document.getElementById("inp"), btn: document.getElementById("btn"), tap: document.getElementById("tapk"),
+         fbx: document.getElementById("fbx"), composing: false, pend: false };
   QV.inp.addEventListener("input", () => { note = ""; document.getElementById("note").textContent = ""; setBtn(); });
   QV.inp.addEventListener("keydown", ev => { if (ev.key === "Enter" && !ev.isComposing && ev.keyCode !== 229) { ev.preventDefault(); press(); } });
-  QV.btn.addEventListener("click", press);
+  // 変換中（未確定）に決定を押したとき: 確定（compositionend）を待ってから判定（0.4 秒で今の値で判定）
+  QV.inp.addEventListener("compositionstart", () => { QV.composing = true; });
+  QV.inp.addEventListener("compositionend", () => { QV.composing = false; setBtn(); if (QV.pend) { QV.pend = false; press(); } });
+  QV.btn.addEventListener("click", () => { if (QV.composing) { QV.pend = true; setTimeout(() => { if (QV && QV.pend) { QV.pend = false; QV.composing = false; press(); } }, 400); return; } press(); });
+  // focus だけ残ってキーボードが出ていない（iOS）: 入力欄・「ここを押して打つ」を押す → 同じ操作の中で blur → focus
+  QV.inp.addEventListener("touchend", () => { if (document.activeElement === QV.inp && !kbOpen()) { QV.inp.blur(); QV.inp.focus(); } });
+  QV.tap.addEventListener("click", () => wake());
+  QV.inp.addEventListener("focus", tapHint); QV.inp.addEventListener("blur", tapHint);
   return QV;
+}
+const TOUCH = !!(window.matchMedia && matchMedia("(pointer: coarse)").matches);
+function kbOpen() { return !TOUCH || !window.visualViewport || innerHeight - visualViewport.height > 120; }
+// 押した操作の中でだけ呼ぶ: 入力欄にキーボードを出す（focus 済みでキーボードが無ければ、いったん外してから入れ直す）
+function wake() {
+  if (!QV) return;
+  if (document.activeElement === QV.inp && !kbOpen()) QV.inp.blur();
+  QV.inp.focus();
+  tapHint();
+}
+function tapHint() {
+  if (!QV || !document.body.contains(QV.tap)) return;
+  QV.tap.classList.toggle("on", S.ph === "type" && !onTop && (document.activeElement !== QV.inp || !kbOpen()));
 }
 function setBtn() { QV.btn.disabled = norm(QV.inp.value) === ""; }
 function press() {
@@ -421,8 +497,9 @@ function press() {
   rec(o, typed);
   t0 = Date.now(); QV.inp.value = ""; note = "";
   flash = o.res === "ok" ? `○ ${K.holes[o.hid].a}` : "";
+  if (S.ci !== before && S.ph === "type") { render(); wake(); return; }   // 2回目: 次のまとまりも続けて打つ（見ておぼえるが無い）
   if (S.ci !== before || S.ph !== "type") { QV.inp.blur(); QV = null; render(); return; }   // まとまりの終わり → 次の 見ておぼえる（キーボードを閉じる）
-  render(); QV.inp.focus();
+  render(); wake();
 }
 function drawType() {
   const c = chunk(S, K), cu = current(S, K);
@@ -443,9 +520,10 @@ function drawType() {
     fb = `<div class="fb"><div class="h">× 正解は ${esc(h.a)}<small>${h.t === "num" || h.ys[0] === h.a ? "" : "（" + esc(h.ys[0]) + "）"}</small>${e.ans ? `<span class="mine">打った ${esc(e.ans)}</span>` : ""}</div>` +
       (h.k ? `<div class="ksh"><span class="km">${esc(h.km)}</span>${maskT(h.k)}</div>` : "") + `</div>`;
   }
-  document.getElementById("fbx").innerHTML = fb;
+  if (QV.fbx.innerHTML !== fb) { QV.fbx.innerHTML = fb; QV.fbx.scrollTop = 0; }
   setBtn();
   fit();
+  tapHint();
 }
 // いまの穴を欄の真ん中に
 function fit() {
@@ -454,8 +532,13 @@ function fit() {
   const p = QV.pane, pr = p.getBoundingClientRect(), cr = cur.getBoundingClientRect();
   p.scrollTop += (cr.top - pr.top) - (p.clientHeight - cr.height) / 2;
 }
-function setVH() { const h = window.visualViewport ? window.visualViewport.height : innerHeight; document.documentElement.style.setProperty("--vh", h + "px"); fit(); }
-if (window.visualViewport) { visualViewport.addEventListener("resize", setVH); visualViewport.addEventListener("scroll", () => scrollTo(0, 0)); }
+function setVH() {
+  const v = window.visualViewport, h = v ? v.height : innerHeight;
+  document.documentElement.style.setProperty("--vh", h + "px");
+  document.documentElement.style.setProperty("--vt", (v ? Math.max(0, v.offsetTop) : 0) + "px");
+  fit(); tapHint();
+}
+if (window.visualViewport) { visualViewport.addEventListener("resize", setVH); visualViewport.addEventListener("scroll", setVH); }
 addEventListener("resize", setVH);
 if (TRY) {
   document.body.insertAdjacentHTML("afterbegin", '<div style="position:fixed;top:0;left:0;right:0;z-index:55;background:var(--accbg);color:var(--acc);border-bottom:1px solid var(--line);font-size:12px;text-align:center;padding:1px 8px">試し（娘の記録に混ざらない）</div>');
@@ -465,6 +548,7 @@ if (!API) { const t = document.createElement("div"); t.id = "norec"; t.textConte
 setVH();
 render();
 flush();
+syncGet();
 </script>
 </body>
 </html>
