@@ -13,7 +13,7 @@
 html,body{height:100%;margin:0}
 body{background:var(--bg);color:var(--ink);font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;font-size:17px;line-height:1.55;-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
 button{font:inherit;color:inherit;cursor:pointer;-webkit-user-select:none;user-select:none;touch-action:manipulation}
-#app{max-width:520px;margin:0 auto;height:calc(100dvh - var(--top,0px));display:flex;flex-direction:column;overflow:hidden;padding:0 14px}
+#app{max-width:520px;margin:0 auto;height:calc(var(--vh,100dvh) - var(--top,0px));display:flex;flex-direction:column;overflow:hidden;padding:0 14px}
 .bar{flex:none;display:flex;align-items:center;gap:8px;height:38px;border-bottom:1px solid var(--line)}
 .tag{font-size:12px;font-weight:700;padding:2px 9px;border-radius:999px;white-space:nowrap}
 .tag.社会{background:var(--sbg-社会);color:var(--s-社会)} .tag.理科{background:var(--sbg-理科);color:var(--s-理科)}
@@ -106,6 +106,41 @@ button{font:inherit;color:inherit;cursor:pointer;-webkit-user-select:none;user-s
 .homedock{flex:none;padding:8px 0 calc(12px + env(safe-area-inset-bottom))}
 #err{position:fixed;left:0;right:0;bottom:0;background:#fff3f2;color:var(--ng);font-size:12px;white-space:pre-wrap;padding:4px 8px;z-index:60;display:none}
 #norec{position:fixed;top:1px;right:6px;font-size:10px;line-height:1.2;color:var(--faint);z-index:50}
+
+/* ふつうのキーボード（11/23 夕）: 見える高さの中に 札・問い・入力欄・返し */
+.qv{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:6px 0 8px}
+.qv .grp{padding:5px 8px 6px;border-radius:12px}
+.qv .gname{font-size:11.5px;margin-bottom:3px}
+.qv .chips{gap:4px}
+.qv .chip{font-size:13px;padding:2px 8px}
+.qv .chip.blank{width:48px;height:21px}
+.qv.fold .chips{display:none}
+.qv .ba{font-size:11.5px;line-height:1.35;color:var(--acc);margin-bottom:2px}
+.qv.fold .gname{margin-bottom:0}
+.qv.fold2 .qlbl,.qv.fold2 .gname{display:none}
+.qv.fold2 .q{font-size:14.5px;font-weight:600;line-height:1.4}
+.qv.fold2 .sent{font-size:14.5px}
+.qv.fold2 .fb,.qv.fold2 .okc{margin-top:6px;padding:6px 10px}
+.qv.fold2 .inrow{margin-top:6px}
+.qv.fold2 .ksh{font-size:12.5px}
+.qv .qlbl{margin:6px 2px 1px;font-size:11.5px}
+.qv .q{font-size:17px;line-height:1.45}
+.qv .sent{font-size:16px;line-height:1.5}
+.inrow{display:flex;gap:8px;margin-top:8px}
+.inrow input{flex:1;min-width:0;height:44px;font-size:20px;padding:0 12px;border:1.5px solid var(--acc);border-radius:12px;background:var(--card);color:var(--ink);font-family:inherit}
+.inrow input[readonly]{border-color:var(--line);color:var(--sub)}
+.inrow .go{flex:none;width:92px;height:44px;border:none;border-radius:12px;background:var(--ink);color:#fff;font-size:17px;font-weight:700}
+.inrow .go:disabled{opacity:.25}
+.inrow .go:active{transform:scale(.97)}
+.qv .fb{margin-top:8px}
+.qv .okc{margin-top:8px;height:auto;padding:8px 12px;display:block}
+.qv .okc .h{font-size:19px}
+.qv .okc .ksh{margin-top:4px;font-size:13px}
+.okline{font-size:13px;color:var(--ok);font-weight:700;margin-top:3px}
+.qv .tiles{margin-top:8px;gap:6px}
+.qv .tile{min-height:40px;font-size:15.5px}
+.qv .tile.all{text-align:center;font-weight:700;border-color:var(--ink)}
+.rules{overflow-wrap:anywhere}
 </style>
 </head>
 <body>
@@ -167,9 +202,15 @@ function current(S, K) {
   }
   return { it, q, e: S.cur, g: gOf(K, it.g) };
 }
+// 打った文字の正規化: 前後の空白・全角半角（NFKC）・大文字小文字・カタカナ→ひらがな
+function norm(v) { return hira(String(v || "").normalize("NFKC").trim().toLowerCase()); }
+// 判定（11/23 夕 パパ: ふつうのキーボード。頭2文字でよく、多く打ってもよい）: 読みのどれかの前方一致で2文字以上／正解の表記の前方一致で2文字以上・表記と一致
 function match(q, v) {
-  if (q.t === "num") { const x = String(v || "").replace(/[０-９．]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).trim(); return x !== "" && Number(x) === Number(q.a); }
-  return (q.ys || []).includes(hira(v));
+  if (q.t === "num") { const x = norm(v); return x !== "" && Number(x) === Number(q.a); }
+  const n = norm(v), a = norm(q.a);
+  if (n && n === a) return true;
+  if (n.length < 2) return false;
+  return (q.yy || q.ys || []).map(norm).some(r => r.startsWith(n)) || a.startsWith(n);
 }
 // 打った答え（ask・fix・retype）→ ○なら true
 function submit(S, K, v) {
@@ -218,7 +259,7 @@ function insertRe(S, g) {
   S.queue.splice(Math.min(p, L), 0, { g, r: "re" });
 }
 function isEnd(S, K) { return current(S, K) === null; }
-if (typeof module !== "undefined") module.exports = { GAP, hira, newState, visitQs, current, match, submit, pickTile, next, insertRe, isEnd, sig };
+if (typeof module !== "undefined") module.exports = { GAP, hira, norm, newState, visitQs, current, match, submit, pickTile, next, insertRe, isEnd, sig };
 // CORE-END
 </script>
 <script>
@@ -273,10 +314,9 @@ function rec(c, suf, typed, right, ok) {
 }
 
 const RULE = [
-  "ことば: ひらがなで頭の2文字（小さい ゃ ゅ ょ っ も1文字。のばす音は ー。が・ぱ は か・は のあとに ゛゜）",
-  "数: 数字だけ（単位は書いてある）",
-  "文: 違う所を押して、正しいことばを打つ。正しい文なら「ぜんぶ正しい」",
-  "まちがえたら、正解を打ち直してから次へ。その問は、ほかの組をはさんで、2回正解するまで出る",
+  "ふつうのキーボードで打つ。頭の2文字でいい（ひらがな・漢字どちらでも）",
+  "文の正誤は、違う所を押してから正しいことばを打つ",
+  "まちがえたら打ち直して次へ。その問はあとでまた出る",
 ];
 function bar(c) {
   const lab = c.it.r === "re" ? "もう一度" : c.it.r === 1 ? "1周目" : "2周目";
@@ -298,9 +338,9 @@ function bindMenu() {
 function render() {
   save();
   if (!K.groups.length) { $app.innerHTML = `<div class="home"><p class="left">${esc(KUMI_ERR || "データがありません")}</p></div>`; return; }
-  if (onTop) return drawHome(false);
+  if (onTop) { QV = null; return drawHome(false); }
   const c = current(S, K);
-  if (!c) return drawHome(true);
+  if (!c) { QV = null; return drawHome(true); }
   drawQ(c);
 }
 
@@ -324,112 +364,125 @@ function drawHome(end) {
   $app.innerHTML = `<div class="bar"><span class="sp"></span><button class="menu" id="mb" aria-label="メニュー">…</button></div>${menuHtml()}` + h +
     (end ? "" : `<div class="homedock"><button class="act" id="go">${fresh ? "はじめる" : "つづきから"}</button></div>`);
   bindMenu();
-  const go = document.getElementById("go"); if (go) go.onclick = () => { onTop = false; t0 = Date.now(); render(); };
+  const go = document.getElementById("go"); if (go) go.onclick = () => { onTop = false; t0 = Date.now(); render(); const c = current(S, K); if (QV && c && usesInput(c.e)) QV.inp.focus(); };
 }
 
-const COLS = ["あいうえお", "かきくけこ", "さしすせそ", "たちつてと", "なにぬねの", "はひふへほ", "まみむめも", "や ゆ よ", "らりるれろ", "わ を ん"];
-const DK = { か: "が", き: "ぎ", く: "ぐ", け: "げ", こ: "ご", さ: "ざ", し: "じ", す: "ず", せ: "ぜ", そ: "ぞ", た: "だ", ち: "ぢ", つ: "づ", て: "で", と: "ど", は: "ば", ひ: "び", ふ: "ぶ", へ: "べ", ほ: "ぼ", う: "ゔ" };
-const HD = { は: "ぱ", ひ: "ぴ", ふ: "ぷ", へ: "ぺ", ほ: "ぽ" };
-function kanaPad(off) {
-  const cell = ch => ch === " " ? `<span></span>` : `<button class="k" data-c="${ch}">${ch}</button>`;
-  return `<div class="area${off ? " off" : ""}"><div class="kb">${[0, 1, 2, 3, 4].map(r => COLS.map(col => cell(col[r] || " ")).join("")).join("")}</div>` +
-    `<div class="kb2">${["゛", "゜", "ゃ", "ゅ", "ょ", "っ", "ー"].map(ch => `<button class="k" data-c="${ch}">${ch}</button>`).join("")}<button class="k fn" data-c="BS">消す</button></div></div>`;
+// 問の画面（11/23 夕: 50音盤をやめ、スマホのふつうのキーボード）。入力欄は1つを作り直さずに使い回す（iOS は押した処理の中でしか focus が効かない）。
+// 上から 組の札 → 問い → 入力欄と決定（横並び）→ 返し。見える高さ（visualViewport）に収め、はみ出すときは札の段を畳む
+let QV = null;   // 問の画面の骨組み（作ったら使い回す）
+function skeleton() {
+  if (QV && document.body.contains(QV.inp)) return QV;
+  $app.innerHTML = `<div id="qbar"></div><div class="qv" id="qv"><div id="grp"></div><div id="qq"></div><div id="sei"></div>` +
+    `<div class="inrow" id="inrow"><input id="inp" type="text" lang="ja" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="done"><button class="go" id="btn">決定</button></div>` +
+    `<div id="fbx"></div></div>`;
+  QV = { qv: document.getElementById("qv"), inp: document.getElementById("inp"), btn: document.getElementById("btn"), inrow: document.getElementById("inrow") };
+  QV.inp.addEventListener("input", () => { const c = current(S, K); if (!c) return; c.e.ty = QV.inp.value; save(); setBtn(c); });
+  QV.inp.addEventListener("keydown", ev => { if (ev.key === "Enter" && !ev.isComposing && ev.keyCode !== 229) { ev.preventDefault(); press(); } });
+  QV.btn.addEventListener("click", press);
+  return QV;
 }
-function numPad() {
-  return `<div class="area"><div class="np">${["1", "2", "3", "4", "5", "6", "7", "8", "9", "BS", "0", "."].map(ch =>
-    ch === "BS" ? `<button class="k fn" data-c="BS">消す</button>` : ch === "." ? `<span></span>` : `<button class="k" data-c="${ch}">${ch}</button>`).join("")}</div></div>`;
+const usesInput = e => ["ask", "fix", "retype", "done"].includes(e.phase);
+function setBtn(c) {
+  const { q, e } = c, B = QV.btn;
+  if (e.phase === "done") { B.textContent = "次へ"; B.disabled = false; return; }
+  B.textContent = "決定";
+  const n = norm(QV.inp.value);
+  B.disabled = q.t === "num" ? n === "" : !(n.length >= 2 || (n && n === norm(q.a)));
 }
-function typedBox(q, e) {
-  if (q.t === "num") return `<div class="typed"><span class="num">${esc(e.ty) || "&nbsp;"}</span>${q.post ? `<span class="post">${esc(q.post)}</span>` : ""}</div>`;
-  const t = e.ty || "";
-  return `<div class="typed"><span class="box${t.length === 0 ? " cur" : ""}">${esc(t[0] || "")}</span><span class="box${t.length === 1 ? " cur" : ""}">${esc(t[1] || "")}</span></div>`;
+// 決定・次へ（ボタンと Enter）。押した処理の中で入力欄に focus して、キーボードを出したままにする
+function press() {
+  const c = current(S, K); if (!c) return;
+  const { q, e } = c;
+  if (e.phase === "done") {
+    next(S, K); t0 = Date.now(); QV.inp.value = ""; render();
+    const c2 = current(S, K);
+    if (c2 && usesInput(c2.e) && QV && document.body.contains(QV.inp)) QV.inp.focus(); else if (QV) QV.inp.blur();
+    return;
+  }
+  if (!usesInput(e) || QV.btn.disabled) return;
+  const ph = e.phase, typed = QV.inp.value;
+  const good = submit(S, K, typed);
+  if (good == null) return;
+  rec(c, ph === "retype" ? "|打ち直し" : "", typed, answerText(q), good);
+  t0 = Date.now(); QV.inp.value = ""; render(); QV.inp.focus();
 }
 const answerText = q => q.t === "num" ? `${q.a}${q.post || ""}` : q.a;
 const yomiText = q => q.t === "num" || !q.y || q.y === q.a ? "" : `（${q.y}）`;
 const km = q => q.km ? `<span class="km">${esc(q.km)}</span>` : "";   // 返しの出どころ（本／錬成の解説／カリテの解説／演問の解説。kumi_build.py が出典から付ける）
-const kaeshi = q => `<div class="ksh">${km(q)}${esc(q.k)}</div><div class="src">${esc(q.src)}</div>`;
-
-// 1組＝1画面のまとまり: 上に組の名前と並べる語、その下に問い。下の欄は 打つ盤／札 と 決定・次へ（位置は動かない）
+const kaeshi = q => `<div class="ksh">${km(q)}${esc(q.k)}</div>`;
 function drawQ(c) {
   const { q, e, g } = c;
-  const word = q.t === "sei" ? (q.bad ? q.a : "") : q.a;
-  const chips = g.words.map(w => `<span class="chip${e.phase === "done" && e.first && w === word ? " hit" : (e.phase === "retype" || (e.phase === "done" && e.first === false)) && w === word ? " miss" : ""}">${esc(w)}</span>`).join("");
+  skeleton();
+  document.getElementById("qbar").innerHTML = bar(c);
+  bindMenu();
   const missed = e.phase === "retype" || e.phase === "retile" || (e.phase === "done" && e.first === false);
-  // 答えが組の語のどれかになる問いは、答える前は札を伏せる（数だけ見せ、組の名前も語を含まない呼び名に）。答えたあと（○・×）で開ける
+  const word = q.t === "sei" ? (q.bad ? q.a : "") : q.a;
+  // 答えが組の語のどれかになる問いは、答える前は札を伏せる（数だけ。組の名前も語を含まない呼び名）。答えたら開ける
   const hide = g.words.includes(q.a) && !(missed || e.phase === "done");
-  const chipsHtml = hide ? g.words.map(() => `<span class="chip blank"></span>`).join("") : chips;
-  let body = `<div class="grp">${missed ? "" : `<div class="gname">${esc(hide ? (g.label || "") : g.name)}</div>`}<div class="chips">${chipsHtml}</div></div>`;   // ×の画面は組の名前を省いて、並べる語と返しを残す
-  let prompt = "", area = "", act = "";
+  const chips = hide ? g.words.map(() => `<span class="chip blank"></span>`).join("")
+    : g.words.map(w => `<span class="chip${w === word ? (e.phase === "done" && e.first ? " hit" : missed ? " miss" : "") : ""}">${esc(w)}</span>`).join("");
+  document.getElementById("grp").innerHTML = `<div class="grp">${q.ba ? `<div class="ba">${esc(q.ba)}</div>` : ""}<div class="gname">${esc(hide ? (g.label || "") : g.name)}</div><div class="chips">${chips}</div></div>`;
+  let qq = "";
   if (q.t === "sei") {
     const showBad = missed || e.phase === "fix" || (e.phase === "done" && q.bad);
-    const sent = q.tiles.map((t, i) => `<span class="${showBad && q.bad === i + 1 ? "badtile" : e.tile === i + 1 && !showBad ? "picked" : ""}">${esc(t)}</span>`).join("");
-    body += `<div class="qlbl">文の正誤　${e.phase === "where" ? "違う所は？" : "違う所"}</div>` + (e.phase === "retile" ? "" : `<div class="sent${missed ? " small" : ""}">${sent}</div>`);   // 押し直し（retile）は返しを見せるため文を省く（札が下にある）
-    if (e.phase === "fix") body += `<div class="qlbl">${esc(q.fixq || "正しいことばは？")}</div>`;
-  } else {
-    body += `<div class="qlbl">${q.t === "num" ? "数で" : "ことばの頭の2文字で"}</div><div class="q${missed ? " small" : ""}">${esc(q.q)}</div>`;
-  }
+    const sent = q.tiles.map((t, i) => `<span class="${showBad && q.bad === i + 1 ? "badtile" : ""}">${esc(t)}</span>`).join("");
+    qq = `<div class="qlbl">文の正誤　${e.phase === "where" ? "違う所を押す。正しい文なら「ぜんぶ正しい」" : e.phase === "fix" ? esc(q.fixq || "正しいことばは？") : "違う所"}</div>` +
+      (e.phase === "where" || e.phase === "retile" ? "" : `<div class="sent">${sent}</div>`);
+  } else qq = `<div class="qlbl">${q.t === "num" ? "数で" : "頭の2文字でいい"}</div><div class="q">${esc(q.q)}</div>`;
+  document.getElementById("qq").innerHTML = qq;
+  const sei = document.getElementById("sei");
+  if (e.phase === "where" || e.phase === "retile") {
+    sei.innerHTML = `<div class="tiles">${q.tiles.map((t, i) => `<button class="tile${e.phase === "retile" && e.tile === i + 1 ? " picked" : ""}" data-t="${i + 1}"${e.phase === "retile" ? " disabled" : ""}>${esc(t)}</button>`).join("")}` +
+      `<button class="tile all" id="all">ぜんぶ正しい</button></div>`;
+    sei.querySelectorAll(".tile[data-t]").forEach(el => el.onclick = () => tile(c, +el.dataset.t));
+    document.getElementById("all").onclick = () => tile(c, 0);
+  } else sei.innerHTML = "";
+  QV.inrow.style.display = usesInput(e) ? "" : "none";
+  const im = q.t === "num" ? "numeric" : "text";
+  if (QV.inp.inputMode !== im) QV.inp.inputMode = im;
+  QV.inp.placeholder = e.phase === "retype" ? "正解を打ち直す" : q.t === "num" ? "数字" + (q.post ? `（${q.post}）` : "") : "頭の2文字";
+  QV.inp.readOnly = e.phase === "done";
+  if (e.phase !== "done" && QV.inp.value !== (e.ty || "")) QV.inp.value = e.ty || "";
+  setBtn(c);
+  let fb = "";
   if (missed) {
     const right = q.t === "sei" && !q.bad ? "この文は、ぜんぶ正しい" : `正解は ${esc(answerText(q))}<small>${esc(yomiText(q))}</small>`;
-    const mine = q.t === "sei" && e.tile != null && !(q.bad && e.tile === q.bad) ? (e.tile === 0 ? "ぜんぶ正しい" : q.tiles[e.tile - 1]) : e.ans;
     const how = q.t === "sei" && e.tile != null && !(q.bad && e.tile === q.bad) ? "押した" : "打った";
-    body += `<div class="fb"><div class="h">× ${right}${mine ? `<span class="mine">${how} ${esc(mine)}</span>` : ""}</div><div class="ksh">${km(q)}${esc(q.k)}</div></div>`;
-  }
-  // 下の欄
-  if (e.phase === "where" || e.phase === "retile") {
-    prompt = e.phase === "retile" ? "「ぜんぶ正しい」を押す" : "違う所の札を押す。正しい文なら「ぜんぶ正しい」";
-    area = `<div class="area tall"><div class="tiles">${q.tiles.map((t, i) => `<button class="tile${e.phase === "retile" && e.tile === i + 1 ? " picked" : ""}" data-t="${i + 1}"${e.phase === "retile" ? " disabled" : ""}>${esc(t)}</button>`).join("")}</div></div>`;
-    act = `<button class="act sub" id="all">ぜんぶ正しい</button>`;
+    const mine = how === "押した" ? (e.tile === 0 ? "ぜんぶ正しい" : q.tiles[e.tile - 1]) : e.ans;
+    fb = `<div class="fb"><div class="h">× ${right}${mine ? `<span class="mine">${how} ${esc(mine)}</span>` : ""}</div>${kaeshi(q)}${e.phase === "done" ? `<div class="okline">打てた。次へ</div>` : ""}</div>`;
   } else if (e.phase === "done") {
-    area = e.first === false ? `<div class="area tall"><div class="okc re"><div class="h">打てた。次へ</div><div class="src">この問は、ほかの組をはさんで、また出る</div></div></div>`
-      : `<div class="area tall"><div class="okc"><div class="h">○ ${esc(q.t === "sei" && !q.bad ? "ぜんぶ正しい" : answerText(q))}<small>${esc(yomiText(q))}</small></div>${kaeshi(q)}</div></div>`;
-    prompt = "";
-    act = `<button class="act" id="nx">次へ</button>`;
-  } else {
-    const n = q.t === "num", re = e.phase === "retype";
-    prompt = re ? (n ? "正解の数を打ち直す" : "正解の頭の2文字を打ち直す") : n ? "数字を打って「決定」" : e.phase === "fix" ? "正しいことばの頭の2文字" : "頭の2文字を打って「決定」";
-    area = (n ? numPad() : kanaPad(false));
-    const ready = n ? String(e.ty || "").length > 0 : (e.ty || "").length === 2;
-    act = `<button class="act" id="ok"${ready ? "" : " disabled"}>決定</button>`;
+    fb = `<div class="okc"><div class="h">○ ${esc(q.t === "sei" && !q.bad ? "ぜんぶ正しい" : answerText(q))}<small>${esc(yomiText(q))}</small></div>${kaeshi(q)}</div>`;
   }
-  const typed = e.phase === "where" || e.phase === "retile" || e.phase === "done" ? "" : typedBox(q, e);   // 札・○の欄は背の高い area（typed 行のぶん）で、下の欄の高さは同じ
-  $app.innerHTML = bar(c) + `<div class="pane" id="pane">${body}</div><div class="dock"><div class="prompt">${esc(prompt)}</div>${typed}${area}${act}</div>`;
-  bindMenu();
-  const pn = document.getElementById("pane"); if (missed && pn && pn.scrollHeight > pn.clientHeight) pn.scrollTop = pn.scrollHeight;   // 返しが下で切れるときは、返しが見える所まで
-  $app.querySelectorAll(".k[data-c]").forEach(el => el.onclick = () => {
-    const ch = el.dataset.c; let ty = e.ty || ""; const last = ty.slice(-1);
-    if (ch === "BS") ty = ty.slice(0, -1);
-    else if (q.t === "num") { if (ty.length < 6) ty += ch; }
-    else if (ch === "゛") { if (DK[last]) ty = ty.slice(0, -1) + DK[last]; }
-    else if (ch === "゜") { if (HD[last]) ty = ty.slice(0, -1) + HD[last]; }
-    else if (ty.length < 2) ty += ch;
-    e.ty = ty; render();
-  });
-  const ok = document.getElementById("ok");
-  if (ok) ok.onclick = () => {
-    const ph = e.phase, typed = e.ty || "";
-    const good = submit(S, K, typed);
-    if (good == null) return;
-    const suf = ph === "retype" ? "|打ち直し" : "";
-    rec(c, suf, typed, answerText(q), good);
-    t0 = Date.now(); render();
-  };
-  $app.querySelectorAll(".tile[data-t]").forEach(el => el.onclick = () => tile(c, +el.dataset.t));
-  const all = document.getElementById("all"); if (all) all.onclick = () => tile(c, 0);
-  const nx = document.getElementById("nx");
-  if (nx) nx.onclick = () => { next(S, K); t0 = Date.now(); render(); document.getElementById("pane") && (document.getElementById("pane").scrollTop = 0); };
+  document.getElementById("fbx").innerHTML = fb;
+  fit();
 }
+// 見える高さに収める: はみ出すときは札の段を畳む（呼び名だけ残す）
+function fit() {
+  if (!QV) return;
+  QV.qv.classList.remove("fold", "fold2");
+  if (QV.qv.scrollHeight > QV.qv.clientHeight + 1) QV.qv.classList.add("fold");
+  if (QV.qv.scrollHeight > QV.qv.clientHeight + 1) QV.qv.classList.add("fold2");   // まだはみ出す: 問いを小さく・見出しを省く
+  QV.qv.scrollTop = 0;
+  if (QV.qv.scrollHeight > QV.qv.clientHeight + 1) { const f = document.getElementById("fbx"); if (f && f.lastElementChild) f.lastElementChild.scrollIntoView({ block: "end" }); }
+}
+function setVH() { const h = window.visualViewport ? window.visualViewport.height : innerHeight; document.documentElement.style.setProperty("--vh", h + "px"); fit(); }
+if (window.visualViewport) { visualViewport.addEventListener("resize", setVH); visualViewport.addEventListener("scroll", () => scrollTo(0, 0)); }
+addEventListener("resize", setVH);
 function tile(c, i) {
   const { q, e } = c, ph = e.phase;
   const r = pickTile(S, K, i); if (r == null) return;
   const name = i === 0 ? "ぜんぶ正しい" : q.tiles[i - 1], right = q.bad ? q.tiles[q.bad - 1] : "ぜんぶ正しい";
   rec(c, ph === "retile" ? "|打ち直し" : "|どこ", name, right, r);
   t0 = Date.now(); render();
+  const c2 = current(S, K);
+  if (c2 && c2.e.phase !== "done" && usesInput(c2.e)) QV.inp.focus(); else if (QV) QV.inp.blur();   // 正しい語を打つ段でキーボードを開く
 }
 if (TRY) {
   document.body.insertAdjacentHTML("afterbegin", '<div style="position:fixed;top:0;left:0;right:0;z-index:55;background:var(--accbg);color:var(--acc);border-bottom:1px solid var(--line);font-size:12px;text-align:center;padding:1px 8px">試し（娘の記録に混ざらない）</div>');
   document.documentElement.style.setProperty("--top", "20px"); document.body.style.paddingTop = "20px";
 }
 if (!API) { const t = document.createElement("div"); t.id = "norec"; t.textContent = DEVMODE ? "確かめ（送らない）" : "きろくなし"; document.body.appendChild(t); }
+setVH();
 render();
 flush();
 </script>
