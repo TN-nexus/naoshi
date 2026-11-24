@@ -457,6 +457,8 @@ let S = ls.get(SKEY, null);
 if (!S || S.v !== 1) S = newState();
 ensure(S);
 const save = () => ls.set(SKEY, S);
+// 試しで娘と同じ所から（?try=1&now=1）: 新しい試しの状態を、ひき算・かけ算クリア・たし算10・わり算8 から始める（パパの確かめ用。記録は送らない）
+if (TRY && params.get("now") === "1" && S.phase === "new") { Object.assign(S, { phase: "run", opi: 2 }); S.cur.add = 10; S.cur.div = 8; S.cleared = { sub: true, mul: true }; save(); }
 // 送り直し（?r=<印>&rd=add,sub）: 印が前と違うとき1回だけ、rd の種目をしらべ直す（ほかの種目の現在地は残す）
 const R = params.get("r") || "", RD = (params.get("rd") || "").split(",").filter(o => OPS.includes(o));
 if (R && S.r !== R) {
