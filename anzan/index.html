@@ -46,6 +46,11 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:"Hiragino Sans",
 .pad button:active{background:var(--selbg)}
 .pad .okb{background:var(--sel);color:#fff;border-color:var(--sel);font-size:20px}
 .pad .del{font-size:18px;color:var(--sub)}
+.pad .wd{font-size:20px;color:#7a3e00;background:#fff4e5}
+.pad .s2{grid-column:span 2}
+.inp{display:inline-flex;align-items:center;min-width:80px;min-height:62px;border:2px solid var(--sel);background:var(--selbg);border-radius:10px;padding:2px 8px;vertical-align:middle}
+.inp.done{border-color:var(--ok);background:var(--okbg);color:var(--ok)} .inp.bad{border-color:var(--ng);background:var(--ngbg)}
+.msg .fr{font-size:20px}
 .center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px}
 .center h1{font-size:28px;margin:0 0 12px}
 .center p{margin:6px 0;color:var(--sub)}
@@ -520,7 +525,7 @@ function boxesHtml() {
     return `<span class="${cls}" data-i="${i}">${v}</span>`;
   };
   const f = P.f, j = P.op === "sub" ? "−" : "+";
-  if (f === "fr") return `<span class="t">${P.qh}</span> <span class="t">${b(0)}<span class="fr">${b(1)}${b(2)}</span></span>`;
+  if (f === "fr") return `<span class="t">${P.qh}</span> <span class="inp${review ? (P.b.every((w, k) => vals[k] === w) ? " done" : " bad") : ""}">${review ? mixHtml(vals[0], vals[1], vals[2]) : frInHtml(buf)}</span>`;
   if (f === "mid") return `<span class="t">${esc(P.q)} =</span> <span class="t">${b(0)} ${j} ${b(1)}</span> <span class="t">= ${b(2)}</span>`;
   if (f === "qr") return `<span class="t">${esc(P.q)} =</span> <span class="t">${b(0)} あまり ${b(1)}</span>`;
   if (f === "part") return `<span class="t">${esc(P.q)} ⇒ ${b(0)}</span>`;
@@ -545,14 +550,22 @@ function render() {
     <div class="main">
       <div class="inst${P.f === "part" ? " strong" : ""}">${esc(instD)}</div><div class="ex">（例）${esc(ex)}</div>
       <div class="q${(P.f === "mid" || P.f === "qr") ? " s" : P.f === "fr" ? " f" : ""}">${boxesHtml()}</div>
-      <div class="msg ${msgCls}">${msg || (P.f === "fr" ? ["整数があれば入れて「つぎ」。なければ空のまま「つぎ」", "分子を入れて「つぎ」", "分母を入れて「OK」"][bi] : P.b.length > 1 && bi < P.b.length - 1 ? "入れたら「つぎ」で、となりの箱へ" : "")}</div>
+      <div class="msg ${msgCls}">${msg || (P.f === "fr" ? "読むとおりに「と」「分の」でおして OK（例: 2 と 3 分の 2）" : P.b.length > 1 && bi < P.b.length - 1 ? "入れたら「つぎ」で、となりの箱へ" : "")}</div>
     </div>
-    <div class="pad">${[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => `<button data-k="${n}">${n}</button>`).join("")}<button class="del" data-k="del">けす</button><button data-k="0">0</button><button class="okb" data-k="ok">${bi < P.b.length - 1 ? "つぎ ▶" : "OK"}</button></div>`;
+    <div class="pad">${[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => `<button data-k="${n}">${n}</button>`).join("")}${P.f === "fr"
+      ? `<button class="wd" data-k="t">と</button><button data-k="0">0</button><button class="wd" data-k="b">分の</button><button class="del" data-k="del">けす</button><button class="okb s2" data-k="ok">OK</button>`
+      : `<button class="del" data-k="del">けす</button><button data-k="0">0</button><button class="okb" data-k="ok">${bi < P.b.length - 1 ? "つぎ ▶" : "OK"}</button>`}</div>`;
 }
 function key(k) {
   if (lock || !P) return;
   if (k === "del") buf = buf.slice(0, -1);
   else if (k === "ok") return submit();
+  else if (P.f === "fr") {
+    const last = buf.slice(-1), dig = /[0-9]/.test(last);
+    if (k === "t") { if (dig && !buf.includes("t") && !buf.includes("b")) buf += "t"; }
+    else if (k === "b") { if (dig && !buf.includes("b")) buf += "b"; }
+    else if (buf.length < 10) buf += k;
+  }
   else if (buf.length < 6) buf = (buf === "0" ? "" : buf) + k;
   render();
 }
@@ -572,25 +585,48 @@ function ansText(p) {
   if (p.f === "qr") return `${b[0]} あまり ${b[1]}`;
   return String(b[0]);
 }
+function ansHtml(p) { return p.f === "fr" ? mixHtml(p.b[0], p.b[1], p.b[2]) : esc(ansText(p)); }
 function inText(p, v) {
   if (p.f === "fr") return v[1] ? (v[0] ? `${v[0]}と${v[1]}/${v[2]}` : `${v[1]}/${v[2]}`) : String(v[0]);
   return ansText(Object.assign({}, p, { b: v }));
 }
+// 11/24 昼2（パパ）: 分数は「と」「分の」のボタンで、読むとおりに打つ（2と3分の2・5分の1）。中では t＝と、b＝分の
+function mixHtml(w, n, d) { return `${w ? w : ""}${n ? `<span class="fr"><span>${n}</span><span>${d}</span></span>` : (w ? "" : "0")}`; }
+function frParse(x) {
+  const ti = x.indexOf("t"), bi2 = x.indexOf("b");
+  const w = ti >= 0 ? x.slice(0, ti) : "", rest = ti >= 0 ? x.slice(ti + 1) : x;
+  if (bi2 < 0) return { w, d: ti >= 0 ? rest : "", n: "", plain: ti >= 0 ? "" : rest, b: false };
+  const r2 = rest.split("b");
+  return { w, d: r2[0], n: r2[1] || "", plain: "", b: true };
+}
+function frInHtml(x) {
+  const f = frParse(x), q = v => v === "" ? "<span style='color:#9aa'>□</span>" : v;
+  if (!f.b && x.indexOf("t") < 0) return f.plain || "&nbsp;";
+  return `${f.w ? f.w : ""}<span class="fr"><span>${f.b ? q(f.n) : q("")}</span><span>${q(f.d)}</span></span>`;
+}
 function submit() {
-  if (buf === "" && !(P.f === "fr" && bi === 0)) return;
-  vals[bi] = buf === "" ? 0 : parseInt(buf, 10); buf = "";
+  if (P.f === "fr") {
+    const f = frParse(buf);
+    if (!f.b || f.n === "" || f.d === "") { msg = "「分の」のあとに数を入れて OK（例: 2 と 3 分の 2）"; msgCls = ""; return render(); }
+    vals = [f.w === "" ? 0 : parseInt(f.w, 10), parseInt(f.n, 10), parseInt(f.d, 10)]; bi = P.b.length - 1; buf = "";
+  }
+  else {
+  if (buf === "") return;
+  vals[bi] = parseInt(buf, 10); buf = "";
   if (bi < P.b.length - 1) { bi++; return render(); }
+  }
   const ok = P.b.every((w, k) => vals[k] === w);
   if (mode === "retype") {   // ×のあと: 正解を自分で入れて次へ（11/24 昼 パパ。11/23 夕の「最後は娘が入れる」）
     if (ok) { review = true; bi = P.b.length; msg = "○ 入れられた。つぎへ"; msgCls = "ok"; lock = true; render(); return setTimeout(after, 600); }
-    vals = []; bi = 0; msg = `正解は ${esc(ansText(P))}。もう一度入れてね`; msgCls = "ng"; return render();
+    vals = []; bi = 0; msg = `正解は ${ansHtml(P)}。もう一度入れてね`; msgCls = "ng"; return render();
   }
   firstTry = ok; firstIn = vals.join(","); ms1 = Math.round(performance.now() - t0);
   const mine = inText(P, vals);
   complete();
-  if (ok) { review = true; bi = P.b.length; msg = `○ せいかい（${esc(mine)}）`; msgCls = "ok"; lock = true; render(); return setTimeout(after, 700); }
+  const mineH = P.f === "fr" ? mixHtml(vals[0], vals[1], vals[2]) : esc(mine);
+  if (ok) { review = true; bi = P.b.length; msg = `○ せいかい（${mineH}）`; msgCls = "ok"; lock = true; render(); return setTimeout(after, 700); }
   mode = "retype"; vals = []; bi = 0;
-  msg = `✖ きみの答え ${esc(mine)}<br>正解は ${esc(ansText(P))}。正解を入れてすすもう`; msgCls = "ng";
+  msg = `✖ てみーの答え ${mineH}<br>正解は ${ansHtml(P)}。正解を入れてすすもう`; msgCls = "ng";
   render();
 }
 function complete() {   // 最初の答えを記録する（○×はここで決まる）
