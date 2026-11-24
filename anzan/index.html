@@ -320,7 +320,7 @@ function gen(op, lv, rng) {
   a = ri(rng, 1000, 9999); b = ri(rng, 2, 9) * (rng() < 0.75 ? 10 : 100); q = `${a} ÷ ${b}`; return out([Math.floor(a / b), a % b]);
 }
 // 診断で出す形: 答えだけで分解がある段は3箱で出す
-function diagForm(p) { return (p.f === "ans" && p.mid) ? Object.assign({}, p, { f: "mid", b: p.mid }) : p; }
+function diagForm(p) { return p; }   // 11/24 昼: 診断も答えだけで出す（3箱をやめた）
 function newState() {
   return { v: 1, phase: "new", cur: { add: 1, sub: 1, mul: 1, div: 1 }, last: { add: null, sub: null, mul: null, div: null }, dops: ["add", "div"],
            opi: 0, diag: { opi: 0, lv: 1, miss: 0 }, set: null, streak: 0, sets: 0, p: null };
@@ -334,7 +334,7 @@ function diagStep(S, ok) {
   if (!ok && d.low == null) d.low = d.lv;
   let done = false;
   if (d.miss >= 2 || d.lv >= MAX[op]) { S.cur[op] = d.low != null ? d.low : MAX[op]; done = true; }
-  else do { d.lv++; } while (LV[op][d.lv].f === "part");   // 部品の段（1のくらいだけ等）は診断で出さない（答え方を取り違えやすい。11/17）
+  else do { d.lv++; } while (d.lv < MAX[op] && skipLv(op, d.lv));   // 部品の段（1のくらいだけ等）は診断で出さない（答え方を取り違えやすい。11/17）
   if (done) { d.opi++; d.lv = 1; d.miss = 0; d.low = null; d.first = null; if (d.opi >= dops(S).length) { S.phase = "run"; if (!S.dops) S.opi = 0; S.dops = null; } }   // しらべ直しのあとは、止まっていた種目のつづきから
   return S;
 }
@@ -352,11 +352,12 @@ function ensure(S) {
 }
 // いま回す論点（ORDER の順にクリアしていない先頭から ACTIVE_N 本）
 function active(S) { ensure(S); return ORDER.filter(o => !S.cleared[o]).slice(0, ACTIVE_N); }
-function nextLv(op, lv) { let l = lv + 1; while (l < MAX[op] && LV[op][l].f === "part") l++; return Math.min(l, MAX[op]); }
-function prevLv(op, lv) { let l = lv - 1; while (l > 1 && LV[op][l].f === "part") l--; return Math.max(l, 1); }
+// 出さない段: 部品（11/17 夕3）と 3箱（11/24 昼 パパ「3箱の段もやめる」）。番号は本のまま飛ばす
+function skipLv(op, l) { const f = LV[op][l] && LV[op][l].f; return f === "part" || f === "mid"; }
+function nextLv(op, lv) { let l = lv + 1; while (l < MAX[op] && skipLv(op, l)) l++; return Math.min(l, MAX[op]); }
+function prevLv(op, lv) { let l = lv - 1; while (l > 1 && skipLv(op, l)) l--; return Math.max(l, 1); }
 // 落とす先: 3箱の段からは1つ前の3箱の段（小さい数で分け方を固め直す。無ければ1つ前の段）。ほかは1つ前の段
 function dropLv(op, lv) {
-  if (LV[op][lv].f === "mid") for (let l = lv - 1; l >= 1; l--) if (LV[op][l].f === "mid") return l;
   return prevLv(op, lv);
 }
 function allCleared(S) { return active(S).length === 0; }
@@ -366,7 +367,7 @@ function startSet(S) {
   if (allCleared(S)) { S.phase = "grad"; S.set = null; return S; }
   const act = active(S);
   const op = act[(S.opi || 0) % act.length];
-  while (LV[op][S.cur[op]].f === "part") S.cur[op]++;   // 部品の段（1のくらいだけ等）は出さない。番号は本のまま飛ばす（11/17 パパ）
+  while (S.cur[op] < MAX[op] && skipLv(op, S.cur[op])) S.cur[op]++;   // 部品の段（1のくらいだけ等）は出さない。番号は本のまま飛ばす（11/17 パパ）
   S.set = { op, lv: S.cur[op], i: 0, ok: 0, note: S.note[op] || "", marks: [] };
   S.note[op] = "";
   return S;
