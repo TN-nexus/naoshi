@@ -33,6 +33,12 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:"Hiragino Sans",
 .box.now{border-color:var(--sel);background:var(--selbg)}
 .box.done{border-color:var(--ok);background:var(--okbg);color:var(--ok)}
 .box.bad{border-color:var(--ng);background:var(--ngbg)}
+.fr{display:inline-flex;flex-direction:column;vertical-align:middle;text-align:center;line-height:1.15;margin:0 3px}
+.fr>span:first-child{border-bottom:2px solid var(--ink);padding:0 3px}
+.q .fr .box{min-width:50px;height:40px;line-height:36px;font-size:22px;margin:2px 0}
+.sq{display:inline-block;border:2px solid var(--ink);width:30px;height:34px;vertical-align:middle}
+.q.f{font-size:24px;line-height:1.6}
+.op.w{font-size:13px}
 .msg{min-height:54px;text-align:center;font-size:17px;padding-top:8px}
 .msg.ng{color:var(--ng);font-weight:700} .msg.ok{color:var(--ok);font-weight:700}
 .pad{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;padding:8px 12px calc(12px + env(safe-area-inset-bottom))}
@@ -57,10 +63,16 @@ table{border-collapse:collapse;font-size:13px;width:100%} td,th{border:1px solid
 <div id="banner"><div class="ic"></div><div class="a"></div><div class="b"></div><div class="c"></div></div>
 <script>
 // CORE-BEGIN（純粋関数。node で new Function に入れて単体を回せる）
-const OPS = ["add", "sub", "mul", "div"];
-const OPN = { add: "たし算", sub: "ひき算", mul: "かけ算", div: "わり算" };
-const MAX = { add: 11, sub: 12, mul: 8, div: 10 };
-const SIGN = { add: "+", sub: "−", mul: "×", div: "÷" };
+const OPS = ["add", "sub", "mul", "div"];   // 山本塾の4種目（11/17）
+// 11/24 朝3（パパ）: 計算の論点を4本ずつ回す。クリアした論点は消え、ORDER の次の論点が入る（ひき算・かけ算はクリア済みで外した）。
+// ORDER＝娘の落ち方と大目的（組分けの大問1）で並べた順。新しい論点は計算くらぶ「計算力の土台」の形で端末が作る
+const ORDER = ["add", "div", "fmd", "finv", "mixas", "d2f"];
+const ACTIVE_N = 4;
+const TRACKS = OPS.concat(["fmd", "finv", "mixas", "d2f"]);
+const OPN = { add: "たし算", sub: "ひき算", mul: "かけ算", div: "わり算", fmd: "分数のかけ・わり算", finv: "分数の逆算", mixas: "帯分数のたし・ひき算", d2f: "小数から分数" };
+const MAX = { add: 11, sub: 12, mul: 8, div: 10, fmd: 3, finv: 3, mixas: 3, d2f: 3 };
+const SIGN = { add: "+", sub: "−", mul: "×", div: "÷", fmd: "分×", finv: "□", mixas: "帯", d2f: "小分" };
+const FR = { fmd: 1, finv: 1, mixas: 1, d2f: 1 };   // 分数で答える論点
 const SET_N = 5;   // 1セット5問・5問とも最初の入力で正解なら次のレベル（11/17 夕5 パパ。診断は別）
 const T_ANS = "計算しなさい。", T_TOP = "上のくらいから計算して、答えを入れなさい。";
 const T_A2 = "10のくらいだけをたして、1のくらいだけをたしてから、答えをもとめなさい。";
@@ -115,13 +127,101 @@ const LV = {
     { f: "qr", t: T_R, e: "325 ÷ 3 = 108 あまり 1" },
     { f: "qr", t: T_R, e: "3568 ÷ 3 = 1189 あまり 1" },
     { f: "qr", t: T_R, e: "3568 ÷ 30 = 118 あまり 28" }],
+  fmd: [null,
+    { f: "fr", t: "計算しなさい。答えは約分しきった形で（仮分数は帯分数に）。", e: "18/25 × 20/27 = 8/15" },
+    { f: "fr", t: "計算しなさい。答えは約分しきった形で（仮分数は帯分数に）。", e: "7/18 ÷ 14/27 = 3/4" },
+    { f: "fr", t: "計算しなさい。答えは約分しきった形で（仮分数は帯分数に）。", e: "13/14 ÷ 39/56 = 1と1/3" }],
+  finv: [null,
+    { f: "fr", t: "□にあてはまる数を求めなさい。", e: "5/12 + □ = 3/4 → □ = 1/3" },
+    { f: "fr", t: "□にあてはまる数を求めなさい。", e: "7/8 ÷ □ = 5/12 → □ = 2と1/10" },
+    { f: "fr", t: "□にあてはまる数を求めなさい。", e: "3/5 − □ = 1/10 → □ = 1/2" }],
+  mixas: [null,
+    { f: "fr", t: "計算しなさい。答えは約分しきった形で。", e: "1と1/2 + 1と1/3 = 2と5/6" },
+    { f: "fr", t: "計算しなさい。答えは約分しきった形で。", e: "2と5/6 − 1と3/4 = 1と1/12" },
+    { f: "fr", t: "計算しなさい。答えは約分しきった形で。", e: "3と1/2 − 1と5/6 = 1と2/3" }],
+  d2f: [null,
+    { f: "fr", t: "分数に直しなさい。約分しきった形で。", e: "0.25 → 1/4" },
+    { f: "fr", t: "分数に直しなさい。約分しきった形で。", e: "0.375 → 3/8" },
+    { f: "fr", t: "分数に直しなさい。約分しきった形で（整数のあるときは帯分数）。", e: "2.375 → 2と3/8" }],
 };
+// 分数（11/24）。[分子, 分母] で持つ。答えの箱は [整数, 分子, 分母]（整数が無いときは 0＝空のまま）
+function gcd(a, b) { while (b) [a, b] = [b, a % b]; return a; }
+function lcm(a, b) { return a / gcd(a, b) * b; }
+function red(n, d) { const g = gcd(n, d); return [n / g, d / g]; }
+function fadd(x, y) { return red(x[0] * y[1] + y[0] * x[1], x[1] * y[1]); }
+function fsub(x, y) { return red(x[0] * y[1] - y[0] * x[1], x[1] * y[1]); }
+function fmul(x, y) { return red(x[0] * y[0], x[1] * y[1]); }
+function fdiv(x, y) { return red(x[0] * y[1], x[1] * y[0]); }
+function mixed(x) { return [Math.floor(x[0] / x[1]), x[0] % x[1], x[1]]; }
+function ftxt(x) { const m = mixed(x); return m[1] === 0 ? String(m[0]) : (m[0] ? `${m[0]}と${m[1]}/${m[2]}` : `${m[1]}/${m[2]}`); }
+function fhtml(x) { const m = mixed(x); return `${m[0] ? m[0] : ""}<span class="fr"><span>${m[1]}</span><span>${m[2]}</span></span>`; }
+const FDEN = [2, 3, 4, 5, 6, 8, 9, 10, 12, 15, 16, 18, 20, 24, 25];
+function rfrac(rng, dens) { for (;;) { const d = pick(rng, dens || FDEN), n = ri(rng, 1, d - 1); if (gcd(n, d) === 1) return [n, d]; } }
+function okAns(x, maxD) { return x[0] > 0 && x[0] % x[1] !== 0 && x[1] <= (maxD || 99); }
+function genFr(op, lv, rng) {
+  const fr = (q, qh, x) => ({ op, lv, f: "fr", q, qh, b: mixed(x), mid: null });
+  if (op === "fmd") {   // 土台15: 真分数どうしの × ÷。たすきに約分が2か所ある形
+    for (;;) {
+      const div = lv === 1 ? false : lv === 2 ? true : rng() < 0.5;
+      const p = ri(rng, 1, 9), q = ri(rng, 1, 9), r = ri(rng, 1, 9), t = ri(rng, 1, 9), g1 = ri(rng, 2, 9), g2 = ri(rng, 2, 9);
+      let a, b, c, d;
+      if (!div) { a = p * g1; b = q * g2; c = r * g2; d = t * g1; } else { a = p * g1; c = r * g1; b = q * g2; d = t * g2; }
+      if (!(a < b && c < d && gcd(a, b) === 1 && gcd(c, d) === 1 && b <= 99 && d <= 99 && b >= 5 && d >= 5)) continue;
+      const x = div ? fdiv([a, b], [c, d]) : fmul([a, b], [c, d]);
+      if (!okAns(x, 60)) continue;
+      const sg = div ? "÷" : "×";
+      return fr(`${a}/${b} ${sg} ${c}/${d}`, `${fhtml([a, b])} ${sg} ${fhtml([c, d])} =`, x);
+    }
+  }
+  if (op === "finv") {   // 土台16: □が1つ・計算が1つ。L1 たし・ひき、L2 かけ・わり、L3 まぜる
+    const ADD = ["a+x", "x+a", "x-a", "a-x"], MUL = ["x*a", "a*x", "x/a", "a/x"];
+    for (;;) {
+      const form = pick(rng, lv === 1 ? ADD : lv === 2 ? MUL : ADD.concat(MUL));
+      let A, B, X;
+      if (form === "a+x" || form === "x+a") { X = rfrac(rng); A = rfrac(rng); B = fadd(A, X); }
+      else if (form === "x-a") { B = rfrac(rng); A = rfrac(rng); X = fadd(B, A); }
+      else if (form === "a-x") { X = rfrac(rng); B = rfrac(rng); A = fadd(X, B); }
+      else if (form === "x*a" || form === "a*x") { X = rfrac(rng); A = rfrac(rng); B = fmul(A, X); }
+      else if (form === "x/a") { B = rfrac(rng); A = rfrac(rng); X = fmul(B, A); }
+      else { X = rfrac(rng); B = rfrac(rng); A = fmul(X, B); }
+      if (!(A[0] < A[1] && B[0] < B[1] && A[1] <= 36 && B[1] <= 36 && okAns(X, 36) && X[0] / X[1] < 4)) continue;
+      const sg = { "+": "＋", "-": "−", "*": "×", "/": "÷" }[form[1]], qa = fhtml(A), sq = `<span class="sq">□</span>`;
+      const left = form[0] === "a" ? `${qa} ${sg} ${sq}` : `${sq} ${sg} ${qa}`;
+      const tl = form[0] === "a" ? `${ftxt(A)} ${sg} □` : `□ ${sg} ${ftxt(A)}`;
+      return fr(`${tl} = ${ftxt(B)}`, `${left} = ${fhtml(B)}<br>□ =`, X);
+    }
+  }
+  if (op === "mixas") {   // 土台14: 帯分数 ± 帯分数（整数 1〜3）。ひき算は くり下がりのある問も出る
+    const D = [2, 3, 4, 5, 6, 8, 9, 10, 12, 15, 18];
+    for (;;) {
+      const sub = lv === 1 ? false : lv === 2 ? true : rng() < 0.6;
+      const f1 = rfrac(rng, D), f2 = rfrac(rng, D), w1 = ri(rng, 1, 3), w2 = ri(rng, 1, 3);
+      if (lcm(f1[1], f2[1]) > 36) continue;
+      const A = red(w1 * f1[1] + f1[0], f1[1]), B = red(w2 * f2[1] + f2[0], f2[1]);
+      if (sub && A[0] * B[1] <= B[0] * A[1]) continue;
+      const x = sub ? fsub(A, B) : fadd(A, B);
+      if (!okAns(x)) continue;
+      const sg = sub ? "−" : "＋";
+      return fr(`${ftxt(A)} ${sg} ${ftxt(B)}`, `${fhtml(A)} ${sg} ${fhtml(B)} =`, x);
+    }
+  }
+  // d2f 土台08: 小数を分数に。L1 0.5・0.25 の仲間、L2 0.125・0.05 の仲間、L3 整数つき
+  const P1 = ["5", "25", "75", "2", "4", "6", "8"], P2 = ["125", "375", "625", "875", "05", "15", "35", "45", "55", "65", "85", "95", "04", "08", "12", "16", "24", "36"];
+  for (;;) {
+    const fp = pick(rng, lv === 1 ? P1 : lv === 2 ? P2 : P1.concat(P2)), w = lv === 3 ? ri(rng, 1, 4) : 0;
+    const den = Math.pow(10, fp.length), x = red(w * den + parseInt(fp, 10), den);
+    if (!okAns(x)) continue;
+    const dec = `${w}.${fp}`;
+    return fr(`${dec} → 分数`, `${dec} を分数に<br>`, x);
+  }
+}
 function ri(rng, a, b) { return a + Math.floor(rng() * (b - a + 1)); }
 function pick(rng, arr) { return arr[Math.floor(rng() * arr.length)]; }
 function tens(n) { return Math.floor(n / 10); }
 // 1問を作る。返り: {op, lv, f, q（式）, b（箱の正解の列）, mid（3箱の正解。分解が無ければ null）}
 function gen(op, lv, rng) {
   rng = rng || Math.random;
+  if (FR[op]) return genFr(op, lv, rng);
   const f = LV[op][lv].f;
   let a, b, x, mid = null, q;
   const out = bx => ({ op, lv, f, q, b: bx, mid });
@@ -201,7 +301,7 @@ function gen(op, lv, rng) {
 // 診断で出す形: 答えだけで分解がある段は3箱で出す
 function diagForm(p) { return (p.f === "ans" && p.mid) ? Object.assign({}, p, { f: "mid", b: p.mid }) : p; }
 function newState() {
-  return { v: 1, phase: "new", cur: { add: 1, sub: 1, mul: 1, div: 1 }, last: { add: null, sub: null, mul: null, div: null },
+  return { v: 1, phase: "new", cur: { add: 1, sub: 1, mul: 1, div: 1 }, last: { add: null, sub: null, mul: null, div: null }, dops: ["add", "div"],
            opi: 0, diag: { opi: 0, lv: 1, miss: 0 }, set: null, streak: 0, sets: 0, p: null };
 }
 function dops(S) { return (S.dops && S.dops.length) ? S.dops : OPS; }   // しらべ直すときは一部の種目だけ
@@ -226,8 +326,11 @@ function ensure(S) {
   if (!S.fail) S.fail = { add: 0, sub: 0, mul: 0, div: 0 };
   if (!S.cleared) S.cleared = {};
   if (!S.note) S.note = {};
+  for (const o of TRACKS) { if (S.cur[o] == null) S.cur[o] = 1; if (S.lap[o] == null) S.lap[o] = 0; if (S.fail[o] == null) S.fail[o] = 0; if (!(o in S.last)) S.last[o] = null; }
   return S;
 }
+// いま回す論点（ORDER の順にクリアしていない先頭から ACTIVE_N 本）
+function active(S) { ensure(S); return ORDER.filter(o => !S.cleared[o]).slice(0, ACTIVE_N); }
 function nextLv(op, lv) { let l = lv + 1; while (l < MAX[op] && LV[op][l].f === "part") l++; return Math.min(l, MAX[op]); }
 function prevLv(op, lv) { let l = lv - 1; while (l > 1 && LV[op][l].f === "part") l--; return Math.max(l, 1); }
 // 落とす先: 3箱の段からは1つ前の3箱の段（小さい数で分け方を固め直す。無ければ1つ前の段）。ほかは1つ前の段
@@ -235,13 +338,13 @@ function dropLv(op, lv) {
   if (LV[op][lv].f === "mid") for (let l = lv - 1; l >= 1; l--) if (LV[op][l].f === "mid") return l;
   return prevLv(op, lv);
 }
-function allCleared(S) { return OPS.every(o => S.cleared[o]); }
+function allCleared(S) { return active(S).length === 0; }
 // セットを始める（クリアした種目は飛ばす）。全部クリアなら phase を grad にして set は作らない
 function startSet(S) {
   ensure(S);
   if (allCleared(S)) { S.phase = "grad"; S.set = null; return S; }
-  while (S.cleared[OPS[S.opi]]) S.opi = (S.opi + 1) % OPS.length;
-  const op = OPS[S.opi];
+  const act = active(S);
+  const op = act[(S.opi || 0) % act.length];
   while (LV[op][S.cur[op]].f === "part") S.cur[op]++;   // 部品の段（1のくらいだけ等）は出さない。番号は本のまま飛ばす（11/17 パパ）
   S.set = { op, lv: S.cur[op], i: 0, ok: 0, note: S.note[op] || "", marks: [] };
   S.note[op] = "";
@@ -265,7 +368,9 @@ function endSet(S) {
     }
   }
   S.last[op] = st.ok; S.res = res;
-  S.opi = (S.opi + 1) % OPS.length; S.set = null; S.sets++;
+  const act = active(S), before = ORDER.filter(o => !S.cleared[o] || o === op).slice(0, ACTIVE_N).indexOf(op);
+  S.added = res === "clear" ? (act.length >= ACTIVE_N ? act[ACTIVE_N - 1] : "") : "";
+  S.opi = act.length ? ((res === "clear" ? before : before + 1) % act.length) : 0; S.set = null; S.sets++;
   if (allCleared(S)) S.phase = "grad";
   return S;
 }
@@ -338,7 +443,7 @@ if (R && S.r !== R) {
   S.r = R;
   for (const kv of (params.get("cur") || "").split(",")) {   // cur=div:6,mul:6 ＝その種目の現在地を置き直す（印が変わったとき1回だけ）
     const [o, v] = kv.split(":"), n = parseInt(v, 10);
-    if (OPS.includes(o) && n >= 1 && n <= MAX[o] && S.phase !== "new") { S.cur[o] = n; S.last[o] = null; ensure(S); S.fail[o] = 0; S.cleared[o] = false; S.note[o] = ""; if (S.set && S.set.op === o) { S.set = null; S.p = null; } }
+    if (TRACKS.includes(o) && n >= 1 && n <= MAX[o] && S.phase !== "new") { S.cur[o] = n; S.last[o] = null; ensure(S); S.fail[o] = 0; S.cleared[o] = false; S.note[o] = ""; if (S.set && S.set.op === o) { S.set = null; S.p = null; } }
   }
   if (S.phase !== "new" && RD.length) { S.phase = "diag"; S.dops = RD; S.diag = { opi: 0, lv: 1, miss: 0 }; S.set = null; S.p = null; RD.forEach(o => { S.last[o] = null; }); }
   save();
@@ -350,13 +455,14 @@ const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "
 const LAPC = ["#c9c6bf", "#2b5cb8", "#1f7a4d", "#e07a00", "#8b3fc7", "#d6336c", "#0f8f9c"];   // 0＝グレー、1周目から6色を回す
 function iconsHtml(nowOp) {
   ensure(S);
-  return `<div class="ops">${OPS.map(o => {
+  const list = active(S); if (nowOp && !list.includes(nowOp)) list.push(nowOp);
+  return `<div class="ops">${list.map(o => {
     const n = S.lap[o] || 0, col = S.cleared[o] ? "#d4a017" : LAPC[n ? 1 + (n - 1) % 6 : 0];
-    return `<span class="op${o === nowOp ? " now" : ""}${S.cleared[o] ? " clr" : ""}" style="background:${col}">${S.cleared[o] ? "★" : SIGN[o]}</span>`;
+    return `<span class="op${o === nowOp ? " now" : ""}${S.cleared[o] ? " clr" : ""}${SIGN[o].length > 1 ? " w" : ""}" style="background:${col}">${S.cleared[o] ? "★" : SIGN[o]}</span>`;
   }).join("")}</div>`;
 }
 function grad() {
-  $app.innerHTML = `<div class="center">${iconsHtml("")}<h1>ぜんぶクリア！</h1><p>たし算・ひき算・かけ算・わり算、さいごの段までできたよ。</p><p>そつぎょう、おめでとう。</p></div>`;
+  $app.innerHTML = `<div class="center">${iconsHtml("")}<h1>ぜんぶクリア！</h1><p>いまある論点は、さいごの段までできたよ。</p><p>そつぎょう、おめでとう。</p></div>`;
   fireworks();
 }
 function next() {
@@ -375,7 +481,7 @@ function next() {
   show();
 }
 function intro() {
-  $app.innerHTML = `<div class="center"><h1>あんざん</h1><p>上のくらいから計算する練習だよ。</p><p>さいしょに、いまの場所をしらべるね。</p><p>数字をおして「OK」。</p><button class="big" id="go">はじめる</button></div>`;
+  $app.innerHTML = `<div class="center"><h1>あんざん</h1><p>計算の練習だよ。</p><p>さいしょに、いまの場所をしらべるね。</p><p>数字をおして「OK」。</p><button class="big" id="go">はじめる</button></div>`;
   document.getElementById("go").onclick = () => { S.phase = "diag"; save(); next(); };
 }
 function show() {
@@ -390,6 +496,7 @@ function boxesHtml() {
     return `<span class="${cls}" data-i="${i}">${v}</span>`;
   };
   const f = P.f, j = P.op === "sub" ? "−" : "+";
+  if (f === "fr") return `<span class="t">${P.qh}</span> <span class="t">${b(0)}<span class="fr">${b(1)}${b(2)}</span></span>`;
   if (f === "mid") return `<span class="t">${esc(P.q)} =</span> <span class="t">${b(0)} ${j} ${b(1)}</span> <span class="t">= ${b(2)}</span>`;
   if (f === "qr") return `<span class="t">${esc(P.q)} =</span> <span class="t">${b(0)} あまり ${b(1)}</span>`;
   if (f === "part") return `<span class="t">${esc(P.q)} ⇒ ${b(0)}</span>`;
@@ -413,8 +520,8 @@ function render() {
     <div class="streak">${S.streak >= 2 ? `🔥 ${S.streak}問れんぞく正解` : ""}</div>
     <div class="main">
       <div class="inst${P.f === "part" ? " strong" : ""}">${esc(instD)}</div><div class="ex">（例）${esc(ex)}</div>
-      <div class="q${(P.f === "mid" || P.f === "qr") ? " s" : ""}">${boxesHtml()}</div>
-      <div class="msg ${msgCls}">${msg || (P.b.length > 1 && bi < P.b.length - 1 ? "入れたら「つぎ」で、となりの箱へ" : "")}</div>
+      <div class="q${(P.f === "mid" || P.f === "qr") ? " s" : P.f === "fr" ? " f" : ""}">${boxesHtml()}</div>
+      <div class="msg ${msgCls}">${msg || (P.f === "fr" ? ["整数があれば入れて「つぎ」。なければ空のまま「つぎ」", "分子を入れて「つぎ」", "分母を入れて「OK」"][bi] : P.b.length > 1 && bi < P.b.length - 1 ? "入れたら「つぎ」で、となりの箱へ" : "")}</div>
     </div>
     <div class="pad">${[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => `<button data-k="${n}">${n}</button>`).join("")}<button class="del" data-k="del">けす</button><button data-k="0">0</button><button class="okb" data-k="ok">${bi < P.b.length - 1 ? "つぎ ▶" : "OK"}</button></div>`;
 }
@@ -428,14 +535,14 @@ function key(k) {
 $app.addEventListener("click", e => {
   const b = e.target.closest("button[data-k]"); if (b) return key(b.dataset.k);
   const x = e.target.closest(".box[data-i]");   // 先の箱をタップ＝いまの箱を決定して進む（空なら案内だけ）
-  if (x && !lock && P && +x.dataset.i > bi) { if (buf !== "") submit(); else { msg = "さきに、青い箱に数字を入れてね"; msgCls = ""; render(); } }
+  if (x && !lock && P && +x.dataset.i > bi) { if (buf !== "" || (P.f === "fr" && bi === 0)) submit(); else { msg = "さきに、青い箱に数字を入れてね"; msgCls = ""; render(); } }
 });
 document.addEventListener("keydown", e => {
   if (/^[0-9]$/.test(e.key)) key(e.key); else if (e.key === "Backspace") key("del"); else if (e.key === "Enter") key("ok");
 });
 function submit() {
-  if (buf === "") return;
-  const v = parseInt(buf, 10), want = P.b[bi];
+  if (buf === "" && !(P.f === "fr" && bi === 0)) return;
+  const v = buf === "" ? 0 : parseInt(buf, 10), want = P.b[bi];
   if (mode === "first" && firstTry) firstIn += (firstIn ? "," : "") + v;
   if (v === want) {
     vals[bi] = v; bi++; buf = ""; hint = null; msg = ""; msgCls = "";
@@ -451,7 +558,11 @@ function submit() {
     msg = "ちがうよ。分けてやってみよう。"; msgCls = "ng";
     return render();
   }
-  hint = want; msg = `ここは ${want}。入れてすすもう。`; msgCls = "ng";
+  hint = want;
+  if (P.f === "fr") { const ans = P.b[1] ? (P.b[0] ? `${P.b[0]}と${P.b[1]}/${P.b[2]}` : `${P.b[1]}/${P.b[2]}`) : String(P.b[0]);
+    msg = `答えは ${ans}。` + (bi === 0 ? (want ? `整数は ${want}。` : "整数はなし（空のまま「つぎ」）。") : `ここは ${want}。`); }
+  else msg = `ここは ${want}。入れてすすもう。`;
+  msgCls = "ng";
   render();
 }
 function complete() {
@@ -469,7 +580,7 @@ function after() {
   S.streak = firstTry ? S.streak + 1 : 0;   // 調べ直しの問も数える（パパ 11/17 夜）
   if (kind === "diag") {
     diagStep(S, firstTry); save();
-    if (S.phase === "run") return banner("しらべおわり", "ここからスタート", OPS.map(o => `${OPN[o]} ${S.cur[o]}`).join("　"), 2600, next);
+    if (S.phase === "run") return banner("しらべおわり", "ここからスタート", active(S).map(o => `${OPN[o]} ${S.cur[o]}`).join("　"), 2600, next);
     return next();
   }
   const st = S.set;
@@ -479,7 +590,7 @@ function after() {
   const score = st.ok, name = `${OPN[st.op]} レベル${st.lv}`, op = st.op;
   endSet(S); save();
   fireworks();
-  if (S.res === "clear") return banner(`${OPN[op]} クリア！`, "さいごの段までできたよ。おめでとう！", S.phase === "grad" ? "" : "のこりの種目をつづけよう", 3600, next);
+  if (S.res === "clear") return banner(`${OPN[op]} クリア！`, "さいごの段までできたよ。おめでとう！", S.phase === "grad" ? "" : S.added ? `つぎの論点「${OPN[S.added]}」が入ったよ` : "のこりの論点をつづけよう", 3600, next);
   banner("できた！", `${name}　${SET_N}問中 ${score}問`, S.res === "up" ? "つぎは レベルアップ" : S.res === "down" ? "つぎは 前の段で かためよう" : "つぎも この段。5問ぜんぶ正解でレベルアップ", 2200, next);
 }
 function banner(a, b, c, ms, cb, nowOp) {
@@ -508,7 +619,7 @@ function oya() {   // パパ用（?oya=1）。この端末に残っている記�
   for (const r of all) { if (r.kind === "diag") continue; const k = `${OPN[r.op]} L${r.lv} ${r.f}`; const o = by[k] || (by[k] = { n: 0, ok: 0, ms: 0 }); o.n++; o.ok += r.ok; o.ms += r.ms; }
   const rows = Object.keys(by).sort().map(k => `<tr><td>${k}</td><td>${by[k].n}</td><td>${by[k].ok}</td><td>${(by[k].ms / by[k].n / 1000).toFixed(1)}</td></tr>`).join("");
   const tail = all.slice(-40).reverse().map(r => `<tr><td>${r.ts.slice(5, 16)}</td><td>${r.kind}</td><td>${OPN[r.op]}${r.lv}</td><td>${esc(r.q)}</td><td>${r.ok ? "○" : "×"} ${esc(r.a)}</td><td>${esc(r.c)}</td><td>${(r.ms / 1000).toFixed(1)}</td></tr>`).join("");
-  $app.innerHTML = `<div class="oya"><p><b>現在地</b>（${S.phase}・${S.sets}セット済）: ${OPS.map(o => `${OPN[o]} ${S.cur[o]}`).join("／")}　送り待ち ${ls.get(QKEY, []).length}行</p>
+  $app.innerHTML = `<div class="oya"><p><b>現在地</b>（${S.phase}・${S.sets}セット済）: ${active(S).map(o => `${OPN[o]} ${S.cur[o]}`).join("／")}（クリア ${Object.keys(S.cleared).filter(o => S.cleared[o]).map(o => OPN[o]).join("・") || "なし"}）　送り待ち ${ls.get(QKEY, []).length}行</p>
     <table><tr><th>レベル・形</th><th>問</th><th>○</th><th>平均秒</th></tr>${rows}</table><p><b>新しい40問</b></p>
     <table><tr><th>時刻</th><th>種類</th><th>段</th><th>式</th><th>入力</th><th>正解</th><th>秒</th></tr>${tail}</table>
     <p><button id="rs">診断からやり直す（2回おす）</button></p></div>`;
