@@ -66,13 +66,13 @@ table{border-collapse:collapse;font-size:13px;width:100%} td,th{border:1px solid
 const OPS = ["add", "sub", "mul", "div"];   // 山本塾の4種目（11/17）
 // 11/24 朝3（パパ）: 計算の論点を4本ずつ回す。クリアした論点は消え、ORDER の次の論点が入る（ひき算・かけ算はクリア済みで外した）。
 // ORDER＝娘の落ち方と大目的（組分けの大問1）で並べた順。新しい論点は計算くらぶ「計算力の土台」の形で端末が作る
-const ORDER = ["add", "div", "fmd", "finv", "mixas", "d2f"];
+const ORDER = ["add", "div", "fmd", "finv", "dsx", "mixas"];   // dsx＝÷小数（組分け06 大問1 の型。土台08 の小数→分数を1段目に含む）
 const ACTIVE_N = 4;
-const TRACKS = OPS.concat(["fmd", "finv", "mixas", "d2f"]);
-const OPN = { add: "たし算", sub: "ひき算", mul: "かけ算", div: "わり算", fmd: "分数のかけ・わり算", finv: "分数の逆算", mixas: "帯分数のたし・ひき算", d2f: "小数から分数" };
-const MAX = { add: 11, sub: 12, mul: 8, div: 10, fmd: 3, finv: 3, mixas: 3, d2f: 3 };
-const SIGN = { add: "+", sub: "−", mul: "×", div: "÷", fmd: "分×", finv: "□", mixas: "帯", d2f: "小分" };
-const FR = { fmd: 1, finv: 1, mixas: 1, d2f: 1 };   // 分数で答える論点
+const TRACKS = OPS.concat(["fmd", "finv", "dsx", "mixas", "d2f"]);
+const OPN = { add: "たし算", sub: "ひき算", mul: "かけ算", div: "わり算", fmd: "分数のかけ・わり算", finv: "分数の逆算", mixas: "帯分数のたし・ひき算", d2f: "小数から分数", dsx: "小数と分数のかけ・わり算" };
+const MAX = { add: 11, sub: 12, mul: 8, div: 10, fmd: 3, finv: 3, mixas: 3, d2f: 3, dsx: 3 };
+const SIGN = { add: "+", sub: "−", mul: "×", div: "÷", fmd: "分×", finv: "□", mixas: "帯", d2f: "小分", dsx: "÷小" };
+const FR = { fmd: 1, finv: 1, mixas: 1, d2f: 1, dsx: 1 };   // 分数で答える論点
 const SET_N = 5;   // 1セット5問・5問とも最初の入力で正解なら次のレベル（11/17 夕5 パパ。診断は別）
 const T_ANS = "計算しなさい。", T_TOP = "上のくらいから計算して、答えを入れなさい。";
 const T_A2 = "10のくらいだけをたして、1のくらいだけをたしてから、答えをもとめなさい。";
@@ -143,6 +143,10 @@ const LV = {
     { f: "fr", t: "分数に直しなさい。約分しきった形で。", e: "0.25 → 1/4" },
     { f: "fr", t: "分数に直しなさい。約分しきった形で。", e: "0.375 → 3/8" },
     { f: "fr", t: "分数に直しなさい。約分しきった形で（整数のあるときは帯分数）。", e: "2.375 → 2と3/8" }],
+  dsx: [null,
+    { f: "fr", t: "分数に直しなさい。約分しきった形で。", e: "0.375 → 3/8" },
+    { f: "fr", t: "計算しなさい。答えは約分しきった形で（仮分数は帯分数に）。", e: "3/4 ÷ 0.375 = 2" },
+    { f: "fr", t: "計算しなさい。答えは約分しきった形で（仮分数は帯分数に）。", e: "1.25 × 4/15 = 1/3" }],
 };
 // 分数（11/24）。[分子, 分母] で持つ。答えの箱は [整数, 分子, 分母]（整数が無いときは 0＝空のまま）
 function gcd(a, b) { while (b) [a, b] = [b, a % b]; return a; }
@@ -203,6 +207,23 @@ function genFr(op, lv, rng) {
       if (!okAns(x)) continue;
       const sg = sub ? "−" : "＋";
       return fr(`${ftxt(A)} ${sg} ${ftxt(B)}`, `${fhtml(A)} ${sg} ${fhtml(B)} =`, x);
+    }
+  }
+  if (op === "dsx") {   // ÷小数: 小数を分数に直して計算（L1 直すだけ、L2 分数 ÷ 小数・分数 × 小数、L3 整数つきの小数もまぜる）
+    const D1 = ["2", "4", "6", "8", "5", "25", "75", "125", "375", "625", "875", "05", "15", "35", "45", "55", "85"];
+    for (;;) {
+      const fp = pick(rng, D1), w = lv === 3 ? ri(rng, 0, 2) : lv === 1 ? (rng() < 0.3 ? 1 : 0) : 0;
+      const den = Math.pow(10, fp.length), dv = red(w * den + parseInt(fp, 10), den), dec = `${w}.${fp}`;
+      if (lv === 1) { if (!okAns(dv)) continue; return fr(`${dec} → 分数`, `${dec} を分数に<br>`, dv); }
+      const a = rfrac(rng, [2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 18, 20, 21, 24, 25, 27]);
+      const kind = lv === 2 ? pick(rng, ["d", "d", "m"]) : pick(rng, ["d", "m", "m2"]);
+      let x, q, qh;
+      if (kind === "d") { x = fdiv(a, dv); q = `${ftxt(a)} ÷ ${dec}`; qh = `${fhtml(a)} ÷ ${dec} =`; }
+      else if (kind === "m") { x = fmul(a, dv); q = `${ftxt(a)} × ${dec}`; qh = `${fhtml(a)} × ${dec} =`; }
+      else { x = fmul(dv, a); q = `${dec} × ${ftxt(a)}`; qh = `${dec} × ${fhtml(a)} =`; }
+      const gc = kind === "d" ? gcd(a[0], dv[0]) * gcd(a[1], dv[1]) : gcd(a[0], dv[1]) * gcd(a[1], dv[0]);
+      if (gc < 2 || !okAns(x, 60) || x[0] / x[1] > 9) continue;   // 約分が1つはある問だけ
+      return fr(q, qh, x);
     }
   }
   // d2f 土台08: 小数を分数に。L1 0.5・0.25 の仲間、L2 0.125・0.05 の仲間、L3 整数つき
@@ -559,8 +580,11 @@ function submit() {
     return render();
   }
   hint = want;
-  if (P.f === "fr") { const ans = P.b[1] ? (P.b[0] ? `${P.b[0]}と${P.b[1]}/${P.b[2]}` : `${P.b[1]}/${P.b[2]}`) : String(P.b[0]);
-    msg = `答えは ${ans}。` + (bi === 0 ? (want ? `整数は ${want}。` : "整数はなし（空のまま「つぎ」）。") : `ここは ${want}。`); }
+  if (P.f === "fr") {   // 11/24（W219）: 1回目は数を見せずにヒント、2回目に数を見せる。どちらも本人が入れて進む
+    P.miss = P.miss || [0, 0, 0]; const n = ++P.miss[bi];
+    if (n === 1) msg = bi === 0 ? (want ? "整数の部分がちがうよ。仮分数のままになっていない？" : "整数はないよ。空のまま「つぎ」") : `${bi === 1 ? "分子" : "分母"}がちがうよ。約分しきった？ もう一度。`;
+    else msg = bi === 0 ? (want ? `整数は ${want}。入れてすすもう。` : "整数はなし。空のまま「つぎ」") : `ここは ${want}。入れてすすもう。`;
+  }
   else msg = `ここは ${want}。入れてすすもう。`;
   msgCls = "ng";
   render();
